@@ -71,7 +71,7 @@ public class PlayerProfile : PlayerProfileEntity
 
 #if DEBUG
         _logger.LogDebug("[{ClassName}] {MethodName} -> GetPlayerProfile -> [{ConnType}] Loaded player {PlayerName} ({SteamID}) with ID {ProfileID}.",
-            nameof(PlayerProfile), methodName, Config.API.GetApiOnly() ? "API" : "DB", this.Name, this.SteamID, this.ID
+            nameof(PlayerProfile), methodName, Config.Api.GetApiOnly() ? "API" : "DB", this.Name, this.SteamID, this.ID
         );
 #endif
     }
@@ -93,7 +93,7 @@ public class PlayerProfile : PlayerProfileEntity
 
 #if DEBUG
         _logger.LogDebug("[{ClassName}] {MethodName} -> InsertPlayerProfile -> [{ConnType}] New player {PlayerName} ({SteamID}) added with ID {ProfileID}.",
-            nameof(PlayerProfile), methodName, Config.API.GetApiOnly() ? "API" : "DB", this.Name, this.SteamID, this.ID
+            nameof(PlayerProfile), methodName, Config.Api.GetApiOnly() ? "API" : "DB", this.Name, this.SteamID, this.ID
         );
 #endif
     }
@@ -116,7 +116,7 @@ public class PlayerProfile : PlayerProfileEntity
 
 #if DEBUG
         _logger.LogDebug("[{ClassName}] {MethodName} -> UpdatePlayerProfile -> [{ConnType}] Updated player {PlayerName} ({SteamID}) with ID {ProfileID}.",
-            nameof(PlayerProfile), methodName, Config.API.GetApiOnly() ? "API" : "DB", this.Name, this.SteamID, this.ID
+            nameof(PlayerProfile), methodName, Config.Api.GetApiOnly() ? "API" : "DB", this.Name, this.SteamID, this.ID
         );
 #endif
     }

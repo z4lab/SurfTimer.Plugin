@@ -249,7 +249,7 @@ public partial class SurfTimer
 
 #if DEBUG
             Console.WriteLine($"============== Initial entity value: {Regex.Match(trigger.Entity.Name, "[0-9][0-9]?").Value} | Assigned to `stage`: {stage} | player.Timer.Checkpoint: {stage - 1}");
-            Console.WriteLine($"CS2 Surf DEBUG >> CBaseTrigger_StartTouchFunc (Stage start zones) -> player.Stats.PB[{pStyle}].Checkpoint.Count = {player.Stats.PB[pStyle].Checkpoints.Count}");
+            Console.WriteLine($"CS2 Surf DEBUG >> CBaseTrigger_StartTouchFunc (Stage start zones) -> player.Stats.PB[{player.Timer.Style}].Checkpoint.Count = {player.Stats.PB[player.Timer.Style].Checkpoints.Count}");
 #endif
 
             // Print checkpoint message

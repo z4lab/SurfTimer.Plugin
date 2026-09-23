@@ -369,7 +369,7 @@ public class Map : MapEntity
 
 #if DEBUG
         _logger.LogDebug("[{ClassName}] {MethodName} -> Finished LoadMapRecordRuns in {Elapsed}ms | API = {API}",
-            nameof(Map), methodName, stopwatch.ElapsedMilliseconds, Config.API.GetApiOnly());
+            nameof(Map), methodName, stopwatch.ElapsedMilliseconds, Config.Api.GetApiOnly());
 #endif
     }
 
@@ -449,7 +449,7 @@ public class Map : MapEntity
             {
 #if DEBUG
                 _logger.LogDebug("[{ClassName}] {MethodName} -> LoadMapRecordRuns : Map -> [{DBorAPI}] Loaded {MapCompletions} runs (MapID {MapID} | Style {Style}). WR by {PlayerName} - {Time}",
-                    nameof(Map), methodName, Config.API.GetApiOnly() ? "API" : "DB", this.MapCompletions[style], this.ID, style, this.WR[style].Name, PlayerHUD.FormatTime(this.WR[style].RunTime)
+                    nameof(Map), methodName, Config.Api.GetApiOnly() ? "API" : "DB", this.MapCompletions[style], this.ID, style, this.WR[style].Name, PlayerHud.FormatTime(this.WR[style].RunTime)
                 );
 #endif
 
@@ -526,7 +526,7 @@ public class Map : MapEntity
                     break;
 #if DEBUG
                 _logger.LogDebug("[{ClassName}] {MethodName} -> SetReplayData -> [BonusWR] Adding run {ID} {Time} (Ticks = {Ticks}; Frames = {Frames}) to `ReplayManager.AllBonusWR`",
-                    nameof(Map), methodName, this.BonusWR[stage][style].ID, PlayerHUD.FormatTime(this.BonusWR[stage][style].RunTime), this.BonusWR[stage][style].RunTime, frames.Count
+                    nameof(Map), methodName, this.BonusWR[stage][style].ID, PlayerHud.FormatTime(this.BonusWR[stage][style].RunTime), this.BonusWR[stage][style].RunTime, frames.Count
                 );
 #endif
 
@@ -576,7 +576,7 @@ public class Map : MapEntity
                     break;
 #if DEBUG
                 _logger.LogDebug("[{ClassName}] {MethodName} -> SetReplayData -> [StageWR] Adding run {ID} {Time} (Ticks = {Ticks}; Frames = {Frames}) to `ReplayManager.AllStageWR`",
-                    nameof(Map), methodName, this.StageWR[stage][style].ID, PlayerHUD.FormatTime(this.StageWR[stage][style].RunTime), this.StageWR[stage][style].RunTime, frames.Count
+                    nameof(Map), methodName, this.StageWR[stage][style].ID, PlayerHud.FormatTime(this.StageWR[stage][style].RunTime), this.StageWR[stage][style].RunTime, frames.Count
                 );
 #endif
 

@@ -141,6 +141,7 @@ public class CurrentRun : RunStatsEntity
     internal static async Task SaveStageTime(Player player, short stage = -1, int stage_run_time = -1, bool saveLastStage = false)
     {
 #if DEBUG
+        var _logger = SurfTimer.ServiceProvider.GetRequiredService<ILogger<CurrentRun>>();
         _logger.LogTrace("[{Class}] -> SaveStageTime received: Name = {Name} | Stage = {Stage} | RunTime = {RunTime} | IsLastStage = {IsLastStage}",
             nameof(CurrentRun), player.Profile.Name, stage, stage_run_time, saveLastStage
         );
