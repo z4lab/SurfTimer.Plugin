@@ -27,6 +27,7 @@ public partial class SurfTimer
 			int replaybot_count = 1 +
 								(CurrentMap.ReplayManager.StageWR != null ? 1 : 0) +
 								(CurrentMap.ReplayManager.BonusWR != null ? 1 : 0) +
+								(CurrentMap.ReplayManager.CheckpointWR != null ? 1 : 0) +
 								CurrentMap.ReplayManager.CustomReplays.Count;
 
 			if (cbq != replaybot_count)
@@ -38,6 +39,7 @@ public partial class SurfTimer
 		CurrentMap.ReplayManager.MapWR.Tick();
 		CurrentMap.ReplayManager.StageWR?.Tick();
 		CurrentMap.ReplayManager.BonusWR?.Tick();
+		CurrentMap.ReplayManager.CheckpointWR?.Tick();
 
 		if (CurrentMap.ReplayManager.MapWR.MapTimeID != -1)
 		{
@@ -75,6 +77,23 @@ public partial class SurfTimer
 			CurrentMap.ReplayManager.BonusWR.LoadReplayData(repeat_count: 3);
 			CurrentMap.ReplayManager.BonusWR.FormatBotName();
 			CurrentMap.ReplayManager.BonusWR.Start();
+		}
+
+		// Here we will load the NEXT checkpoint segment replay from AllCheckpointWR
+		if (CurrentMap.ReplayManager.CheckpointWR?.RepeatCount == 0)
+		{
+			int next_checkpoint;
+			if (CurrentMap.ReplayManager.AllCheckpointWR[(CurrentMap.ReplayManager.CheckpointWR.Stage % CurrentMap.TotalCheckpoints) + 1][0].MapTimeID == -1)
+				next_checkpoint = 1;
+			else
+				next_checkpoint = (CurrentMap.ReplayManager.CheckpointWR.Stage % CurrentMap.TotalCheckpoints) + 1;
+
+			CurrentMap.ReplayManager.AllCheckpointWR[next_checkpoint][0].Controller = CurrentMap.ReplayManager.CheckpointWR.Controller;
+
+			CurrentMap.ReplayManager.CheckpointWR = CurrentMap.ReplayManager.AllCheckpointWR[next_checkpoint][0];
+			CurrentMap.ReplayManager.CheckpointWR.LoadReplayData(repeat_count: 3);
+			CurrentMap.ReplayManager.CheckpointWR.FormatBotName();
+			CurrentMap.ReplayManager.CheckpointWR.Start();
 		}
 
 		for (int i = 0; i < CurrentMap.ReplayManager.CustomReplays.Count; i++)

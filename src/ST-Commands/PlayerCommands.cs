@@ -38,7 +38,8 @@ public partial class SurfTimer
 			return;
 		}
 
-		playerList[player.UserId ?? 0].Timer.Reset();
+		oPlayer.Timer.Reset();
+		oPlayer.Stats.ThisRun.Checkpoints.Clear();
 		if (!CurrentMap.StartZone.IsZero())
 			Server.NextFrame(() =>
 			{
@@ -127,7 +128,8 @@ public partial class SurfTimer
 			return;
 		}
 
-		if (!CurrentMap.StageStartZone[stage].IsZero())
+		bool zoneExists = stage == 1 ? !CurrentMap.StartZone.IsZero() : !CurrentMap.StageStartZone[stage].IsZero();
+		if (zoneExists)
 		{
 			playerList[player.UserId ?? 0].Timer.Reset();
 

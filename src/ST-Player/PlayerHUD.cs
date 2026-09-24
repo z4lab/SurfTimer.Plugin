@@ -644,4 +644,70 @@ public class PlayerHud
 		);
 #endif
 	}
+
+	/// <summary>
+	/// Displays a Stage completion comparison message in player chat (staged maps only).
+	/// Compares against the standalone Stage PB/WR records, not the generic per-run Checkpoint splits.
+	/// Only calculates if a record exists yet, otherwise it will display N/A.
+	/// </summary>
+	/// <param name="stage">Stage that was just completed</param>
+	/// <param name="stageRunTime">Ticks it took to complete the stage</param>
+	/// <param name="exitVelocity">Player's velocity at the moment the stage was completed</param>
+	internal void DisplayStageMessage(short stage, int stageRunTime, VectorT exitVelocity)
+	{
+		int style = _player.Timer.Style;
+		float exitSpeed = exitVelocity.velMag();
+
+		string strPbDifference =
+			$"{ChatColors.Grey}N/A{ChatColors.Default} ({ChatColors.Grey}N/A{ChatColors.Default})";
+		string strWrDifference =
+			$"{ChatColors.Grey}N/A{ChatColors.Default} ({ChatColors.Grey}N/A{ChatColors.Default})";
+
+		PersonalBest stagePb = _player.Stats.StagePB[stage][style];
+		if (stagePb.ID != -1)
+		{
+			int pbTime = stagePb.RunTime;
+			float pbSpeed = (float)
+				Math.Sqrt(stagePb.EndVelX * stagePb.EndVelX + stagePb.EndVelY * stagePb.EndVelY + stagePb.EndVelZ * stagePb.EndVelZ);
+
+			strPbDifference = string.Empty;
+			if (pbTime - stageRunTime < 0.0)
+				strPbDifference += ChatColors.Red + "+" + FormatTime((pbTime - stageRunTime) * -1);
+			else
+				strPbDifference += ChatColors.Green + "-" + FormatTime(pbTime - stageRunTime);
+			strPbDifference += ChatColors.Default + " ";
+
+			if (pbSpeed - exitSpeed <= 0.0)
+				strPbDifference += "(" + ChatColors.Green + "+" + ((pbSpeed - exitSpeed) * -1).ToString("0");
+			else
+				strPbDifference += "(" + ChatColors.Red + "-" + (pbSpeed - exitSpeed).ToString("0");
+			strPbDifference += ChatColors.Default + ")";
+		}
+
+		PersonalBest stageWr = SurfTimer.CurrentMap.StageWR[stage][style];
+		if (stageWr.ID != -1)
+		{
+			int wrTime = stageWr.RunTime;
+			float wrSpeed = (float)
+				Math.Sqrt(stageWr.EndVelX * stageWr.EndVelX + stageWr.EndVelY * stageWr.EndVelY + stageWr.EndVelZ * stageWr.EndVelZ);
+
+			strWrDifference = string.Empty;
+			if (wrTime - stageRunTime < 0.0)
+				strWrDifference += ChatColors.Red + "+" + FormatTime((wrTime - stageRunTime) * -1);
+			else
+				strWrDifference += ChatColors.Green + "-" + FormatTime(wrTime - stageRunTime);
+			strWrDifference += ChatColors.Default + " ";
+
+			if (wrSpeed - exitSpeed <= 0.0)
+				strWrDifference += "(" + ChatColors.Green + "+" + ((wrSpeed - exitSpeed) * -1).ToString("0");
+			else
+				strWrDifference += "(" + ChatColors.Red + "-" + (wrSpeed - exitSpeed).ToString("0");
+			strWrDifference += ChatColors.Default + ")";
+		}
+
+		_player.Controller.PrintToChat(
+			$"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["stage_message",
+			stage, FormatTime(stageRunTime), exitSpeed.ToString("0"), strPbDifference, strWrDifference]}"
+		);
+	}
 }

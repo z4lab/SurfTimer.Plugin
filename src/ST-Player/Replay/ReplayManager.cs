@@ -7,6 +7,7 @@ public class ReplayManager
 	public ReplayPlayer MapWR { get; set; }
 	public ReplayPlayer? BonusWR { get; set; } = null;
 	public ReplayPlayer? StageWR { get; set; } = null;
+	public ReplayPlayer? CheckpointWR { get; set; } = null;
 	/// <summary>
 	/// Contains all Stage records for all styles - Refer to as AllStageWR[stage#][style]
 	/// </summary>
@@ -15,19 +16,24 @@ public class ReplayManager
 	/// Contains all Bonus records for all styles - Refer to as AllBonusWR[bonus#][style]
 	/// </summary>
 	public Dictionary<int, ReplayPlayer>[] AllBonusWR { get; set; } = Array.Empty<Dictionary<int, ReplayPlayer>>();
+	/// <summary>
+	/// Contains all Checkpoint segment records for all styles (non-staged maps only) - Refer to as AllCheckpointWR[checkpoint#][style]
+	/// </summary>
+	public Dictionary<int, ReplayPlayer>[] AllCheckpointWR { get; set; } = Array.Empty<Dictionary<int, ReplayPlayer>>();
 	public List<ReplayPlayer> CustomReplays { get; set; }
 
 
 	/// <param name="map_id">ID of the map</param>
 	/// <param name="staged">Does the map have Stages</param>
 	/// <param name="bonused">Does the map have Bonuses</param>
+	/// <param name="checkpointed">Does the map have Checkpoint segments (non-staged maps only)</param>
 	/// <param name="frames">Frames for the replay</param>
 	/// <param name="run_time">Run time (Ticks) for the run</param>
 	/// <param name="playerName">Name of the player</param>
 	/// <param name="map_time_id">ID of the run</param>
 	/// <param name="style">Style of the run</param>
 	/// <param name="stage">Stage/Bonus of the run</param>
-	internal ReplayManager(int map_id, bool staged, bool bonused, List<ReplayFrame> frames, int run_time = 0, string playerName = "", int map_time_id = -1, int style = 0, int stage = 0)
+	internal ReplayManager(int map_id, bool staged, bool bonused, bool checkpointed, List<ReplayFrame> frames, int run_time = 0, string playerName = "", int map_time_id = -1, int style = 0, int stage = 0)
 	{
 		MapWR = new ReplayPlayer
 		{
@@ -71,6 +77,21 @@ public class ReplayManager
 			BonusWR = new ReplayPlayer();
 		}
 
+		if (checkpointed)
+		{
+			this.AllCheckpointWR = new Dictionary<int, ReplayPlayer>[SurfTimer.CurrentMap.TotalCheckpoints + 1];
+
+			for (int i = 1; i <= SurfTimer.CurrentMap.TotalCheckpoints; i++)
+			{
+				AllCheckpointWR[i] = new Dictionary<int, ReplayPlayer>();
+				foreach (int x in Config.Styles)
+				{
+					AllCheckpointWR[i][x] = new ReplayPlayer();
+				}
+			}
+			CheckpointWR = new ReplayPlayer();
+		}
+
 		CustomReplays = new List<ReplayPlayer>();
 	}
 
@@ -83,6 +104,9 @@ public class ReplayManager
 			return true;
 
 		if (this.BonusWR?.Controller?.Equals(controller) == true)
+			return true;
+
+		if (this.CheckpointWR?.Controller?.Equals(controller) == true)
 			return true;
 
 		foreach (var replay in this.CustomReplays)

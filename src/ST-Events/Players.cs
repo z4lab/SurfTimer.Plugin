@@ -74,6 +74,24 @@ public partial class SurfTimer
 			return HookResult.Continue;
 		}
 
+		// Spawn the CheckpointWR bot
+		if (CurrentMap.ReplayManager.CheckpointWR != null && !CurrentMap.ReplayManager.CheckpointWR.IsPlayable && controller.IsBot)
+		{
+			CurrentMap.ReplayManager.CheckpointWR.SetController(controller, 3);
+			CurrentMap.ReplayManager.CheckpointWR.LoadReplayData(repeat_count: 3);
+
+			controller.SwitchTeam(CsTeam.Terrorist);
+
+			AddTimer(1.5f, () =>
+			{
+				CurrentMap.ReplayManager.CheckpointWR.Controller!.RemoveWeapons();
+				CurrentMap.ReplayManager.CheckpointWR.Start();
+				CurrentMap.ReplayManager.CheckpointWR.FormatBotName();
+			});
+
+			return HookResult.Continue;
+		}
+
 		// // Spawn the CustomReplays bot (for PB replays?) - T
 		// CurrentMap.ReplayManager.CustomReplays.ForEach(replay =>
 		// {
@@ -169,6 +187,9 @@ public partial class SurfTimer
 
 		if (CurrentMap.ReplayManager.BonusWR != null && CurrentMap.ReplayManager.BonusWR.Controller != null && CurrentMap.ReplayManager.BonusWR.Controller.Equals(player))
 			CurrentMap.ReplayManager.BonusWR!.Reset();
+
+		if (CurrentMap.ReplayManager.CheckpointWR != null && CurrentMap.ReplayManager.CheckpointWR.Controller != null && CurrentMap.ReplayManager.CheckpointWR.Controller.Equals(player) && CurrentMap.ReplayManager.CheckpointWR.MapID != -1)
+			CurrentMap.ReplayManager.CheckpointWR.Reset();
 
 		for (int i = 0; i < CurrentMap.ReplayManager.CustomReplays.Count; i++)
 			if (CurrentMap.ReplayManager.CustomReplays[i].Controller != null && CurrentMap.ReplayManager.CustomReplays[i].Controller!.Equals(player))

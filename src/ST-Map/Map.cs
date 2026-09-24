@@ -42,6 +42,14 @@ public class Map : MapEntity
 	/// Stage World Record - Refer to as StageWR[stage#][style]
 	/// </summary>
 	public Dictionary<int, PersonalBest>[] StageWR { get; set; } = Array.Empty<Dictionary<int, PersonalBest>>();
+	/// <summary>
+	/// Checkpoint segment World Record (non-staged maps only) - Refer to as CheckpointWR[checkpoint#][style]
+	/// </summary>
+	public Dictionary<int, PersonalBest>[] CheckpointWR { get; set; } = Array.Empty<Dictionary<int, PersonalBest>>();
+	/// <summary>
+	/// Checkpoint segment Completion Count (non-staged maps only) - Refer to as CheckpointCompletions[checkpoint#][style]
+	/// </summary>
+	public Dictionary<int, int>[] CheckpointCompletions { get; set; } = Array.Empty<Dictionary<int, int>>();
 
 	/// <summary>
 	/// Not sure what this is for.
@@ -90,16 +98,25 @@ public class Map : MapEntity
 
 	internal async Task InitializeAsync([CallerMemberName] string methodName = "")
 	{
+		bool checkpointed = this.Stages == 0 && this.TotalCheckpoints > 0;
+
 		// Initialize ReplayManager with placeholder values
-		this.ReplayManager = new ReplayManager(-1, this.Stages > 0, this.Bonuses > 0, null!);
+		this.ReplayManager = new ReplayManager(-1, this.Stages > 0, this.Bonuses > 0, checkpointed, null!);
 
 		// Initialize WR variables
 		this.StageWR = new Dictionary<int, PersonalBest>[this.Stages + 1]; // We do + 1 cause stages and bonuses start from 1, not from 0
 		this.StageCompletions = new Dictionary<int, int>[this.Stages + 1];
 		this.BonusWR = new Dictionary<int, PersonalBest>[this.Bonuses + 1];
 		this.BonusCompletions = new Dictionary<int, int>[this.Bonuses + 1];
+		this.CheckpointWR = checkpointed
+			? new Dictionary<int, PersonalBest>[this.TotalCheckpoints + 1]
+			: Array.Empty<Dictionary<int, PersonalBest>>();
+		this.CheckpointCompletions = checkpointed
+			? new Dictionary<int, int>[this.TotalCheckpoints + 1]
+			: Array.Empty<Dictionary<int, int>>();
 		int initStages = 0;
 		int initBonuses = 0;
+		int initCheckpoints = 0;
 
 		foreach (int style in Config.Styles)
 		{
@@ -123,10 +140,19 @@ public class Map : MapEntity
 				this.BonusCompletions[i][style] = 0;
 				initBonuses++;
 			}
+
+			for (int i = 1; checkpointed && i <= this.TotalCheckpoints; i++)
+			{
+				this.CheckpointWR[i] ??= new Dictionary<int, PersonalBest>();
+				this.CheckpointWR[i][style] = new PersonalBest { Type = 3 };
+				this.CheckpointCompletions[i] ??= new Dictionary<int, int>();
+				this.CheckpointCompletions[i][style] = 0;
+				initCheckpoints++;
+			}
 		}
 
-		_logger.LogInformation("[{ClassName}] {MethodName} -> Initialized WR variables. | Bonuses: {Bonuses} | Stages: {Stages}",
-			nameof(Map), methodName, initBonuses, initStages
+		_logger.LogInformation("[{ClassName}] {MethodName} -> Initialized WR variables. | Bonuses: {Bonuses} | Stages: {Stages} | Checkpoints: {Checkpoints}",
+			nameof(Map), methodName, initBonuses, initStages, initCheckpoints
 		);
 
 		await LoadMapInfo();
@@ -440,6 +466,22 @@ public class Map : MapEntity
 
 					SetReplayData(run.Type, run.Style, run.Stage, run.ReplayFrames!);
 					break;
+
+				case 3: // Checkpoint segment WR data and total completions (non-staged maps only)
+					CheckpointWR[run.Stage][run.Style].ID = run.ID;
+					CheckpointWR[run.Stage][run.Style].RunTime = run.RunTime;
+					CheckpointWR[run.Stage][run.Style].StartVelX = run.StartVelX;
+					CheckpointWR[run.Stage][run.Style].StartVelY = run.StartVelY;
+					CheckpointWR[run.Stage][run.Style].StartVelZ = run.StartVelZ;
+					CheckpointWR[run.Stage][run.Style].EndVelX = run.EndVelX;
+					CheckpointWR[run.Stage][run.Style].EndVelY = run.EndVelY;
+					CheckpointWR[run.Stage][run.Style].EndVelZ = run.EndVelZ;
+					CheckpointWR[run.Stage][run.Style].RunDate = run.RunDate;
+					CheckpointWR[run.Stage][run.Style].Name = run.Name;
+					CheckpointCompletions[run.Stage][run.Style] = run.TotalCount;
+
+					SetReplayData(run.Type, run.Style, run.Stage, run.ReplayFrames!);
+					break;
 			}
 		}
 
@@ -468,7 +510,7 @@ public class Map : MapEntity
 	/// Sets the data for a replay that has been retrieved from MapTimes data.
 	/// Also sets the first Stage replay if no replays existed for stages until now.
 	/// </summary>
-	/// <param name="type">Type - 0 = Map, 1 = Bonus, 2 = Stage</param>
+	/// <param name="type">Type - 0 = Map, 1 = Bonus, 2 = Stage, 3 = Checkpoint segment</param>
 	/// <param name="style">Style to add</param>
 	/// <param name="stage">Stage to add</param>
 	/// <param name="replayFramesBase64">Base64 encoded string for the replay_frames</param>
@@ -624,6 +666,60 @@ public class Map : MapEntity
 					this.ReplayManager.StageWR.RecordRank = 1;
 				}
 				break;
+			case 3: // Checkpoint segment Replays (non-staged maps only)
+					// Skip if the same checkpoint run already exists
+				if (this.ReplayManager.AllCheckpointWR[stage][style].RecordRunTime == this.CheckpointWR[stage][style].RunTime)
+					break;
+#if DEBUG
+				_logger.LogDebug("[{ClassName}] {MethodName} -> SetReplayData -> [CheckpointWR] Adding run {ID} {Time} (Ticks = {Ticks}; Frames = {Frames}) to `ReplayManager.AllCheckpointWR`",
+					nameof(Map), methodName, this.CheckpointWR[stage][style].ID, PlayerHud.FormatTime(this.CheckpointWR[stage][style].RunTime), this.CheckpointWR[stage][style].RunTime, frames.Count
+				);
+#endif
+
+				// Add all checkpoints found to a dictionary with their data
+				this.ReplayManager.AllCheckpointWR[stage][style].MapID = this.ID;
+				this.ReplayManager.AllCheckpointWR[stage][style].Frames = frames;
+				this.ReplayManager.AllCheckpointWR[stage][style].RecordRunTime = this.CheckpointWR[stage][style].RunTime;
+				this.ReplayManager.AllCheckpointWR[stage][style].RecordPlayerName = this.CheckpointWR[stage][style].Name!;
+				this.ReplayManager.AllCheckpointWR[stage][style].MapTimeID = this.CheckpointWR[stage][style].ID;
+				this.ReplayManager.AllCheckpointWR[stage][style].Stage = stage;
+				this.ReplayManager.AllCheckpointWR[stage][style].Type = 3;
+				this.ReplayManager.AllCheckpointWR[stage][style].RecordRank = 1;
+				this.ReplayManager.AllCheckpointWR[stage][style].IsPlayable = true; // We set this to `true` else we overwrite it and need to call SetController method again
+				for (int i = 0; i < frames.Count; i++)
+				{
+					ReplayFrame f = frames[i];
+					switch (f.Situation)
+					{
+						case ReplayFrameSituation.CHECKPOINT_ZONE_ENTER:
+							this.ReplayManager.AllCheckpointWR[stage][style].CheckpointEnterSituations.Add(i);
+							break;
+						case ReplayFrameSituation.CHECKPOINT_ZONE_EXIT:
+							this.ReplayManager.AllCheckpointWR[stage][style].CheckpointExitSituations.Add(i);
+							break;
+					}
+				}
+				// Set the checkpoint to replay first
+				if (this.ReplayManager.CheckpointWR != null && this.ReplayManager.CheckpointWR.MapID == -1)
+				{
+#if DEBUG
+					_logger.LogDebug("[{ClassName}] {MethodName} -> [CheckpointWR] Setting first `ReplayManager.CheckpointWR` to checkpoint {stage}",
+						nameof(Map), methodName, stage
+					);
+#endif
+
+					if (this.ReplayManager.CheckpointWR.IsPlaying) // Maybe only stop the replay if we are overwriting the current checkpoint being played?
+						this.ReplayManager.CheckpointWR.Stop();
+					this.ReplayManager.CheckpointWR.MapID = this.ID;
+					this.ReplayManager.CheckpointWR.Frames = frames;
+					this.ReplayManager.CheckpointWR.RecordRunTime = this.CheckpointWR[stage][style].RunTime;
+					this.ReplayManager.CheckpointWR.RecordPlayerName = this.CheckpointWR[stage][style].Name!;
+					this.ReplayManager.CheckpointWR.MapTimeID = this.CheckpointWR[stage][style].ID;
+					this.ReplayManager.CheckpointWR.Stage = stage;
+					this.ReplayManager.CheckpointWR.Type = 3;
+					this.ReplayManager.CheckpointWR.RecordRank = 1;
+				}
+				break;
 		}
 
 		// Start the new map replay if none existed until now
@@ -643,6 +739,11 @@ public class Map : MapEntity
 			{
 				this.ReplayManager.StageWR.ResetReplay();
 				this.ReplayManager.StageWR.Start();
+			}
+			else if (type == 3 && this.ReplayManager.CheckpointWR != null && !this.ReplayManager.CheckpointWR.IsPlaying)
+			{
+				this.ReplayManager.CheckpointWR.ResetReplay();
+				this.ReplayManager.CheckpointWR.Start();
 			}
 		}
 		);

@@ -20,6 +20,10 @@ public class PlayerStats
 	/// </summary>
 	public Dictionary<int, PersonalBest>[] StagePB { get; set; }
 	/// <summary>
+	/// Checkpoint segment Personal Best (non-staged maps only) - Refer to as CheckpointPB[checkpoint#][style]
+	/// </summary>
+	public Dictionary<int, PersonalBest>[] CheckpointPB { get; set; }
+	/// <summary>
 	/// This object tracks data for the Player's current run.
 	/// </summary>
 	public CurrentRun ThisRun { get; set; } = new CurrentRun();
@@ -37,8 +41,13 @@ public class PlayerStats
 		// Initialize PB variables
 		this.StagePB = new Dictionary<int, PersonalBest>[SurfTimer.CurrentMap.Stages + 1];
 		this.BonusPB = new Dictionary<int, PersonalBest>[SurfTimer.CurrentMap.Bonuses + 1];
+		bool checkpointed = SurfTimer.CurrentMap.Stages == 0 && SurfTimer.CurrentMap.TotalCheckpoints > 0;
+		this.CheckpointPB = checkpointed
+			? new Dictionary<int, PersonalBest>[SurfTimer.CurrentMap.TotalCheckpoints + 1]
+			: Array.Empty<Dictionary<int, PersonalBest>>();
 		int initStage = 0;
 		int initBonus = 0;
+		int initCheckpoint = 0;
 
 		foreach (int style in Config.Styles)
 		{
@@ -57,11 +66,18 @@ public class PlayerStats
 				this.BonusPB[i][style] = new PersonalBest { Type = 1 };
 				initBonus++;
 			}
+
+			for (int i = 1; checkpointed && i <= SurfTimer.CurrentMap.TotalCheckpoints; i++)
+			{
+				this.CheckpointPB[i] ??= new Dictionary<int, PersonalBest>();
+				this.CheckpointPB[i][style] = new PersonalBest { Type = 3 };
+				initCheckpoint++;
+			}
 		}
 
 
-		_logger.LogTrace("[{ClassName}] {MethodName} -> PlayerStats -> Initialized {StagesInitialized} Stages and {BonusesInitialized} Bonuses",
-			nameof(PlayerStats), methodName, initStage, initBonus
+		_logger.LogTrace("[{ClassName}] {MethodName} -> PlayerStats -> Initialized {StagesInitialized} Stages, {BonusesInitialized} Bonuses and {CheckpointsInitialized} Checkpoint segments",
+			nameof(PlayerStats), methodName, initStage, initBonus, initCheckpoint
 		);
 	}
 
@@ -118,6 +134,23 @@ public class PlayerStats
 					StagePB[mapTime.Stage][style].EndVelY = mapTime.EndVelY;
 					StagePB[mapTime.Stage][style].EndVelZ = mapTime.EndVelZ;
 					StagePB[mapTime.Stage][style].RunDate = mapTime.RunDate;
+					break;
+
+				case 3: // Checkpoint segment time
+#if DEBUG
+					_logger.LogDebug("[{ClassName}] {MethodName} -> LoadPlayerMapTimesData >> CheckpointPB with ID {ID}", nameof(PlayerStats), methodName, mapTime.ID);
+#endif
+					CheckpointPB[mapTime.Stage][style].ID = mapTime.ID;
+					CheckpointPB[mapTime.Stage][style].RunTime = mapTime.RunTime;
+					CheckpointPB[mapTime.Stage][style].Type = mapTime.Type;
+					CheckpointPB[mapTime.Stage][style].Rank = mapTime.Rank;
+					CheckpointPB[mapTime.Stage][style].StartVelX = mapTime.StartVelX;
+					CheckpointPB[mapTime.Stage][style].StartVelY = mapTime.StartVelY;
+					CheckpointPB[mapTime.Stage][style].StartVelZ = mapTime.StartVelZ;
+					CheckpointPB[mapTime.Stage][style].EndVelX = mapTime.EndVelX;
+					CheckpointPB[mapTime.Stage][style].EndVelY = mapTime.EndVelY;
+					CheckpointPB[mapTime.Stage][style].EndVelZ = mapTime.EndVelZ;
+					CheckpointPB[mapTime.Stage][style].RunDate = mapTime.RunDate;
 					break;
 
 				default: // Map time

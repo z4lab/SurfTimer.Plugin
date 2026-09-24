@@ -56,7 +56,7 @@ public partial class SurfTimer : BasePlugin
 
 	// Metadata
 	public override string ModuleName => $"CS2 {Config.PluginName}";
-	public override string ModuleVersion => "DEV-1";
+	public override string ModuleVersion => "1.0.1";
 	public override string ModuleDescription => "Official Surf Timer by the CS2 Surf Initiative.";
 	public override string ModuleAuthor => "The CS2 Surf Initiative - github.com/cs2surf";
 

@@ -15,8 +15,13 @@ public class PlayerTimer
 	// Tracking
 	public short Stage { get; set; } = 0; // Current stage tracker
 	public short Checkpoint { get; set; } = 0; // Current checkpoint tracker
-	public short Bonus { get; set; } = 0; // To-do: bonus implementation - Current bonus tracker 
+	public short Bonus { get; set; } = 0; // To-do: bonus implementation - Current bonus tracker
 	public short Style { get; set; } = 0; // To-do: functionality for player to change this value and the actual styles implementation - Current style tracker
+
+	// Velocity the player had when they started running the stage `Stage` currently identifies
+	public float StageEntryVelX { get; set; } = 0;
+	public float StageEntryVelY { get; set; } = 0;
+	public float StageEntryVelZ { get; set; } = 0;
 
 	// Timing
 	public int Ticks { get; set; } = 0; // To-do: sub-tick counting? This currently goes on OnTick, which is not sub-tick I believe? Needs investigating
