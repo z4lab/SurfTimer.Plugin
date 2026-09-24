@@ -16,7 +16,18 @@ public class ReplayRecorder
 	}
 
 	public bool IsRecording { get; set; } = false;
-	public bool IsSaving { get; set; } = false;
+	private int _pendingSaves = 0;
+	/// <summary>
+	/// True while any delayed run save is scheduled or in flight - resets are blocked so the
+	/// recorder's Frames aren't cleared before the save trims them.
+	/// </summary>
+	public bool IsSaving => Volatile.Read(ref _pendingSaves) > 0;
+	internal void BeginSave() => Interlocked.Increment(ref _pendingSaves);
+	internal void EndSave()
+	{
+		if (Interlocked.Decrement(ref _pendingSaves) < 0)
+			Interlocked.Exchange(ref _pendingSaves, 0);
+	}
 	public ReplayFrameSituation CurrentSituation { get; set; } = ReplayFrameSituation.NONE;
 	public List<ReplayFrame> Frames { get; set; } = new List<ReplayFrame>();
 	public List<int> StageEnterSituations { get; set; } = new List<int>();
@@ -112,8 +123,6 @@ public class ReplayRecorder
 
 	internal string TrimReplay(Player player, short type = 0, short bonus = 0, short stage = 0, bool lastStage = false, short checkpoint = 0, bool lastCheckpoint = false, [CallerMemberName] string methodName = "")
 	{
-		this.IsSaving = true;
-
 		List<ReplayFrame>? trimmed_frames = new List<ReplayFrame>();
 
 		_logger.LogTrace(">>> [{ClassName}] {MethodName} -> Trimming replay for '{PlayerName}' | type = {Type} | lastStage = {LastStage} ",
@@ -151,7 +160,6 @@ public class ReplayRecorder
 				}
 		}
 
-		this.IsSaving = false;
 		_logger.LogTrace("[{ClassName}] {MethodName} -> Sending total of {Frames} replay frames.",
 			nameof(CurrentRun), methodName, trimmed_frames?.Count
 		);
@@ -280,8 +288,9 @@ public class ReplayRecorder
 		);
 
 		stage_end_index = Frames.FindLastIndex(f => f.Situation == endZone);
-		stage_exit_index = Frames.FindLastIndex(stage_end_index - 1, f => f.Situation == exitZone);
-		stage_enter_index = Frames.FindLastIndex(stage_end_index - 1, f => f.Situation == enterZone);
+		// FindLastIndex(startIndex) throws for negative indexes, so only search before a real end marker
+		stage_exit_index = stage_end_index >= 1 ? Frames.FindLastIndex(stage_end_index - 1, f => f.Situation == exitZone) : -1;
+		stage_enter_index = stage_end_index >= 1 ? Frames.FindLastIndex(stage_end_index - 1, f => f.Situation == enterZone) : -1;
 
 		_logger.LogInformation("[{ClassName}] {MethodName} -> Trimming Stage Run replay. Stage {Stage}, enter {EnterIndex}, exit {ExitIndex}, end {EndIndex}",
 			nameof(ReplayRecorder), methodName, stage, stage_enter_index, stage_exit_index, stage_end_index
@@ -348,8 +357,9 @@ public class ReplayRecorder
 		);
 
 		checkpoint_end_index = Frames.FindLastIndex(f => f.Situation == endZone);
-		checkpoint_exit_index = Frames.FindLastIndex(checkpoint_end_index - 1, f => f.Situation == exitZone);
-		checkpoint_enter_index = Frames.FindLastIndex(checkpoint_end_index - 1, f => f.Situation == enterZone);
+		// FindLastIndex(startIndex) throws for negative indexes, so only search before a real end marker
+		checkpoint_exit_index = checkpoint_end_index >= 1 ? Frames.FindLastIndex(checkpoint_end_index - 1, f => f.Situation == exitZone) : -1;
+		checkpoint_enter_index = checkpoint_end_index >= 1 ? Frames.FindLastIndex(checkpoint_end_index - 1, f => f.Situation == enterZone) : -1;
 
 		_logger.LogInformation("[{ClassName}] {MethodName} -> Trimming Checkpoint Run replay. Checkpoint {Checkpoint}, enter {EnterIndex}, exit {ExitIndex}, end {EndIndex}",
 			nameof(ReplayRecorder), methodName, checkpoint, checkpoint_enter_index, checkpoint_exit_index, checkpoint_end_index

@@ -23,6 +23,11 @@ public class PlayerTimer
 	public float StageEntryVelY { get; set; } = 0;
 	public float StageEntryVelZ { get; set; } = 0;
 
+	// Velocity the player had when they started running the checkpoint segment `Checkpoint` currently identifies (non-staged maps only)
+	public float CheckpointEntryVelX { get; set; } = 0;
+	public float CheckpointEntryVelY { get; set; } = 0;
+	public float CheckpointEntryVelZ { get; set; } = 0;
+
 	// Timing
 	public int Ticks { get; set; } = 0; // To-do: sub-tick counting? This currently goes on OnTick, which is not sub-tick I believe? Needs investigating
 

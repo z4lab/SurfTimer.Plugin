@@ -3,12 +3,49 @@ using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Entities.Constants;
 using CounterStrikeSharp.API.Modules.Memory;
 using CounterStrikeSharp.API.Modules.Utils;
-
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace SurfTimer;
 
 unsafe static class Extensions
 {
+	/// <summary>
+	/// Moves a player/bot to Spectator (SourceMod's ChangeClientTeam equivalent).
+	/// A manual "jointeam 1" from the client works, but on this server CSS's ChangeTeam never
+	/// reaches the engine's ChangeTeam (no "ChangeTeam() CTMDBG" line is ever logged for it), and
+	/// SwitchTeam rejects Spectator outright. So after trying ChangeTeam, "jointeam 1" is sent to
+	/// the client to run itself - the same path as the player choosing Spectator from the M menu.
+	/// </summary>
+	public static void MoveToSpectator(this CCSPlayerController controller)
+	{
+		if (!controller.IsValid || controller.Team == CsTeam.Spectator)
+			return;
+
+		var logger = SurfTimer.ServiceProvider.GetRequiredService<ILogger<SurfTimer>>();
+		void LogState(string step) => logger.LogInformation(
+			"[MoveToSpectator] {Name} {Step}: team={Team} alive={Alive}",
+			controller.PlayerName, step, controller.Team, controller.PawnIsAlive);
+
+		controller.ChangeTeam(CsTeam.Spectator);
+
+		Server.NextFrame(() =>
+		{
+			if (!controller.IsValid)
+				return;
+
+			if (controller.Team == CsTeam.Spectator)
+			{
+				LogState("done (ChangeTeam)");
+				return;
+			}
+
+			// Client round-trip - result shows up a few ticks later, checked by the caller's poll
+			controller.ExecuteClientCommand("jointeam 1");
+			LogState("sent jointeam 1 to client");
+		});
+	}
+
 	public static void Teleport(this CBaseEntity entity, VectorT? position = null, QAngleT? angles = null, VectorT? velocity = null)
 	{
 		Guard.IsValidEntity(entity);

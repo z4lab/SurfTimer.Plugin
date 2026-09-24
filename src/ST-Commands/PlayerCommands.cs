@@ -4,6 +4,8 @@ using CounterStrikeSharp.API.Modules.Commands;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Modules.Utils;
 using CounterStrikeSharp.API.Modules.Admin;
+using CounterStrikeSharp.API.Modules.Menu;
+using Microsoft.Extensions.Logging;
 
 namespace SurfTimer;
 
@@ -231,16 +233,139 @@ public partial class SurfTimer
 			);
 	}
 
-	[ConsoleCommand("css_spec", "Moves a player automaticlly into spectator mode")]
+	[ConsoleCommand("css_spec", "Spectate a player or bot by (partial) name, or open a picker menu")]
 	[CommandHelper(whoCanExecute: CommandUsage.CLIENT_ONLY)]
 	public void MovePlayerToSpectator(CCSPlayerController? player, CommandInfo command)
 	{
 		if (player == null)
 			return;
 
+		if (command.ArgCount <= 1)
+		{
+			ChatMenu menu = new ChatMenu("Spectate (press M to rejoin a team, or type !r)");
+			foreach (var candidate in GetSpectateCandidates(player))
+			{
+				menu.AddMenuOption(candidate.PlayerName, (p, o) => SpectateTarget(p, candidate));
+			}
+			menu.Open(player);
+			return;
+		}
+
+		string search = command.ArgString.Trim();
+		var match = GetSpectateCandidates(player)
+			.FirstOrDefault(c => c.PlayerName.Contains(search, StringComparison.OrdinalIgnoreCase));
+
+		if (match == null)
+		{
+			player.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["spec_no_match", search]}");
+			return;
+		}
+
+		SpectateTarget(player, match);
+	}
+
+	/// <summary>
+	/// Alive humans and currently-playing replay bots, excluding the caller. `playerList` only holds
+	/// connected humans - replay bots are never in it - so both sources are unioned. Dead/spectating
+	/// players and idle bots are left out since the engine rejects them as observer targets.
+	/// </summary>
+	private IEnumerable<CCSPlayerController> GetSpectateCandidates(CCSPlayerController caller)
+	{
+		return playerList.Values.Select(p => p.Controller)
+			.Concat(CurrentMap.ReplayManager.Pool.Where(s => s.IsPlaying && s.Controller != null).Select(s => s.Controller!))
+			.Where(c => c.IsValid && !c.Equals(caller) && IsSpectatable(c));
+	}
+
+	private static bool IsSpectatable(CCSPlayerController target)
+	{
+		var pawn = target.PlayerPawn.Value;
+		return target.IsValid
+			&& target.PawnIsAlive
+			&& pawn != null && pawn.IsValid
+			&& (target.Team == CsTeam.Terrorist || target.Team == CsTeam.CounterTerrorist);
+	}
+
+	/// <summary>
+	/// Moves the spectator to Spectator team (abandoning their run) and points their first-person
+	/// view at target - the CS2 equivalent of SourceMod's ChangeClientTeam + m_hObserverTarget +
+	/// m_iObserverMode. Waits until both the observer pawn exists and the target is alive, so
+	/// callers can invoke it right after requesting/respawning a bot.
+	/// </summary>
+	private void SpectateTarget(CCSPlayerController spectator, CCSPlayerController target)
+	{
 		Server.NextFrame(() =>
-			player.ChangeTeam(CsTeam.Spectator)
-		);
+		{
+			if (!spectator.IsValid)
+				return;
+
+			if (playerList.TryGetValue(spectator.UserId ?? 0, out var oPlayer))
+			{
+				oPlayer.Timer.Reset();
+				oPlayer.Stats.ThisRun.Checkpoints.Clear();
+			}
+
+			spectator.MoveToSpectator();
+
+			AddTimer(0.1f, () => TrySetObserverTarget(spectator, target, attemptsLeft: SpectatePollAttempts));
+		});
+	}
+
+	// 15s at 0.1s per attempt - long enough for the player to pick Spectator from the M menu
+	// themselves if the automatic team switch doesn't go through.
+	private const int SpectatePollAttempts = 150;
+	private const int SpectateManualHintAttempt = SpectatePollAttempts - 15;
+
+	private void TrySetObserverTarget(CCSPlayerController spectator, CCSPlayerController target, int attemptsLeft)
+	{
+		if (!spectator.IsValid || !target.IsValid)
+			return;
+
+		CCSObserverPawn? observerPawn = spectator.ObserverPawn.Value;
+		bool observerReady = spectator.Team == CsTeam.Spectator
+			&& observerPawn != null && observerPawn.IsValid && observerPawn.ObserverServices != null;
+
+		if (!observerReady || !IsSpectatable(target))
+		{
+			if (attemptsLeft == SpectateManualHintAttempt && spectator.Team != CsTeam.Spectator)
+				spectator.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["spec_manual_hint", target.PlayerName]}");
+
+			if (attemptsLeft > 0)
+				AddTimer(0.1f, () => TrySetObserverTarget(spectator, target, attemptsLeft - 1));
+			else
+				_logger.LogWarning("[{ClassName}] SpectateTarget -> gave up on {Spectator} -> {Target} (spectatorTeam={Team}, spectatorAlive={Alive}, observerPawnValid={ObsValid}, observerServices={ObsServices}, targetSpectatable={TargetOk})",
+					nameof(SurfTimer), spectator.PlayerName, target.PlayerName, spectator.Team, spectator.PawnIsAlive,
+					observerPawn != null && observerPawn.IsValid, observerPawn?.ObserverServices != null, IsSpectatable(target)
+				);
+			return;
+		}
+
+		uint targetPawnRaw = target.PlayerPawn.Raw;
+
+		var obs = observerPawn!.ObserverServices!;
+		obs.ObserverTarget.Raw = targetPawnRaw;
+		obs.ObserverMode = (byte)ObserverMode_t.OBS_MODE_IN_EYE;
+		// ObserverServices is a pointer component of the pawn - the pawn's pointer field is what
+		// has to be marked dirty for the change to be networked to the client.
+		Utilities.SetStateChanged(observerPawn, "CBasePlayerPawn", "m_pObserverServices");
+
+		Server.NextFrame(() =>
+		{
+			if (!spectator.IsValid || !target.IsValid || !observerPawn.IsValid || observerPawn.ObserverServices == null)
+				return;
+
+			if (observerPawn.ObserverServices.ObserverTarget.Raw == targetPawnRaw)
+			{
+				_logger.LogInformation("[{ClassName}] SpectateTarget -> {Spectator} -> {Target}: observer target set (schema)",
+					nameof(SurfTimer), spectator.PlayerName, target.PlayerName
+				);
+				return;
+			}
+
+			_logger.LogInformation("[{ClassName}] SpectateTarget -> {Spectator} -> {Target}: schema write was overridden, falling back to spec_player",
+				nameof(SurfTimer), spectator.PlayerName, target.PlayerName
+			);
+			spectator.ExecuteClientCommandFromServer($"spec_player \"{target.PlayerName}\"");
+		});
 	}
 
 	[ConsoleCommand("css_rank", "Show the current rank of the player for the style they are in")]
@@ -263,103 +388,56 @@ public partial class SurfTimer
         Replay Commands
     #########################
     */
-	[ConsoleCommand("css_replaybotpause", "Pause the replay bot playback")]
-	[ConsoleCommand("css_rbpause", "Pause the replay bot playback")]
+
+	/// <summary>
+	/// Finds the pool slot the given player is currently spectating, if any.
+	/// </summary>
+	private ReplayPlayer? FindSpectatedPoolSlot(CCSPlayerController player)
+	{
+		Player oPlayer = playerList[player.UserId ?? 0];
+		foreach (var slot in CurrentMap.ReplayManager.Pool)
+		{
+			if (slot.Controller != null && oPlayer.IsSpectating(slot.Controller))
+				return slot;
+		}
+		return null;
+	}
+
+	[ConsoleCommand("css_replaybotpause", "Pause the replay bot you're spectating")]
+	[ConsoleCommand("css_rbpause", "Pause the replay bot you're spectating")]
 	[CommandHelper(whoCanExecute: CommandUsage.CLIENT_ONLY)]
 	public void PauseReplay(CCSPlayerController? player, CommandInfo command)
 	{
 		if (player == null || player.Team != CsTeam.Spectator)
 			return;
 
-		foreach (ReplayPlayer rb in CurrentMap.ReplayManager.CustomReplays)
-		{
-			if (!rb.IsPlayable || !rb.IsPlaying || !playerList[player.UserId ?? 0].IsSpectating(rb.Controller!))
-				continue;
-
-			rb.Pause();
-		}
+		FindSpectatedPoolSlot(player)?.Pause();
 	}
 
-	[ConsoleCommand("css_rbplay", "Start all replays from the start")]
+	[ConsoleCommand("css_rbplay", "Restart the replay bot you're spectating from the beginning")]
 	[CommandHelper(whoCanExecute: CommandUsage.CLIENT_ONLY)]
 	public void PlayReplay(CCSPlayerController? player, CommandInfo command)
 	{
 		if (player == null || player.Team != CsTeam.Spectator)
 			return;
 
-		Player oPlayer = playerList[player.UserId ?? 0];
-		CurrentMap.ReplayManager.MapWR.ResetReplay();
-		CurrentMap.ReplayManager.MapWR.Start();
-
-		CurrentMap.ReplayManager.StageWR?.ResetReplay();
-		CurrentMap.ReplayManager.StageWR?.Start();
-
-		foreach (ReplayPlayer rb in CurrentMap.ReplayManager.CustomReplays)
-		{
-			if (!rb.IsPlayable || !rb.IsPlaying || !oPlayer.IsSpectating(rb.Controller!))
-				continue;
-
-			rb.Start();
-		}
+		var slot = FindSpectatedPoolSlot(player);
+		slot?.ResetReplay();
+		slot?.Start();
 	}
 
-	[ConsoleCommand("css_replaybotflip", "Flips the replay bot between Forward/Backward playback")]
-	[ConsoleCommand("css_rbflip", "Flips the replay bot between Forward/Backward playback")]
+	[ConsoleCommand("css_replaybotflip", "Flips the replay bot you're spectating between Forward/Backward playback")]
+	[ConsoleCommand("css_rbflip", "Flips the replay bot you're spectating between Forward/Backward playback")]
 	[CommandHelper(whoCanExecute: CommandUsage.CLIENT_ONLY)]
 	public void ReverseReplay(CCSPlayerController? player, CommandInfo command)
 	{
 		if (player == null || player.Team != CsTeam.Spectator)
 			return;
 
-		foreach (ReplayPlayer rb in CurrentMap.ReplayManager.CustomReplays)
-		{
-			if (!rb.IsPlayable || !rb.IsPlaying || !playerList[player.UserId ?? 0].IsSpectating(rb.Controller!))
-				continue;
-
-			rb.FrameTickIncrement *= -1;
-		}
+		var slot = FindSpectatedPoolSlot(player);
+		if (slot != null)
+			slot.FrameTickIncrement *= -1;
 	}
-
-	// [ConsoleCommand("css_pbreplay", "Allows for replay of player's PB")]
-	// public void PbReplay(CCSPlayerController? player, CommandInfo command)
-	// {
-	//     if(player == null)
-	//         return;
-
-	//     int maptime_id = playerList[player!.UserId ?? 0].Stats.PB[playerList[player.UserId ?? 0].Timer.Style].ID;
-	//     if (command.ArgCount > 1)
-	//     {
-	//         try
-	//         {
-	//             maptime_id = int.Parse(command.ArgByIndex(1));
-	//         }
-	//         catch {}
-	//     }
-
-	//     if(maptime_id == -1 || !CurrentMap.ConnectedMapTimes.Contains(maptime_id))
-	//     {
-	//         player.PrintToChat($"{Config.PluginPrefix} {ChatColors.Red}No time was found");
-	//         return;
-	//     }
-
-	//     for(int i = 0; i < CurrentMap.ReplayBots.Count; i++)
-	//     {
-	//         if(CurrentMap.ReplayBots[i].MapTimeID == maptime_id)
-	//         {
-	//             player.PrintToChat($"{Config.PluginPrefix} {ChatColors.Red}A bot of this run already playing");
-	//             return;
-	//         }
-	//     }
-
-	//     CurrentMap.ReplayBots = CurrentMap.ReplayBots.Prepend(new ReplayPlayer() {
-	//         Stat_MapTimeID = maptime_id,
-	//         Stat_Prefix = "PB"
-	//     }).ToList();
-
-	//     Server.NextFrame(() => {
-	//         Server.ExecuteCommand($"bot_quota {CurrentMap.ReplayBots.Count}");
-	//     });
-	// }
 
 	/*
     ########################
@@ -591,15 +669,12 @@ public partial class SurfTimer
 		player.PrintToChat($"{Config.PluginPrefix} .ReplayRecorder.IsRecording: {ChatColors.Green}{oPlayer.ReplayRecorder.IsRecording}");
 		player.PrintToChat($"{Config.PluginPrefix} .ReplayManager.MapWR.RecordRunTime: {ChatColors.Green}{CurrentMap.ReplayManager.MapWR.RecordRunTime}");
 		player.PrintToChat($"{Config.PluginPrefix} .ReplayManager.MapWR.Frames.Count: {ChatColors.Green}{CurrentMap.ReplayManager.MapWR.Frames.Count}");
-		player.PrintToChat($"{Config.PluginPrefix} .ReplayManager.MapWR.IsPlayable: {ChatColors.Green}{CurrentMap.ReplayManager.MapWR.IsPlayable}");
-		player.PrintToChat($"{Config.PluginPrefix} .ReplayManager.MapWR.MapSituations.Count: {ChatColors.Green}{CurrentMap.ReplayManager.MapWR.MapSituations.Count}");
-		player.PrintToChat($"{Config.PluginPrefix} .ReplayManager.StageWR.RecordRunTime: {ChatColors.Green}{CurrentMap.ReplayManager.StageWR?.RecordRunTime}");
-		player.PrintToChat($"{Config.PluginPrefix} .ReplayManager.StageWR.Frames.Count: {ChatColors.Green}{CurrentMap.ReplayManager.StageWR?.Frames.Count}");
-		player.PrintToChat($"{Config.PluginPrefix} .ReplayManager.StageWR.IsPlayable: {ChatColors.Green}{CurrentMap.ReplayManager.StageWR?.IsPlayable}");
-		player.PrintToChat($"{Config.PluginPrefix} .ReplayManager.BonusWR.RecordRunTime: {ChatColors.Green}{CurrentMap.ReplayManager.BonusWR?.RecordRunTime}");
-		player.PrintToChat($"{Config.PluginPrefix} .ReplayManager.BonusWR.Frames.Count: {ChatColors.Green}{CurrentMap.ReplayManager.BonusWR?.Frames.Count}");
-		player.PrintToChat($"{Config.PluginPrefix} .ReplayManager.BonusWR.IsPlayable: {ChatColors.Green}{CurrentMap.ReplayManager.BonusWR?.IsPlayable}");
-		player.PrintToChat($"{Config.PluginPrefix} .ReplayManager.BonusWR.IsPlaying: {ChatColors.Green}{CurrentMap.ReplayManager.BonusWR?.IsPlaying}");
+		player.PrintToChat($"{Config.PluginPrefix} .ReplayManager.Pool.Count: {ChatColors.Green}{CurrentMap.ReplayManager.Pool.Count}/{Config.ReplayPoolCap}");
+		foreach (var slot in CurrentMap.ReplayManager.Pool)
+		{
+			player.PrintToChat($"{Config.PluginPrefix} Pool slot: Type {ChatColors.Green}{slot.Type}{ChatColors.Default} Stage {ChatColors.Green}{slot.Stage}{ChatColors.Default} " +
+				$"Controller {ChatColors.Green}{slot.Controller?.PlayerName ?? "none"}{ChatColors.Default} IsPlaying {ChatColors.Green}{slot.IsPlaying}{ChatColors.Default} RepeatCount {ChatColors.Green}{slot.RepeatCount}");
+		}
 	}
 
 	[ConsoleCommand("css_ctest", "x")]

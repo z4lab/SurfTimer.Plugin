@@ -1,6 +1,8 @@
-namespace SurfTimer;
-
 using System;
+using System.Text.Json;
+using SurfTimer.Shared.Types;
+
+namespace SurfTimer;
 
 public enum ReplayFrameSituation
 {
@@ -41,5 +43,16 @@ public class ReplayFrame
 	public QAngleT GetAng()
 	{
 		return new QAngleT(this.ang[0], this.ang[1], this.ang[2]);
+	}
+
+	/// <summary>
+	/// Decompresses and deserializes a stored replay_frames blob into a frame list.
+	/// Shared by Map.SetReplayData (WR content templates) and PB replay loading.
+	/// </summary>
+	public static List<ReplayFrame> Deserialize(ReplayFramesString data)
+	{
+		JsonSerializerOptions options = new JsonSerializerOptions { WriteIndented = false, Converters = { new VectorTConverter(), new QAngleTConverter() } };
+		string json = Compressor.Decompress(data.ToString());
+		return JsonSerializer.Deserialize<List<ReplayFrame>>(json, options)!;
 	}
 }

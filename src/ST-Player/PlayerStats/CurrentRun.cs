@@ -210,8 +210,6 @@ public class CurrentRun : RunStatsEntity
 				);
 			}
 
-			player.ReplayRecorder.IsSaving = true;
-
 			// Save stage run
 			await player.Stats.ThisRun.SaveMapTime(player, stage: stage, run_ticks: stage_run_time,
 				segmentStartVelX: startVelX, segmentStartVelY: startVelY, segmentStartVelZ: startVelZ,
@@ -236,7 +234,11 @@ public class CurrentRun : RunStatsEntity
 	/// <param name="checkpoint">Checkpoint segment to save</param>
 	/// <param name="checkpoint_run_time">Run Time (Ticks) for the checkpoint segment run</param>
 	/// <param name="saveLastCheckpoint">Is it the last checkpoint segment?</param>
-	internal static async Task SaveCheckpointTime(Player player, short checkpoint = -1, int checkpoint_run_time = -1, bool saveLastCheckpoint = false)
+	/// <param name="startVelX">This specific checkpoint segment's own entry velocity (not the overall map run's)</param>
+	/// <param name="endVelX">This specific checkpoint segment's own exit velocity (not the overall map run's)</param>
+	internal static async Task SaveCheckpointTime(Player player, short checkpoint = -1, int checkpoint_run_time = -1, bool saveLastCheckpoint = false,
+		float startVelX = 0, float startVelY = 0, float startVelZ = 0,
+		float endVelX = 0, float endVelY = 0, float endVelZ = 0)
 	{
 #if DEBUG
 		var _logger = SurfTimer.ServiceProvider.GetRequiredService<ILogger<CurrentRun>>();
@@ -279,10 +281,11 @@ public class CurrentRun : RunStatsEntity
 				);
 			}
 
-			player.ReplayRecorder.IsSaving = true;
-
 			// Save checkpoint segment run
-			await player.Stats.ThisRun.SaveMapTime(player, checkpoint: checkpoint, run_ticks: checkpoint_run_time); // Save the Checkpoint MapTime PB data
+			await player.Stats.ThisRun.SaveMapTime(player, checkpoint: checkpoint, run_ticks: checkpoint_run_time,
+				segmentStartVelX: startVelX, segmentStartVelY: startVelY, segmentStartVelZ: startVelZ,
+				segmentEndVelX: endVelX, segmentEndVelY: endVelY, segmentEndVelZ: endVelZ
+			); // Save the Checkpoint MapTime PB data
 		}
 	}
 

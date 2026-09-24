@@ -22,6 +22,32 @@ public partial class SurfTimer
 	}
 
 	/// <summary>
+	/// Runs a save 1s later (so frames AFTER touching the zone exist for the replay trim) and blocks
+	/// resets from the moment it's scheduled until it finishes - otherwise a !r in that window clears
+	/// the recorder's Frames before they're trimmed. The lock is always released, even on failure.
+	/// </summary>
+	private void ScheduleRunSave(Player player, string description, Func<Task> save)
+	{
+		player.ReplayRecorder.BeginSave();
+		AddTimer(1.0f, async () =>
+		{
+			try
+			{
+				await save();
+			}
+			catch (Exception ex)
+			{
+				_logger.LogError(ex, "[{ClassName}] {Description} failed for '{Name}'",
+					nameof(SurfTimer), description, player.Profile.Name);
+			}
+			finally
+			{
+				player.ReplayRecorder.EndSave();
+			}
+		});
+	}
+
+	/// <summary>
 	/// Determines the zone type based on the entity name.
 	/// </summary>
 	/// <param name="entityName">Name of the entity.</param>
@@ -111,11 +137,7 @@ public partial class SurfTimer
 
 			if (saveMapTime && !player.Timer.IsPracticeMode)
 			{
-				player.ReplayRecorder.IsSaving = true;
-				AddTimer(1.0f, async () => // This determines whether we will have frames for AFTER touch the endZone 
-				{
-					await player.Stats.ThisRun.SaveMapTime(player); // Save the MapTime PB data
-				});
+				ScheduleRunSave(player, "SaveMapTime", () => player.Stats.ThisRun.SaveMapTime(player));
 			}
 
 			// Add entry in DB for the run
@@ -127,43 +149,34 @@ public partial class SurfTimer
 					float lastStageEntryVelX = player.Timer.StageEntryVelX;
 					float lastStageEntryVelY = player.Timer.StageEntryVelY;
 					float lastStageEntryVelZ = player.Timer.StageEntryVelZ;
-					AddTimer(1.0f, async () => // This determines whether we will have frames for AFTER touch the endZone
+					ScheduleRunSave(player, "SaveStageTime (last)", async () =>
 					{
-						try
-						{
-							// This calculation is wrong unless we wait for a bit in order for the `END_ZONE_ENTER` to be available in the `Frames` object
-							int stage_run_time = player.ReplayRecorder.Frames.FindLastIndex(f => f.Situation == ReplayFrameSituation.END_ZONE_ENTER) - player.ReplayRecorder.Frames.FindLastIndex(f => f.Situation == ReplayFrameSituation.STAGE_ZONE_EXIT);
+						// This calculation is wrong unless we wait for a bit in order for the `END_ZONE_ENTER` to be available in the `Frames` object
+						int stage_run_time = player.ReplayRecorder.Frames.FindLastIndex(f => f.Situation == ReplayFrameSituation.END_ZONE_ENTER) - player.ReplayRecorder.Frames.FindLastIndex(f => f.Situation == ReplayFrameSituation.STAGE_ZONE_EXIT);
 
-							await CurrentRun.SaveStageTime(player, CurrentMap.Stages, stage_run_time, true,
-								startVelX: lastStageEntryVelX, startVelY: lastStageEntryVelY, startVelZ: lastStageEntryVelZ,
-								endVelX: velocity.X, endVelY: velocity.Y, endVelZ: velocity.Z);
+						await CurrentRun.SaveStageTime(player, CurrentMap.Stages, stage_run_time, true,
+							startVelX: lastStageEntryVelX, startVelY: lastStageEntryVelY, startVelZ: lastStageEntryVelZ,
+							endVelX: velocity.X, endVelY: velocity.Y, endVelZ: velocity.Z);
 
-							player.HUD.DisplayStageMessage(CurrentMap.Stages, stage_run_time, velocity);
-						}
-						catch (Exception ex)
-						{
-							_logger.LogError(ex, "[{ClassName}] {Method} -> SaveStageTime (last) failed for '{Name}'",
-								nameof(SurfTimer), nameof(StartTouchHandleMapEndZone), player.Profile.Name);
-						}
+						player.HUD.DisplayStageMessage(CurrentMap.Stages, stage_run_time, velocity);
 					});
 				}
 				// Should we also save a last checkpoint segment run? (non-staged maps only)
 				else if (CurrentMap.Stages == 0 && CurrentMap.TotalCheckpoints > 0)
 				{
-					AddTimer(1.0f, async () => // This determines whether we will have frames for AFTER touch the endZone
+					float lastCheckpointEntryVelX = player.Timer.CheckpointEntryVelX;
+					float lastCheckpointEntryVelY = player.Timer.CheckpointEntryVelY;
+					float lastCheckpointEntryVelZ = player.Timer.CheckpointEntryVelZ;
+					ScheduleRunSave(player, "SaveCheckpointTime (last)", async () =>
 					{
-						try
-						{
-							// This calculation is wrong unless we wait for a bit in order for the `END_ZONE_ENTER` to be available in the `Frames` object
-							int checkpoint_run_time = player.ReplayRecorder.Frames.FindLastIndex(f => f.Situation == ReplayFrameSituation.END_ZONE_ENTER) - player.ReplayRecorder.Frames.FindLastIndex(f => f.Situation == ReplayFrameSituation.CHECKPOINT_ZONE_EXIT);
+						// This calculation is wrong unless we wait for a bit in order for the `END_ZONE_ENTER` to be available in the `Frames` object
+						int checkpoint_run_time = player.ReplayRecorder.Frames.FindLastIndex(f => f.Situation == ReplayFrameSituation.END_ZONE_ENTER) - player.ReplayRecorder.Frames.FindLastIndex(f => f.Situation == ReplayFrameSituation.CHECKPOINT_ZONE_EXIT);
 
-							await CurrentRun.SaveCheckpointTime(player, (short)CurrentMap.TotalCheckpoints, checkpoint_run_time, true);
-						}
-						catch (Exception ex)
-						{
-							_logger.LogError(ex, "[{ClassName}] {Method} -> SaveCheckpointTime (last) failed for '{Name}'",
-								nameof(SurfTimer), nameof(StartTouchHandleMapEndZone), player.Profile.Name);
-						}
+						await CurrentRun.SaveCheckpointTime(player, (short)CurrentMap.TotalCheckpoints, checkpoint_run_time, true,
+							startVelX: lastCheckpointEntryVelX, startVelY: lastCheckpointEntryVelY, startVelZ: lastCheckpointEntryVelZ,
+							endVelX: velocity.X, endVelY: velocity.Y, endVelZ: velocity.Z);
+
+						player.HUD.DisplayCheckpointSegmentMessage((short)CurrentMap.TotalCheckpoints, checkpoint_run_time, velocity);
 					});
 				}
 
@@ -190,24 +203,16 @@ public partial class SurfTimer
 				float lastStageEntryVelX = player.Timer.StageEntryVelX;
 				float lastStageEntryVelY = player.Timer.StageEntryVelY;
 				float lastStageEntryVelZ = player.Timer.StageEntryVelZ;
-				AddTimer(1.0f, async () => // This determines whether we will have frames for AFTER touch the endZone
+				ScheduleRunSave(player, "SaveStageTime (last, stage mode)", async () =>
 				{
-					try
-					{
-						// This calculation is wrong unless we wait for a bit in order for the `END_ZONE_ENTER` to be available in the `Frames` object
-						int stage_run_time = player.ReplayRecorder.Frames.FindLastIndex(f => f.Situation == ReplayFrameSituation.END_ZONE_ENTER) - player.ReplayRecorder.Frames.FindLastIndex(f => f.Situation == ReplayFrameSituation.STAGE_ZONE_EXIT);
+					// This calculation is wrong unless we wait for a bit in order for the `END_ZONE_ENTER` to be available in the `Frames` object
+					int stage_run_time = player.ReplayRecorder.Frames.FindLastIndex(f => f.Situation == ReplayFrameSituation.END_ZONE_ENTER) - player.ReplayRecorder.Frames.FindLastIndex(f => f.Situation == ReplayFrameSituation.STAGE_ZONE_EXIT);
 
-						await CurrentRun.SaveStageTime(player, CurrentMap.Stages, stage_run_time, true,
-							startVelX: lastStageEntryVelX, startVelY: lastStageEntryVelY, startVelZ: lastStageEntryVelZ,
-							endVelX: velocity.X, endVelY: velocity.Y, endVelZ: velocity.Z);
+					await CurrentRun.SaveStageTime(player, CurrentMap.Stages, stage_run_time, true,
+						startVelX: lastStageEntryVelX, startVelY: lastStageEntryVelY, startVelZ: lastStageEntryVelZ,
+						endVelX: velocity.X, endVelY: velocity.Y, endVelZ: velocity.Z);
 
-						player.HUD.DisplayStageMessage(CurrentMap.Stages, stage_run_time, velocity);
-					}
-					catch (Exception ex)
-					{
-						_logger.LogError(ex, "[{ClassName}] {Method} -> SaveStageTime (last, stage mode) failed for '{Name}'",
-							nameof(SurfTimer), nameof(StartTouchHandleMapEndZone), player.Profile.Name);
-					}
+					player.HUD.DisplayStageMessage(CurrentMap.Stages, stage_run_time, velocity);
 				});
 			}
 		}
@@ -219,6 +224,8 @@ public partial class SurfTimer
 
 	private static void StartTouchHandleMapStartZone(Player player, CBaseTrigger trigger, [CallerMemberName] string methodName = "")
 	{
+		player.IsInStartZone = true;
+
 		// We shouldn't start timer and reset data until MapTime has been saved - mostly concerns the Replays and trimming the correct parts
 		if (!player.ReplayRecorder.IsSaving)
 		{
@@ -242,6 +249,8 @@ public partial class SurfTimer
 
 	private void StartTouchHandleStageStartZone(Player player, CBaseTrigger trigger, [CallerMemberName] string methodName = "")
 	{
+		player.IsInStartZone = true;
+
 		// Get velocities for DB queries
 		// Get the velocity of the player - we will be using this values to compare and write to DB
 		VectorT velocity = player.Controller.PlayerPawn.Value!.AbsVelocity.ToVector_t();
@@ -267,20 +276,10 @@ public partial class SurfTimer
 				float entryVelX = player.Timer.StageEntryVelX;
 				float entryVelY = player.Timer.StageEntryVelY;
 				float entryVelZ = player.Timer.StageEntryVelZ;
-				AddTimer(1.0f, async () => // This determines whether we will have frames for AFTER touch the endZone
-				{
-					try
-					{
-						await CurrentRun.SaveStageTime(player, (short)(stage - 1), stage_run_time,
-							startVelX: entryVelX, startVelY: entryVelY, startVelZ: entryVelZ,
-							endVelX: velocity.X, endVelY: velocity.Y, endVelZ: velocity.Z);
-					}
-					catch (Exception ex)
-					{
-						_logger.LogError(ex, "[{ClassName}] {Method} -> SaveStageTime failed for '{Name}' (stage {Stage})",
-							nameof(SurfTimer), nameof(StartTouchHandleStageStartZone), player.Profile.Name, stage - 1);
-					}
-				});
+				ScheduleRunSave(player, $"SaveStageTime (stage {stage - 1}, stage mode)", () =>
+					CurrentRun.SaveStageTime(player, (short)(stage - 1), stage_run_time,
+						startVelX: entryVelX, startVelY: entryVelY, startVelZ: entryVelZ,
+						endVelX: velocity.X, endVelY: velocity.Y, endVelZ: velocity.Z));
 
 				player.HUD.DisplayStageMessage((short)(stage - 1), stage_run_time, velocity);
 			}
@@ -311,20 +310,10 @@ public partial class SurfTimer
 				float entryVelY = player.Timer.StageEntryVelY;
 				float entryVelZ = player.Timer.StageEntryVelZ;
 
-				AddTimer(1.0f, async () => // This determines whether we will have frames for AFTER touch the endZone
-				{
-					try
-					{
-						await CurrentRun.SaveStageTime(player, (short)(stage - 1), stage_run_time,
-							startVelX: entryVelX, startVelY: entryVelY, startVelZ: entryVelZ,
-							endVelX: velocity.X, endVelY: velocity.Y, endVelZ: velocity.Z);
-					}
-					catch (Exception ex)
-					{
-						_logger.LogError(ex, "[{ClassName}] {Method} -> SaveStageTime failed for '{Name}' (stage {Stage})",
-							nameof(SurfTimer), nameof(StartTouchHandleStageStartZone), player.Profile.Name, stage - 1);
-					}
-				});
+				ScheduleRunSave(player, $"SaveStageTime (stage {stage - 1})", () =>
+					CurrentRun.SaveStageTime(player, (short)(stage - 1), stage_run_time,
+						startVelX: entryVelX, startVelY: entryVelY, startVelZ: entryVelZ,
+						endVelX: velocity.X, endVelY: velocity.Y, endVelZ: velocity.Z));
 			}
 
 			player.Timer.Checkpoint = (short)(stage - 1); // Stage = Checkpoint when in a run on a Staged map
@@ -392,28 +381,29 @@ public partial class SurfTimer
 				player.ReplayRecorder.CheckpointEnterSituations.Add(player.Timer.Ticks);
 			}
 
+			int checkpoint_run_time = player.Timer.Ticks - player.Stats.ThisRun.RunTime; // player.Stats.ThisRun.RunTime should be the Tick we left the previous Checkpoint zone
+			short completedCheckpoint = (short)(checkpoint - 1);
+
 			// Save Checkpoint segment MapTime during a Map run (non-staged maps only)
 			if (SurfTimer.CurrentMap.Stages == 0 && checkpoint > 1 && !failed_checkpoint && !player.Timer.IsPracticeMode)
 			{
-				int checkpoint_run_time = player.Timer.Ticks - player.Stats.ThisRun.RunTime; // player.Stats.ThisRun.RunTime should be the Tick we left the previous Checkpoint zone
-				short completedCheckpoint = (short)(checkpoint - 1);
+				float entryVelX = player.Timer.CheckpointEntryVelX;
+				float entryVelY = player.Timer.CheckpointEntryVelY;
+				float entryVelZ = player.Timer.CheckpointEntryVelZ;
 
-				AddTimer(1.0f, async () => // This determines whether we will have frames for AFTER touch the endZone
-				{
-					try
-					{
-						await CurrentRun.SaveCheckpointTime(player, completedCheckpoint, checkpoint_run_time);
-					}
-					catch (Exception ex)
-					{
-						_logger.LogError(ex, "[{ClassName}] {Method} -> SaveCheckpointTime failed for '{Name}' (checkpoint {Checkpoint})",
-							nameof(SurfTimer), nameof(StartTouchHandleCheckpointZone), player.Profile.Name, completedCheckpoint);
-					}
-				});
+				ScheduleRunSave(player, $"SaveCheckpointTime (checkpoint {completedCheckpoint})", () =>
+					CurrentRun.SaveCheckpointTime(player, completedCheckpoint, checkpoint_run_time,
+						startVelX: entryVelX, startVelY: entryVelY, startVelZ: entryVelZ,
+						endVelX: velocity.X, endVelY: velocity.Y, endVelZ: velocity.Z));
 			}
 
-			// Print checkpoint message
-			player.HUD.DisplayCheckpointMessages();
+			// Print Checkpoint completion message (non-staged maps compare against the standalone
+			// Checkpoint PB/WR records; the rare staged-map-with-checkpoint-zones case falls back to
+			// the generic per-run split message since no standalone Checkpoint records exist there)
+			if (SurfTimer.CurrentMap.Stages == 0)
+				player.HUD.DisplayCheckpointSegmentMessage(completedCheckpoint, checkpoint_run_time, velocity);
+			else
+				player.HUD.DisplayCheckpointMessages();
 
 			if (!player.Stats.ThisRun.Checkpoints.ContainsKey(checkpoint))
 			{
@@ -528,11 +518,7 @@ public partial class SurfTimer
 		{
 			if (saveBonusTime)
 			{
-				player.ReplayRecorder.IsSaving = true;
-				AddTimer(1.0f, async () => // This determines whether we will have frames for AFTER touch the endZone 
-				{
-					await player.Stats.ThisRun.SaveMapTime(player, bonus: bonus_idx); // Save the Bonus MapTime data
-				});
+				ScheduleRunSave(player, $"SaveMapTime (bonus {bonus_idx})", () => player.Stats.ThisRun.SaveMapTime(player, bonus: bonus_idx));
 			}
 		}
 	}
@@ -546,6 +532,8 @@ public partial class SurfTimer
 
 	private static void EndTouchHandleMapStartZone(Player player, [CallerMemberName] string methodName = "")
 	{
+		player.IsInStartZone = false;
+
 		VectorT velocity = player.Controller.PlayerPawn.Value!.AbsVelocity.ToVector_t();
 
 		// MAP START ZONE
@@ -570,6 +558,9 @@ public partial class SurfTimer
 		player.Timer.StageEntryVelX = velocity.X; // Entry speed for Stage 1 (starts at map start)
 		player.Timer.StageEntryVelY = velocity.Y;
 		player.Timer.StageEntryVelZ = velocity.Z;
+		player.Timer.CheckpointEntryVelX = velocity.X; // Entry speed for Checkpoint 1 (starts at map start)
+		player.Timer.CheckpointEntryVelY = velocity.Y;
+		player.Timer.CheckpointEntryVelZ = velocity.Z;
 
 #if DEBUG
 		player.Controller.PrintToChat($"CS2 Surf DEBUG >> CBaseTrigger_{ChatColors.LightRed}EndTouchFunc{ChatColors.Default} -> {ChatColors.Green}Map Start Zone");
@@ -578,6 +569,8 @@ public partial class SurfTimer
 
 	private static void EndTouchHandleStageStartZone(Player player, CBaseTrigger trigger, [CallerMemberName] string methodName = "")
 	{
+		player.IsInStartZone = false;
+
 #if DEBUG
 		player.Controller.PrintToChat($"CS2 Surf DEBUG >> CBaseTrigger_{ChatColors.LightRed}EndTouchFunc{ChatColors.Default} -> {ChatColors.Yellow}Stage {Regex.Match(trigger.Entity!.Name, "[0-9][0-9]?").Value} Start Zone");
 		Console.WriteLine($"===================== player.Timer.Checkpoint {player.Timer.Checkpoint} - player.Stats.ThisRun.Checkpoint.Count {player.Stats.ThisRun.Checkpoints.Count}");
@@ -626,6 +619,12 @@ public partial class SurfTimer
 		Console.WriteLine($"===================== player.Timer.Checkpoint {player.Timer.Checkpoint} - player.Stats.ThisRun.Checkpoint.Count {player.Stats.ThisRun.Checkpoints.Count}");
 #endif
 		VectorT velocity = player.Controller.PlayerPawn.Value!.AbsVelocity.ToVector_t();
+
+		// Entry speed for the checkpoint segment just entered - shown regardless of how it was
+		// entered (non-staged maps only, mirrors EndTouchHandleStageStartZone's capture)
+		player.Timer.CheckpointEntryVelX = velocity.X;
+		player.Timer.CheckpointEntryVelY = velocity.Y;
+		player.Timer.CheckpointEntryVelZ = velocity.Z;
 
 		// This will populate the End velocities for the given Checkpoint zone (Stage = Checkpoint when in a Map Run)
 		if (player.Timer.Checkpoint != 0 && player.Timer.Checkpoint <= player.Stats.ThisRun.Checkpoints.Count)

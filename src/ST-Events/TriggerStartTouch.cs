@@ -12,8 +12,20 @@ public partial class SurfTimer
 	{
 		CBaseTrigger trigger = new CBaseTrigger(caller.Handle);
 		CBaseEntity entity = new CBaseEntity(activator.Handle);
-		CCSPlayerController client = new CCSPlayerController(new CCSPlayerPawn(entity.Handle).Controller.Value!.Handle);
-		if (!client.IsValid || !client.PawnIsAlive || !playerList.ContainsKey((int)client.UserId!)) // !playerList.ContainsKey((int)client.UserId!) make sure to not check for user_id that doesnt exists
+		CCSPlayerController client = null!;
+
+		try
+		{
+			client = new CCSPlayerController(new CCSPlayerPawn(entity.Handle).Controller.Value!.Handle);
+		}
+		catch (Exception ex)
+		{
+			_logger.LogError(ex, "[{ClassName}] OnTriggerStartTouch -> Could not assign `client` (name: {Name}). Exception: {Exception}",
+				nameof(SurfTimer), name, ex.Message
+			);
+		}
+
+		if (client == null || !client.IsValid || !client.PawnIsAlive || !playerList.ContainsKey((int)client.UserId!)) // !playerList.ContainsKey((int)client.UserId!) make sure to not check for user_id that doesnt exists
 		{
 			return HookResult.Continue;
 		}

@@ -28,6 +28,19 @@ public static class Config
 	public static readonly bool ReplaysEnabled = TimerSettings.GetReplaysEnabled();
 	public static readonly int ReplaysPre = TimerSettings.GetReplaysPre();
 
+	/// <summary>
+	/// Maximum number of distinct replays that can play concurrently via !replay.
+	/// </summary>
+	public const int ReplayPoolCap = 3;
+	/// <summary>
+	/// How many times a replay bot repeats its replay before going idle.
+	/// </summary>
+	public const int ReplayRepeatCount = 3;
+	/// <summary>
+	/// Seconds an idle (finished, unclaimed) replay bot waits before being kicked.
+	/// </summary>
+	public const int ReplayIdleTimeoutSeconds = 2;
+
 	// Helper class/methods for configuration loading
 	private static class ConfigLoader
 	{

@@ -24,12 +24,18 @@ public class ReplayPlayer
 	public int MapTimeID { get; set; } = -1;
 	public int Type { get; set; } = -1;
 	public int Stage { get; set; } = -1;
+	public int Style { get; set; } = 0;
 
 	public int RecordRank { get; set; } = -1; // This is used to determine whether replay is for wr or for pb
 	public string RecordPlayerName { get; set; } = "N/A";
 	public int RecordRunTime { get; set; } = -1;
 	public int ReplayCurrentRunTime { get; set; } = 0;
 	public bool IsReplayOutsideZone { get; set; } = false;
+
+	// Pool slot bookkeeping
+	public int RequestedByPlayerId { get; set; } = -1; // -1 = WR content, else the PB owner's Profile.ID
+	public DateTime? IdleSince { get; set; } = null; // Set when this slot finishes a replay and goes idle
+	public int? PendingSpectatorUserId { get; set; } = null; // UserId of whoever is waiting to auto-spectate once this slot's bot spawns
 
 	// Tracking
 	public List<ReplayFrame> Frames { get; set; } = new List<ReplayFrame>();
@@ -100,6 +106,56 @@ public class ReplayPlayer
 		);
 	}
 
+	/// <summary>
+	/// Loads a content template (a WR record, or an ad-hoc PB template) into this pool slot,
+	/// leaving Controller/pool-lifecycle fields untouched.
+	/// </summary>
+	internal void LoadContentFrom(ReplayPlayer source, int requestedByPlayerId = -1)
+	{
+		this.Type = source.Type;
+		this.Stage = source.Stage;
+		this.Style = source.Style;
+		this.MapID = source.MapID;
+		this.MapTimeID = source.MapTimeID;
+		this.RecordRank = source.RecordRank;
+		this.RecordPlayerName = source.RecordPlayerName;
+		this.RecordRunTime = source.RecordRunTime;
+		this.Frames = source.Frames;
+		this.StageEnterSituations = source.StageEnterSituations;
+		this.StageExitSituations = source.StageExitSituations;
+		this.CheckpointEnterSituations = source.CheckpointEnterSituations;
+		this.CheckpointExitSituations = source.CheckpointExitSituations;
+		this.MapSituations = source.MapSituations;
+		this.BonusSituations = source.BonusSituations;
+		this.RequestedByPlayerId = requestedByPlayerId;
+	}
+
+	/// <summary>
+	/// Stops playback, returns the underlying bot to Spectator with the generic "Replay" name,
+	/// and marks the slot idle (eligible for reclaim by a new request, or kicked after
+	/// Config.ReplayIdleTimeoutSeconds if nothing claims it).
+	/// </summary>
+	internal void GoIdle()
+	{
+		this.Stop();
+		this.IdleSince = DateTime.UtcNow;
+
+		if (this.Controller == null)
+			return;
+
+		SchemaString<CBasePlayerController> bot_name = new SchemaString<CBasePlayerController>(this.Controller, "m_iszPlayerName");
+		bot_name.Set("Replay");
+
+		Server.NextFrame(() =>
+		{
+			if (this.Controller == null)
+				return;
+
+			Utilities.SetStateChanged(this.Controller, "CBasePlayerController", "m_iszPlayerName");
+			this.Controller.MoveToSpectator();
+		});
+	}
+
 	internal void Start([CallerMemberName] string methodName = "")
 	{
 		if (!this.IsPlayable || !this.IsEnabled)
@@ -145,6 +201,10 @@ public class ReplayPlayer
 	internal void Tick()
 	{
 		if (this.MapID == -1 || !this.IsEnabled || !this.IsPlaying || !this.IsPlayable || this.Frames.Count == 0)
+			return;
+
+		var pawn = this.Controller?.PlayerPawn.Value;
+		if (pawn == null || !pawn.IsValid || !this.Controller!.PawnIsAlive)
 			return;
 
 		ReplayFrame current_frame = this.Frames[this.CurrentFrameTick];
@@ -196,7 +256,7 @@ public class ReplayPlayer
 		}
 		// END OF BLASPHEMY
 
-		var current_pos = Controller!.PlayerPawn.Value!.AbsOrigin!.ToVector_t();
+		var current_pos = pawn.AbsOrigin!.ToVector_t();
 		var current_frame_pos = current_frame.GetPos();
 		var current_frame_ang = current_frame.GetAng();
 
@@ -205,14 +265,14 @@ public class ReplayPlayer
 		VectorT velocity = (current_frame_pos - current_pos) * 64;
 
 		if (is_on_ground)
-			this.Controller.PlayerPawn.Value.MoveType = MoveType_t.MOVETYPE_WALK;
+			pawn.MoveType = MoveType_t.MOVETYPE_WALK;
 		else
-			this.Controller.PlayerPawn.Value.MoveType = MoveType_t.MOVETYPE_NOCLIP;
+			pawn.MoveType = MoveType_t.MOVETYPE_NOCLIP;
 
 		if ((current_pos - current_frame_pos).Length() > 200)
-			Extensions.Teleport(Controller.PlayerPawn.Value, current_frame_pos, current_frame_ang, null);
+			Extensions.Teleport(pawn, current_frame_pos, current_frame_ang, null);
 		else
-			Extensions.Teleport(Controller.PlayerPawn.Value, null, current_frame_ang, velocity);
+			Extensions.Teleport(pawn, null, current_frame_ang, velocity);
 
 
 		if (!this.IsPaused)
@@ -273,6 +333,8 @@ public class ReplayPlayer
 		if (this.Type == 1)
 			prefix += $"B {this.Stage}";
 		else if (this.Type == 2)
+			prefix += $"S {this.Stage}";
+		else if (this.Type == 3)
 			prefix += $"CP {this.Stage}";
 
 		SchemaString<CBasePlayerController> bot_name = new SchemaString<CBasePlayerController>(this.Controller!, "m_iszPlayerName");

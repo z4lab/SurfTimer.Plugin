@@ -39,5 +39,10 @@
 	"bonuspb_improved": "{lime}{0}{default} beat their {yellow}Bonus {1}{default} Personal Best with a time of {gold}{2}{default}, improving by {green}-{3}{default}! (Previous: {bluegrey}{4})",
 	"bonuspb_missed": "You are behind the {yellow}Bonus {0}{default} record with a time of {grey}{1}{default}, missing the record by {red}+{2}{default} ({gold}{3}{default})!",
 	"checkpoint_message": "CP [{yellow}{0}{default}]: {yellow}{1}{default} {yellow}({2}){default} [PB: {3} | WR: {4}]",
-	"stage_message": "Stage [{yellow}{0}{default}]: {yellow}{1}{default} {yellow}({2}){default} [PB: {3} | WR: {4}]"
+	"stage_message": "Stage [{yellow}{0}{default}]: {yellow}{1}{default} {yellow}({2}){default} [PB: {3} | WR: {4}]",
+	"replay_pool_full": "{red}All {green}{0}{red} replay slots are currently in use. Try again shortly.",
+	"replay_spawning": "{green}Spawning a replay bot, please wait...",
+	"replay_no_pb": "{red}No replay data was saved for this run.",
+	"spec_no_match": "{red}No player found matching '{yellow}{0}{red}'.",
+	"spec_manual_hint": "Press {yellow}M{default} and choose {yellow}Spectator{default} - you'll be put on {lime}{0}{default} automatically."
 }

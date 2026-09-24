@@ -12,8 +12,18 @@ public partial class SurfTimer
 
 		foreach (var player in playerList.Values)
 		{
-			player.Timer.Tick();
-			player.ReplayRecorder.Tick(player);
+			if (!player.Controller.IsValid)
+				continue;
+
+			// Spectators/dead players have no live PlayerPawn - the timer, recorder and speed cap
+			// all read it, and one exception here would abort the tick for everyone.
+			if (player.Controller.PawnIsAlive)
+			{
+				player.Timer.Tick();
+				player.ReplayRecorder.Tick(player);
+				player.TickStartZoneSpeedCap();
+			}
+
 			player.HUD.Display();
 		}
 
@@ -23,12 +33,7 @@ public partial class SurfTimer
 		if (bot_quota != null)
 		{
 			int cbq = bot_quota.GetPrimitiveValue<int>();
-
-			int replaybot_count = 1 +
-								(CurrentMap.ReplayManager.StageWR != null ? 1 : 0) +
-								(CurrentMap.ReplayManager.BonusWR != null ? 1 : 0) +
-								(CurrentMap.ReplayManager.CheckpointWR != null ? 1 : 0) +
-								CurrentMap.ReplayManager.CustomReplays.Count;
+			int replaybot_count = CurrentMap.ReplayManager.Pool.Count;
 
 			if (cbq != replaybot_count)
 			{
@@ -36,74 +41,25 @@ public partial class SurfTimer
 			}
 		}
 
-		CurrentMap.ReplayManager.MapWR.Tick();
-		CurrentMap.ReplayManager.StageWR?.Tick();
-		CurrentMap.ReplayManager.BonusWR?.Tick();
-		CurrentMap.ReplayManager.CheckpointWR?.Tick();
-
-		if (CurrentMap.ReplayManager.MapWR.MapTimeID != -1)
+		// Iterate backwards - KickReplayBot removes from the pool by index mid-loop
+		for (int i = CurrentMap.ReplayManager.Pool.Count - 1; i >= 0; i--)
 		{
-			CurrentMap.ReplayManager.MapWR.FormatBotName();
-		}
+			var slot = CurrentMap.ReplayManager.Pool[i];
 
-		// Here we will load the NEXT stage replay from AllStageWR
-		if (CurrentMap.ReplayManager.StageWR?.RepeatCount == 0)
-		{
-			int next_stage;
-			if (CurrentMap.ReplayManager.AllStageWR[(CurrentMap.ReplayManager.StageWR.Stage % CurrentMap.Stages) + 1][0].MapTimeID == -1)
-				next_stage = 1;
-			else
-				next_stage = (CurrentMap.ReplayManager.StageWR.Stage % CurrentMap.Stages) + 1;
+			if (slot.Controller == null)
+				continue; // Still awaiting the bot to actually spawn - claimed in Players.cs OnPlayerSpawn
 
-			CurrentMap.ReplayManager.AllStageWR[next_stage][0].Controller = CurrentMap.ReplayManager.StageWR.Controller;
+			slot.Tick();
 
-			CurrentMap.ReplayManager.StageWR = CurrentMap.ReplayManager.AllStageWR[next_stage][0];
-			CurrentMap.ReplayManager.StageWR.LoadReplayData(repeat_count: 3);
-			CurrentMap.ReplayManager.StageWR.FormatBotName();
-			CurrentMap.ReplayManager.StageWR.Start();
-		}
-
-		if (CurrentMap.ReplayManager.BonusWR?.RepeatCount == 0)
-		{
-			int next_bonus;
-			if (CurrentMap.ReplayManager.AllBonusWR[(CurrentMap.ReplayManager.BonusWR.Stage % CurrentMap.Bonuses) + 1][0].MapTimeID == -1)
-				next_bonus = 1;
-			else
-				next_bonus = (CurrentMap.ReplayManager.BonusWR.Stage % CurrentMap.Bonuses) + 1;
-
-			CurrentMap.ReplayManager.AllBonusWR[next_bonus][0].Controller = CurrentMap.ReplayManager.BonusWR.Controller;
-
-			CurrentMap.ReplayManager.BonusWR = CurrentMap.ReplayManager.AllBonusWR[next_bonus][0];
-			CurrentMap.ReplayManager.BonusWR.LoadReplayData(repeat_count: 3);
-			CurrentMap.ReplayManager.BonusWR.FormatBotName();
-			CurrentMap.ReplayManager.BonusWR.Start();
-		}
-
-		// Here we will load the NEXT checkpoint segment replay from AllCheckpointWR
-		if (CurrentMap.ReplayManager.CheckpointWR?.RepeatCount == 0)
-		{
-			int next_checkpoint;
-			if (CurrentMap.ReplayManager.AllCheckpointWR[(CurrentMap.ReplayManager.CheckpointWR.Stage % CurrentMap.TotalCheckpoints) + 1][0].MapTimeID == -1)
-				next_checkpoint = 1;
-			else
-				next_checkpoint = (CurrentMap.ReplayManager.CheckpointWR.Stage % CurrentMap.TotalCheckpoints) + 1;
-
-			CurrentMap.ReplayManager.AllCheckpointWR[next_checkpoint][0].Controller = CurrentMap.ReplayManager.CheckpointWR.Controller;
-
-			CurrentMap.ReplayManager.CheckpointWR = CurrentMap.ReplayManager.AllCheckpointWR[next_checkpoint][0];
-			CurrentMap.ReplayManager.CheckpointWR.LoadReplayData(repeat_count: 3);
-			CurrentMap.ReplayManager.CheckpointWR.FormatBotName();
-			CurrentMap.ReplayManager.CheckpointWR.Start();
-		}
-
-		for (int i = 0; i < CurrentMap.ReplayManager.CustomReplays.Count; i++)
-		{
-			if (CurrentMap.ReplayManager.CustomReplays[i].MapID != CurrentMap.ID)
-				CurrentMap.ReplayManager.CustomReplays[i].MapID = CurrentMap.ID;
-
-			CurrentMap.ReplayManager.CustomReplays[i].Tick();
-			if (CurrentMap.ReplayManager.CustomReplays[i].RepeatCount == 0)
+			if (slot.IsPlaying && slot.RepeatCount == 0)
 			{
+				// Finished its repeats - go idle in spectator instead of auto-advancing to another replay
+				slot.GoIdle();
+			}
+			else if (!slot.IsPlaying && slot.IdleSince.HasValue &&
+					(DateTime.UtcNow - slot.IdleSince.Value).TotalSeconds >= Config.ReplayIdleTimeoutSeconds)
+			{
+				// Idle and unclaimed for too long - free the slot
 				CurrentMap.KickReplayBot(i);
 			}
 		}

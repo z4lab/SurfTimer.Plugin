@@ -306,37 +306,18 @@ public class PlayerHud
 	}
 
 	/// <summary>
-	/// Displays the Spectator HUD for the client if they are spectating a replay
+	/// Displays the Spectator HUD for the client if they are spectating a replay bot from the pool
 	/// </summary>
 	internal void DisplaySpectatorHud()
 	{
-		ReplayPlayer? specReplay;
-		string hud = string.Empty;
+		ReplayPlayer? specReplay = SurfTimer.CurrentMap.ReplayManager.Pool.Find(x =>
+			x.Controller != null && _player.IsSpectating(x.Controller)
+		);
 
-		if (_player.IsSpectating(SurfTimer.CurrentMap.ReplayManager.MapWR.Controller!))
-		{
-			specReplay = SurfTimer.CurrentMap.ReplayManager.MapWR;
-			hud = BuildMapWrModule(specReplay);
-		}
-		else if (_player.IsSpectating(SurfTimer.CurrentMap.ReplayManager.StageWR?.Controller!))
-		{
-			specReplay = SurfTimer.CurrentMap.ReplayManager.StageWR!;
-			hud = BuildStageWrModule(specReplay);
-		}
-		else if (_player.IsSpectating(SurfTimer.CurrentMap.ReplayManager.BonusWR?.Controller!))
-		{
-			specReplay = SurfTimer.CurrentMap.ReplayManager.BonusWR!;
-			hud = BuildBonusWrModule(specReplay);
-		}
-		else
-		{
-			specReplay = SurfTimer.CurrentMap.ReplayManager.CustomReplays.Find(x =>
-				_player.IsSpectating(x.Controller!)
-			);
-			if (specReplay != null)
-				hud = BuildCustomReplayModule(specReplay);
-		}
+		if (specReplay == null)
+			return;
 
+		string hud = BuildReplayModule(specReplay);
 		if (!string.IsNullOrEmpty(hud))
 		{
 			_player.Controller.PrintToCenterHtml(hud);
@@ -344,135 +325,26 @@ public class PlayerHud
 	}
 
 	/// <summary>
-	/// Build the Map WR module for the spectator HUD
+	/// Build the spectator HUD module for whichever replay a pool slot is currently playing -
+	/// covers Map/Stage/Bonus/Checkpoint content, both WR and a specific player's PB.
 	/// </summary>
-	/// <param name="specReplay">Replay data to use</param>
-	internal string BuildMapWrModule(ReplayPlayer specReplay)
+	/// <param name="specReplay">Pool slot to use</param>
+	internal string BuildReplayModule(ReplayPlayer specReplay)
 	{
-		float velocity = Extensions.GetVelocityFromController(specReplay.Controller!);
-		string timerColor = specReplay.ReplayCurrentRunTime > 0 ? TimerColorActive : RankColorWr;
-
-		string replayModule = FormatHUDElementHTML("", "Map WR Replay", SpectatorColor, "m");
-		string nameModule = FormatHUDElementHTML("", $"{specReplay.RecordPlayerName}", RankColorWr);
-		string timeModule = FormatHUDElementHTML(
-			"",
-			$"{FormatTime(specReplay.ReplayCurrentRunTime)} / {FormatTime(specReplay.RecordRunTime)}",
-			timerColor
-		);
-		string velocityModule =
-			FormatHUDElementHTML(
-				"Speed",
-				velocity.ToString("0"),
-				Extensions.GetSpeedColorGradient(velocity)
-			) + " u/s";
-		string cycleModule = FormatHUDElementHTML(
-			"Cycle",
-			$"{specReplay.RepeatCount}",
-			SpectatorColor,
-			"s"
-		);
-
-		return $"{replayModule}<br>{nameModule}<br>{timeModule}<br>{velocityModule}<br>{cycleModule}";
-	}
-
-	/// <summary>
-	/// Build the Stage WR module for the spectator HUD
-	/// </summary>
-	/// <param name="specReplay">Replay data to use</param>
-	internal string BuildStageWrModule(ReplayPlayer specReplay)
-	{
-		float velocity = Extensions.GetVelocityFromController(specReplay.Controller!);
-		string timerColor = specReplay.ReplayCurrentRunTime > 0 ? TimerColorActive : RankColorWr;
-
-		string replayModule = FormatHUDElementHTML(
-			"",
-			$"Stage {specReplay.Stage} WR Replay",
-			SpectatorColor,
-			"m"
-		);
-		string nameModule = FormatHUDElementHTML("", $"{specReplay.RecordPlayerName}", RankColorWr);
-		string timeModule = FormatHUDElementHTML(
-			"",
-			$"{FormatTime(specReplay.ReplayCurrentRunTime)} / {FormatTime(specReplay.RecordRunTime)}",
-			timerColor
-		);
-		string velocityModule =
-			FormatHUDElementHTML(
-				"Speed",
-				velocity.ToString("0"),
-				Extensions.GetSpeedColorGradient(velocity)
-			) + " u/s";
-		string cycleModule = FormatHUDElementHTML(
-			"Cycle",
-			$"{specReplay.RepeatCount}",
-			SpectatorColor,
-			"s"
-		);
-
-		return $"{replayModule}<br>{nameModule}<br>{timeModule}<br>{velocityModule}<br>{cycleModule}";
-	}
-
-	/// <summary>
-	/// Build the Bonus WR module for the spectator HUD
-	/// </summary>
-	/// <param name="specReplay">Replay data to use<</param>
-	internal string BuildBonusWrModule(ReplayPlayer specReplay)
-	{
-		float velocity = Extensions.GetVelocityFromController(specReplay.Controller!);
-		string timerColor = specReplay.ReplayCurrentRunTime > 0 ? TimerColorActive : RankColorWr;
-
-		string replayModule = FormatHUDElementHTML(
-			"",
-			$"Bonus {specReplay.Stage} WR Replay",
-			SpectatorColor,
-			"m"
-		);
-		string nameModule = FormatHUDElementHTML("", $"{specReplay.RecordPlayerName}", RankColorWr);
-		string timeModule = FormatHUDElementHTML(
-			"",
-			$"{FormatTime(specReplay.ReplayCurrentRunTime)} / {FormatTime(specReplay.RecordRunTime)}",
-			timerColor
-		);
-		string velocityModule =
-			FormatHUDElementHTML(
-				"Speed",
-				velocity.ToString("0"),
-				Extensions.GetSpeedColorGradient(velocity)
-			) + " u/s";
-		string cycleModule = FormatHUDElementHTML(
-			"Cycle",
-			$"{specReplay.RepeatCount}",
-			SpectatorColor,
-			"s"
-		);
-
-		return $"{replayModule}<br>{nameModule}<br>{timeModule}<br>{velocityModule}<br>{cycleModule}";
-	}
-
-	/// <summary>
-	/// Build the Custom Replay module for the spectator HUD
-	/// </summary>
-	/// <param name="specReplay">Replay data to use<</param>
-	internal string BuildCustomReplayModule(ReplayPlayer specReplay)
-	{
-		float velocity = Extensions.GetVelocityFromController(specReplay.Controller!);
-		string timerColor = specReplay.ReplayCurrentRunTime > 0 ? TimerColorActive : RankColorWr;
-
-		string replayType;
-		switch (specReplay.Type)
+		string kind = specReplay.RequestedByPlayerId == -1 ? "WR" : "PB";
+		string replayType = specReplay.Type switch
 		{
-			case 0:
-				replayType = "Map PB Replay";
-				break;
-			case 1:
-				replayType = $"Bonus {specReplay.Stage} PB Replay";
-				break;
-			case 2:
-				replayType = $"Stage {specReplay.Stage} PB Replay";
-				break;
-			default:
-				return ""; // Invalid type
-		}
+			0 => $"Map {kind} Replay",
+			1 => $"Bonus {specReplay.Stage} {kind} Replay",
+			2 => $"Stage {specReplay.Stage} {kind} Replay",
+			3 => $"Checkpoint {specReplay.Stage} {kind} Replay",
+			_ => "",
+		};
+		if (replayType == "")
+			return ""; // Invalid type
+
+		float velocity = Extensions.GetVelocityFromController(specReplay.Controller!);
+		string timerColor = specReplay.ReplayCurrentRunTime > 0 ? TimerColorActive : RankColorWr;
 
 		string replayModule = FormatHUDElementHTML("", replayType, SpectatorColor, "m");
 		string nameModule = FormatHUDElementHTML("", $"{specReplay.RecordPlayerName}", RankColorWr);
@@ -708,6 +580,72 @@ public class PlayerHud
 		_player.Controller.PrintToChat(
 			$"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["stage_message",
 			stage, FormatTime(stageRunTime), exitSpeed.ToString("0"), strPbDifference, strWrDifference]}"
+		);
+	}
+
+	/// <summary>
+	/// Displays a Checkpoint segment completion comparison message in player chat (non-staged maps
+	/// only). Compares against the standalone Checkpoint PB/WR records, not the generic per-run
+	/// embedded splits. Only calculates if a record exists yet, otherwise it will display N/A.
+	/// </summary>
+	/// <param name="checkpoint">Checkpoint segment that was just completed</param>
+	/// <param name="checkpointRunTime">Ticks it took to complete the checkpoint segment</param>
+	/// <param name="exitVelocity">Player's velocity at the moment the checkpoint segment was completed</param>
+	internal void DisplayCheckpointSegmentMessage(short checkpoint, int checkpointRunTime, VectorT exitVelocity)
+	{
+		int style = _player.Timer.Style;
+		float exitSpeed = exitVelocity.velMag();
+
+		string strPbDifference =
+			$"{ChatColors.Grey}N/A{ChatColors.Default} ({ChatColors.Grey}N/A{ChatColors.Default})";
+		string strWrDifference =
+			$"{ChatColors.Grey}N/A{ChatColors.Default} ({ChatColors.Grey}N/A{ChatColors.Default})";
+
+		PersonalBest checkpointPb = _player.Stats.CheckpointPB[checkpoint][style];
+		if (checkpointPb.ID != -1)
+		{
+			int pbTime = checkpointPb.RunTime;
+			float pbSpeed = (float)
+				Math.Sqrt(checkpointPb.EndVelX * checkpointPb.EndVelX + checkpointPb.EndVelY * checkpointPb.EndVelY + checkpointPb.EndVelZ * checkpointPb.EndVelZ);
+
+			strPbDifference = string.Empty;
+			if (pbTime - checkpointRunTime < 0.0)
+				strPbDifference += ChatColors.Red + "+" + FormatTime((pbTime - checkpointRunTime) * -1);
+			else
+				strPbDifference += ChatColors.Green + "-" + FormatTime(pbTime - checkpointRunTime);
+			strPbDifference += ChatColors.Default + " ";
+
+			if (pbSpeed - exitSpeed <= 0.0)
+				strPbDifference += "(" + ChatColors.Green + "+" + ((pbSpeed - exitSpeed) * -1).ToString("0");
+			else
+				strPbDifference += "(" + ChatColors.Red + "-" + (pbSpeed - exitSpeed).ToString("0");
+			strPbDifference += ChatColors.Default + ")";
+		}
+
+		PersonalBest checkpointWr = SurfTimer.CurrentMap.CheckpointWR[checkpoint][style];
+		if (checkpointWr.ID != -1)
+		{
+			int wrTime = checkpointWr.RunTime;
+			float wrSpeed = (float)
+				Math.Sqrt(checkpointWr.EndVelX * checkpointWr.EndVelX + checkpointWr.EndVelY * checkpointWr.EndVelY + checkpointWr.EndVelZ * checkpointWr.EndVelZ);
+
+			strWrDifference = string.Empty;
+			if (wrTime - checkpointRunTime < 0.0)
+				strWrDifference += ChatColors.Red + "+" + FormatTime((wrTime - checkpointRunTime) * -1);
+			else
+				strWrDifference += ChatColors.Green + "-" + FormatTime(wrTime - checkpointRunTime);
+			strWrDifference += ChatColors.Default + " ";
+
+			if (wrSpeed - exitSpeed <= 0.0)
+				strWrDifference += "(" + ChatColors.Green + "+" + ((wrSpeed - exitSpeed) * -1).ToString("0");
+			else
+				strWrDifference += "(" + ChatColors.Red + "-" + (wrSpeed - exitSpeed).ToString("0");
+			strWrDifference += ChatColors.Default + ")";
+		}
+
+		_player.Controller.PrintToChat(
+			$"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["checkpoint_message",
+			checkpoint, FormatTime(checkpointRunTime), exitSpeed.ToString("0"), strPbDifference, strWrDifference]}"
 		);
 	}
 }

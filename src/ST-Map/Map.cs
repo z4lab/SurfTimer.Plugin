@@ -10,7 +10,6 @@ using SurfTimer.Shared.Types;
 using System.Data;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
-using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace SurfTimer;
@@ -507,8 +506,9 @@ public class Map : MapEntity
 	}
 
 	/// <summary>
-	/// Sets the data for a replay that has been retrieved from MapTimes data.
-	/// Also sets the first Stage replay if no replays existed for stages until now.
+	/// Populates the content-template replay data (MapWR / AllStageWR / AllBonusWR / AllCheckpointWR)
+	/// for a record run retrieved from MapTimes data. These are pure content templates - loading data
+	/// here does not start or spawn any bot; replays only ever start via ReplayManager.RequestReplay.
 	/// </summary>
 	/// <param name="type">Type - 0 = Map, 1 = Bonus, 2 = Stage, 3 = Checkpoint segment</param>
 	/// <param name="style">Style to add</param>
@@ -516,13 +516,7 @@ public class Map : MapEntity
 	/// <param name="replayFramesBase64">Base64 encoded string for the replay_frames</param>
 	internal void SetReplayData(int type, int style, int stage, ReplayFramesString replayFramesBase64, [CallerMemberName] string methodName = "")
 	{
-		JsonSerializerOptions options = new JsonSerializerOptions { WriteIndented = false, Converters = { new VectorTConverter(), new QAngleTConverter() } };
-
-		// Decompress the Base64 string
-		string json = Compressor.Decompress(replayFramesBase64.ToString());
-
-		// Deserialize to List<ReplayFrame>
-		List<ReplayFrame> frames = JsonSerializer.Deserialize<List<ReplayFrame>>(json, options)!;
+		List<ReplayFrame> frames = ReplayFrame.Deserialize(replayFramesBase64);
 
 		switch (type)
 		{
@@ -592,25 +586,6 @@ public class Map : MapEntity
 							break;
 					}
 				}
-				// Set the bonus to replay first
-				if (this.ReplayManager.BonusWR != null && this.ReplayManager.BonusWR.MapID == -1)
-				{
-#if DEBUG
-					_logger.LogDebug("[{ClassName}] {MethodName} -> [BonusWR] Setting first `ReplayManager.BonusWR` to bonus {stage}",
-						nameof(Map), methodName, stage
-					);
-#endif
-					if (this.ReplayManager.BonusWR.IsPlaying) // Maybe only stop the replay if we are overwriting the current bonus being played?
-						this.ReplayManager.BonusWR.Stop();
-					this.ReplayManager.BonusWR.MapID = this.ID;
-					this.ReplayManager.BonusWR.Frames = frames;
-					this.ReplayManager.BonusWR.RecordRunTime = this.BonusWR[stage][style].RunTime;
-					this.ReplayManager.BonusWR.RecordPlayerName = this.BonusWR[stage][style].Name!;
-					this.ReplayManager.BonusWR.MapTimeID = this.BonusWR[stage][style].ID;
-					this.ReplayManager.BonusWR.Stage = stage;
-					this.ReplayManager.BonusWR.Type = 1;
-					this.ReplayManager.BonusWR.RecordRank = 1;
-				}
 				break;
 			case 2: // Stage Replays
 					// Skip if the same stage run already exists
@@ -644,26 +619,6 @@ public class Map : MapEntity
 							this.ReplayManager.AllStageWR[stage][style].StageExitSituations.Add(i);
 							break;
 					}
-				}
-				// Set the stage to replay first
-				if (this.ReplayManager.StageWR != null && this.ReplayManager.StageWR.MapID == -1)
-				{
-#if DEBUG
-					_logger.LogDebug("[{ClassName}] {MethodName} -> [StageWR] Setting first `ReplayManager.StageWR` to stage {stage}",
-						nameof(Map), methodName, stage
-					);
-#endif
-
-					if (this.ReplayManager.StageWR.IsPlaying) // Maybe only stop the replay if we are overwriting the current stage being played?
-						this.ReplayManager.StageWR.Stop();
-					this.ReplayManager.StageWR.MapID = this.ID;
-					this.ReplayManager.StageWR.Frames = frames;
-					this.ReplayManager.StageWR.RecordRunTime = this.StageWR[stage][style].RunTime;
-					this.ReplayManager.StageWR.RecordPlayerName = this.StageWR[stage][style].Name!;
-					this.ReplayManager.StageWR.MapTimeID = this.StageWR[stage][style].ID;
-					this.ReplayManager.StageWR.Stage = stage;
-					this.ReplayManager.StageWR.Type = 2;
-					this.ReplayManager.StageWR.RecordRank = 1;
 				}
 				break;
 			case 3: // Checkpoint segment Replays (non-staged maps only)
@@ -699,67 +654,21 @@ public class Map : MapEntity
 							break;
 					}
 				}
-				// Set the checkpoint to replay first
-				if (this.ReplayManager.CheckpointWR != null && this.ReplayManager.CheckpointWR.MapID == -1)
-				{
-#if DEBUG
-					_logger.LogDebug("[{ClassName}] {MethodName} -> [CheckpointWR] Setting first `ReplayManager.CheckpointWR` to checkpoint {stage}",
-						nameof(Map), methodName, stage
-					);
-#endif
-
-					if (this.ReplayManager.CheckpointWR.IsPlaying) // Maybe only stop the replay if we are overwriting the current checkpoint being played?
-						this.ReplayManager.CheckpointWR.Stop();
-					this.ReplayManager.CheckpointWR.MapID = this.ID;
-					this.ReplayManager.CheckpointWR.Frames = frames;
-					this.ReplayManager.CheckpointWR.RecordRunTime = this.CheckpointWR[stage][style].RunTime;
-					this.ReplayManager.CheckpointWR.RecordPlayerName = this.CheckpointWR[stage][style].Name!;
-					this.ReplayManager.CheckpointWR.MapTimeID = this.CheckpointWR[stage][style].ID;
-					this.ReplayManager.CheckpointWR.Stage = stage;
-					this.ReplayManager.CheckpointWR.Type = 3;
-					this.ReplayManager.CheckpointWR.RecordRank = 1;
-				}
 				break;
 		}
-
-		// Start the new map replay if none existed until now
-		Server.NextFrame(() =>
-		{
-			if (type == 0 && this.ReplayManager.MapWR != null && !this.ReplayManager.MapWR.IsPlaying)
-			{
-				this.ReplayManager.MapWR.ResetReplay();
-				this.ReplayManager.MapWR.Start();
-			}
-			else if (type == 1 && this.ReplayManager.BonusWR != null && !this.ReplayManager.BonusWR.IsPlaying)
-			{
-				this.ReplayManager.BonusWR.ResetReplay();
-				this.ReplayManager.BonusWR.Start();
-			}
-			else if (type == 2 && this.ReplayManager.StageWR != null && !this.ReplayManager.StageWR.IsPlaying)
-			{
-				this.ReplayManager.StageWR.ResetReplay();
-				this.ReplayManager.StageWR.Start();
-			}
-			else if (type == 3 && this.ReplayManager.CheckpointWR != null && !this.ReplayManager.CheckpointWR.IsPlaying)
-			{
-				this.ReplayManager.CheckpointWR.ResetReplay();
-				this.ReplayManager.CheckpointWR.Start();
-			}
-		}
-		);
 	}
 
 	public void KickReplayBot(int index)
 	{
-		if (!this.ReplayManager.CustomReplays[index].IsPlayable)
+		if (this.ReplayManager.Pool[index].Controller == null)
 			return;
 
-		int? id_to_kick = this.ReplayManager.CustomReplays[index].Controller!.UserId;
+		int? id_to_kick = this.ReplayManager.Pool[index].Controller!.UserId;
 		if (id_to_kick == null)
 			return;
 
-		this.ReplayManager.CustomReplays.RemoveAt(index);
-		Server.ExecuteCommand($"kickid {id_to_kick}; bot_quota {this.ReplayManager.CustomReplays.Count}");
+		this.ReplayManager.Pool.RemoveAt(index);
+		Server.ExecuteCommand($"kickid {id_to_kick}; bot_quota {this.ReplayManager.Pool.Count}");
 	}
 
 	public static bool IsInZone(Vector zoneOrigin, float zoneCollisionRadius, Vector spawnOrigin)
