@@ -1,4 +1,5 @@
 using CounterStrikeSharp.API.Modules.Utils;
+using SurfTimer.Shared.Entities;
 
 namespace SurfTimer;
 
@@ -518,17 +519,16 @@ public class PlayerHud
 			$"{ChatColors.Grey}N/A{ChatColors.Default} ({ChatColors.Grey}N/A{ChatColors.Default})";
 
 		// Get PB checkpoint data if available
-		if (_player.Stats.PB[style].Checkpoints != null)
+		CheckpointEntity? pbCheckpoint = null;
+		_player.Stats.PB[style].Checkpoints?.TryGetValue(playerCurrentCheckpoint, out pbCheckpoint);
+		if (pbCheckpoint != null)
 		{
-			pbTime = _player.Stats.PB[style].Checkpoints![playerCurrentCheckpoint].RunTime;
+			pbTime = pbCheckpoint.RunTime;
 			pbSpeed = (float)
 				Math.Sqrt(
-					_player.Stats.PB[style].Checkpoints![playerCurrentCheckpoint].StartVelX
-						* _player.Stats.PB[style].Checkpoints![playerCurrentCheckpoint].StartVelX
-						+ _player.Stats.PB[style].Checkpoints![playerCurrentCheckpoint].StartVelY
-							* _player.Stats.PB[style].Checkpoints![playerCurrentCheckpoint].StartVelY
-						+ _player.Stats.PB[style].Checkpoints![playerCurrentCheckpoint].StartVelZ
-							* _player.Stats.PB[style].Checkpoints![playerCurrentCheckpoint].StartVelZ
+					pbCheckpoint.StartVelX * pbCheckpoint.StartVelX
+						+ pbCheckpoint.StartVelY * pbCheckpoint.StartVelY
+						+ pbCheckpoint.StartVelZ * pbCheckpoint.StartVelZ
 				);
 		}
 		else
@@ -583,50 +583,44 @@ public class PlayerHud
 			);
 #endif
 
-			wrTime = SurfTimer.CurrentMap.WR[style].Checkpoints![playerCurrentCheckpoint].RunTime;
-			wrSpeed = (float)
-				Math.Sqrt(
-					SurfTimer.CurrentMap.WR[style].Checkpoints![playerCurrentCheckpoint].StartVelX
-						* SurfTimer.CurrentMap.WR[style].Checkpoints![playerCurrentCheckpoint].StartVelX
-						+ SurfTimer.CurrentMap.WR[style].Checkpoints![playerCurrentCheckpoint].StartVelY
-							* SurfTimer
-								.CurrentMap
-								.WR[style]
-								.Checkpoints![playerCurrentCheckpoint]
-								.StartVelY
-						+ SurfTimer.CurrentMap.WR[style].Checkpoints![playerCurrentCheckpoint].StartVelZ
-							* SurfTimer
-								.CurrentMap
-								.WR[style]
-								.Checkpoints![playerCurrentCheckpoint]
-								.StartVelZ
-				);
-			// Reset the string
-			strWrDifference = string.Empty;
+			CheckpointEntity? wrCheckpoint = null;
+			SurfTimer.CurrentMap.WR[style].Checkpoints?.TryGetValue(playerCurrentCheckpoint, out wrCheckpoint);
+			if (wrCheckpoint != null)
+			{
+				wrTime = wrCheckpoint.RunTime;
+				wrSpeed = (float)
+					Math.Sqrt(
+						wrCheckpoint.StartVelX * wrCheckpoint.StartVelX
+							+ wrCheckpoint.StartVelY * wrCheckpoint.StartVelY
+							+ wrCheckpoint.StartVelZ * wrCheckpoint.StartVelZ
+					);
+				// Reset the string
+				strWrDifference = string.Empty;
 
-			// Calculate the WR time difference
-			if (wrTime - currentTime < 0.0)
-			{
-				strWrDifference += ChatColors.Red + "+" + FormatTime((wrTime - currentTime) * -1); // We multiply by -1 to get the positive value
-			}
-			else if (wrTime - currentTime >= 0.0)
-			{
-				strWrDifference += ChatColors.Green + "-" + FormatTime(wrTime - currentTime);
-			}
-			strWrDifference += ChatColors.Default + " ";
+				// Calculate the WR time difference
+				if (wrTime - currentTime < 0.0)
+				{
+					strWrDifference += ChatColors.Red + "+" + FormatTime((wrTime - currentTime) * -1); // We multiply by -1 to get the positive value
+				}
+				else if (wrTime - currentTime >= 0.0)
+				{
+					strWrDifference += ChatColors.Green + "-" + FormatTime(wrTime - currentTime);
+				}
+				strWrDifference += ChatColors.Default + " ";
 
-			// Calculate the WR speed difference
-			if (wrSpeed - currentSpeed <= 0.0)
-			{
-				strWrDifference +=
-					"(" + ChatColors.Green + "+" + ((wrSpeed - currentSpeed) * -1).ToString("0"); // We multiply by -1 to get the positive value
+				// Calculate the WR speed difference
+				if (wrSpeed - currentSpeed <= 0.0)
+				{
+					strWrDifference +=
+						"(" + ChatColors.Green + "+" + ((wrSpeed - currentSpeed) * -1).ToString("0"); // We multiply by -1 to get the positive value
+				}
+				else if (wrSpeed - currentSpeed > 0.0)
+				{
+					strWrDifference +=
+						"(" + ChatColors.Red + "-" + (wrSpeed - currentSpeed).ToString("0");
+				}
+				strWrDifference += ChatColors.Default + ")";
 			}
-			else if (wrSpeed - currentSpeed > 0.0)
-			{
-				strWrDifference +=
-					"(" + ChatColors.Red + "-" + (wrSpeed - currentSpeed).ToString("0");
-			}
-			strWrDifference += ChatColors.Default + ")";
 		}
 
 		// Print checkpoint message

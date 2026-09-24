@@ -486,20 +486,20 @@ public partial class SurfTimer
 			// Show Prespeed for Stages - will be enabled/disabled by the user?
 			player.Controller.PrintToCenter($"Stage {stage} - Prespeed: {velocity.velMag().ToString("0")} u/s");
 		}
-		else if (player.Timer.IsRunning)
+		else if (player.Timer.IsRunning && player.Stats.ThisRun.Checkpoints.TryGetValue(player.Timer.Checkpoint, out CheckpointEntity? currentCheckpoint))
 		{
 #if DEBUG
-			Console.WriteLine($"currentCheckpoint.EndVelX {player.Stats.ThisRun.Checkpoints[player.Timer.Checkpoint].EndVelX} - velocity.X {velocity.X}");
-			Console.WriteLine($"currentCheckpoint.EndVelY {player.Stats.ThisRun.Checkpoints[player.Timer.Checkpoint].EndVelY} - velocity.Y {velocity.Y}");
-			Console.WriteLine($"currentCheckpoint.EndVelZ {player.Stats.ThisRun.Checkpoints[player.Timer.Checkpoint].EndVelZ} - velocity.Z {velocity.Z}");
-			Console.WriteLine($"currentCheckpoint.Attempts {player.Stats.ThisRun.Checkpoints[player.Timer.Checkpoint].Attempts}");
+			Console.WriteLine($"currentCheckpoint.EndVelX {currentCheckpoint.EndVelX} - velocity.X {velocity.X}");
+			Console.WriteLine($"currentCheckpoint.EndVelY {currentCheckpoint.EndVelY} - velocity.Y {velocity.Y}");
+			Console.WriteLine($"currentCheckpoint.EndVelZ {currentCheckpoint.EndVelZ} - velocity.Z {velocity.Z}");
+			Console.WriteLine($"currentCheckpoint.Attempts {currentCheckpoint.Attempts}");
 #endif
 
 			// Update the Checkpoint object values
-			player.Stats.ThisRun.Checkpoints[player.Timer.Checkpoint].EndVelX = velocity.X;
-			player.Stats.ThisRun.Checkpoints[player.Timer.Checkpoint].EndVelY = velocity.Y;
-			player.Stats.ThisRun.Checkpoints[player.Timer.Checkpoint].EndVelZ = velocity.Z;
-			player.Stats.ThisRun.Checkpoints[player.Timer.Checkpoint].EndTouch = player.Timer.Ticks;
+			currentCheckpoint.EndVelX = velocity.X;
+			currentCheckpoint.EndVelY = velocity.Y;
+			currentCheckpoint.EndVelZ = velocity.Z;
+			currentCheckpoint.EndTouch = player.Timer.Ticks;
 
 			// Show Prespeed for Checkpoints - will be enabled/disabled by the user?
 			player.Controller.PrintToCenter($"Checkpoint {player.Timer.Checkpoint} - Prespeed: {velocity.velMag():0} u/s");
