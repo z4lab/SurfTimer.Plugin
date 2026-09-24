@@ -44,5 +44,7 @@
 	"replay_spawning": "{green}Spawning a replay bot, please wait...",
 	"replay_no_pb": "{red}No replay data was saved for this run.",
 	"spec_no_match": "{red}No player found matching '{yellow}{0}{red}'.",
+	"repeat_enabled": "Repeat mode {lime}enabled{default} - you'll be sent back to the start of each stage you finish.",
+	"repeat_disabled": "Repeat mode {red}disabled{default}.",
 	"spec_manual_hint": "Press {yellow}M{default} and choose {yellow}Spectator{default} - you'll be put on {lime}{0}{default} automatically."
 }

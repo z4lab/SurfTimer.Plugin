@@ -45,7 +45,7 @@ public partial class SurfTimer
 		if (!CurrentMap.StartZone.IsZero())
 			Server.NextFrame(() =>
 			{
-				Extensions.Teleport(player.PlayerPawn.Value!, CurrentMap.StartZone);
+				Extensions.Teleport(player.PlayerPawn.Value!, CurrentMap.StartZone, null, new VectorT(0, 0, 0));
 			}
 		);
 	}
@@ -83,16 +83,16 @@ public partial class SurfTimer
 		if (oPlayer.Timer.IsBonusMode)
 		{
 			if (oPlayer.Timer.Bonus != 0 && !CurrentMap.BonusStartZone[oPlayer.Timer.Bonus].IsZero())
-				Server.NextFrame(() => Extensions.Teleport(player.PlayerPawn.Value!, CurrentMap.BonusStartZone[oPlayer.Timer.Bonus]));
+				Server.NextFrame(() => Extensions.Teleport(player.PlayerPawn.Value!, CurrentMap.BonusStartZone[oPlayer.Timer.Bonus], null, new VectorT(0, 0, 0)));
 			else // Reset back to map start
-				Server.NextFrame(() => Extensions.Teleport(player.PlayerPawn.Value!, CurrentMap.StartZone));
+				Server.NextFrame(() => Extensions.Teleport(player.PlayerPawn.Value!, CurrentMap.StartZone, null, new VectorT(0, 0, 0)));
 		}
 		else
 		{
 			if (oPlayer.Timer.Stage != 0 && !CurrentMap.StageStartZone[oPlayer.Timer.Stage].IsZero())
-				Server.NextFrame(() => Extensions.Teleport(player.PlayerPawn.Value!, CurrentMap.StageStartZone[oPlayer.Timer.Stage]));
+				Server.NextFrame(() => Extensions.Teleport(player.PlayerPawn.Value!, CurrentMap.StageStartZone[oPlayer.Timer.Stage], null, new VectorT(0, 0, 0)));
 			else // Reset back to map start
-				Server.NextFrame(() => Extensions.Teleport(player.PlayerPawn.Value!, CurrentMap.StartZone));
+				Server.NextFrame(() => Extensions.Teleport(player.PlayerPawn.Value!, CurrentMap.StartZone, null, new VectorT(0, 0, 0)));
 		}
 	}
 
@@ -130,44 +130,105 @@ public partial class SurfTimer
 			return;
 		}
 
-		bool zoneExists = stage == 1 ? !CurrentMap.StartZone.IsZero() : !CurrentMap.StageStartZone[stage].IsZero();
-		if (zoneExists)
-		{
-			playerList[player.UserId ?? 0].Timer.Reset();
-
-			if (player.Team == CsTeam.Spectator || player.Team == CsTeam.None)
-			{
-				Server.NextFrame(() =>  // Weird CS2 bug that requires doing this twice to show the Joined X team in chat and not stay in limbo
-					{
-						player.ChangeTeam(CsTeam.CounterTerrorist);
-						player.Respawn();
-
-						player.ChangeTeam(CsTeam.Spectator);
-
-						player.ChangeTeam(CsTeam.CounterTerrorist);
-						player.Respawn();
-					}
-				);
-			}
-
-			if (stage == 1)
-			{
-				Server.NextFrame(() => Extensions.Teleport(player.PlayerPawn.Value!, CurrentMap.StartZone));
-			}
-			else
-			{
-				playerList[player.UserId ?? 0].Timer.Stage = stage;
-				Server.NextFrame(() => Extensions.Teleport(player.PlayerPawn.Value!, CurrentMap.StageStartZone[stage]));
-				playerList[player.UserId ?? 0].Timer.IsStageMode = true;
-			}
-
-			// To-do: If you run this while you're in the start zone, endtouch for the start zone runs after you've teleported
-			//        causing the timer to start. This needs to be fixed.
-		}
-		else
+		if (!TeleportToStage(player, stage))
 			player.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["invalid_usage",
 				"!s <stage>"]}"
 			);
+	}
+
+	/// <summary>
+	/// Resets the timer and teleports the player to a stage start in stage mode (stage 1 is the map
+	/// start, which runs as a normal map run). Timer.Stage is set before the teleport so entering the
+	/// zone isn't treated as finishing the previous stage. Returns false if the zone doesn't exist.
+	/// </summary>
+	private bool TeleportToStage(CCSPlayerController player, short stage)
+	{
+		bool zoneExists = stage == 1 ? !CurrentMap.StartZone.IsZero() : !CurrentMap.StageStartZone[stage].IsZero();
+		if (!zoneExists)
+			return false;
+
+		playerList[player.UserId ?? 0].Timer.Reset();
+
+		if (player.Team == CsTeam.Spectator || player.Team == CsTeam.None)
+		{
+			Server.NextFrame(() =>  // Weird CS2 bug that requires doing this twice to show the Joined X team in chat and not stay in limbo
+				{
+					player.ChangeTeam(CsTeam.CounterTerrorist);
+					player.Respawn();
+
+					player.ChangeTeam(CsTeam.Spectator);
+
+					player.ChangeTeam(CsTeam.CounterTerrorist);
+					player.Respawn();
+				}
+			);
+		}
+
+		if (stage == 1)
+		{
+			Server.NextFrame(() => Extensions.Teleport(player.PlayerPawn.Value!, CurrentMap.StartZone, null, new VectorT(0, 0, 0)));
+		}
+		else
+		{
+			playerList[player.UserId ?? 0].Timer.Stage = stage;
+			Server.NextFrame(() => Extensions.Teleport(player.PlayerPawn.Value!, CurrentMap.StageStartZone[stage], null, new VectorT(0, 0, 0)));
+			playerList[player.UserId ?? 0].Timer.IsStageMode = true;
+		}
+
+		// To-do: If you run this while you're in the start zone, endtouch for the start zone runs after you've teleported
+		//        causing the timer to start. This needs to be fixed.
+		return true;
+	}
+
+	[ConsoleCommand("css_repeat", "Toggle repeat mode - sends you back to the start of each stage you finish")]
+	[CommandHelper(whoCanExecute: CommandUsage.CLIENT_ONLY)]
+	public void PlayerToggleRepeat(CCSPlayerController? player, CommandInfo command)
+	{
+		if (player == null || !playerList.TryGetValue(player.UserId ?? 0, out var oPlayer))
+			return;
+
+		if (oPlayer.IsRepeatMode)
+		{
+			oPlayer.IsRepeatMode = false;
+			player.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["repeat_disabled"]}");
+			return;
+		}
+
+		if (CurrentMap.Stages <= 0)
+		{
+			player.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["not_staged"]}");
+			return;
+		}
+
+		oPlayer.IsRepeatMode = true;
+		player.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["repeat_enabled"]}");
+
+		// Switch into stage mode on the stage they're currently on (stage 1 = map start)
+		if (!oPlayer.Timer.IsStageMode)
+			TeleportToStage(player, oPlayer.Timer.Stage > 0 ? oPlayer.Timer.Stage : (short)1);
+	}
+
+	/// <summary>
+	/// Sends a repeat-mode player back to the start of the stage they just finished, once any pending
+	/// save is done - the save trims the replay up to the LAST stage-enter marker, so teleporting back
+	/// before it runs would add a new marker and cut the replay wrong.
+	/// </summary>
+	private void ScheduleRepeatTeleport(Player player, short stage, int attemptsLeft = 100)
+	{
+		AddTimer(0.1f, () =>
+		{
+			if (!player.IsRepeatMode || !player.Controller.IsValid || !player.Controller.PawnIsAlive)
+				return;
+
+			if (player.ReplayRecorder.IsSaving)
+			{
+				if (attemptsLeft > 0)
+					ScheduleRepeatTeleport(player, stage, attemptsLeft - 1);
+				return;
+			}
+
+			TeleportToStage(player.Controller, stage);
+		});
 	}
 
 	[ConsoleCommand("css_b", "Teleport to a bonus")]
@@ -225,7 +286,7 @@ public partial class SurfTimer
 				);
 			}
 
-			Server.NextFrame(() => Extensions.Teleport(player.PlayerPawn.Value!, CurrentMap.BonusStartZone[bonus]));
+			Server.NextFrame(() => Extensions.Teleport(player.PlayerPawn.Value!, CurrentMap.BonusStartZone[bonus], null, new VectorT(0, 0, 0)));
 		}
 		else
 			player.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["invalid_usage",

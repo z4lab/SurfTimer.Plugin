@@ -98,7 +98,7 @@ public struct VectorT : IAdditionOperators<VectorT, VectorT, VectorT>,
 
 	public readonly float velMag()
 	{
-		return (float)Math.Sqrt(X * X + Y * Y + Z + Z);
+		return (float)Math.Sqrt(X * X + Y * Y + Z * Z);
 	}
 
 	public readonly bool IsZero(float tolerance = 0.0001f)

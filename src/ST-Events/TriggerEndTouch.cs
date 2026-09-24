@@ -52,7 +52,7 @@ public partial class SurfTimer
 						break;
 					// Map start zones -- hook into map_start, (s)tage1_start
 					case ZoneType.MapStart:
-						EndTouchHandleMapStartZone(player);
+						EndTouchHandleMapStartZone(player, trigger);
 						break;
 					// Stage start zones -- hook into (s)tage#_start
 					case ZoneType.StageStart:

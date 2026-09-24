@@ -78,6 +78,10 @@ public partial class SurfTimer
 		VectorT velocity = player.Controller.PlayerPawn.Value!.AbsVelocity.ToVector_t();
 		int pStyle = player.Timer.Style;
 
+		// The map end is also the last stage's finish - captured before the timer is stopped below
+		bool finishedStageForRepeat = player.IsRepeatMode && CurrentMap.Stages > 0
+			&& player.Timer.IsRunning && !player.Timer.IsBonusMode;
+
 		player.Controller.PrintToCenter($"Map End");
 
 		player.ReplayRecorder.CurrentSituation = ReplayFrameSituation.END_ZONE_ENTER;
@@ -217,6 +221,9 @@ public partial class SurfTimer
 			}
 		}
 
+		if (finishedStageForRepeat)
+			ScheduleRepeatTeleport(player, (short)CurrentMap.Stages);
+
 #if DEBUG
 		player.Controller.PrintToChat($"CS2 Surf DEBUG >> CBaseTrigger_{ChatColors.Lime}StartTouchFunc{ChatColors.Default} -> {ChatColors.Red}Map Stop Zone");
 #endif
@@ -224,7 +231,7 @@ public partial class SurfTimer
 
 	private static void StartTouchHandleMapStartZone(Player player, CBaseTrigger trigger, [CallerMemberName] string methodName = "")
 	{
-		player.IsInStartZone = true;
+		player.CurrentStartZoneIndex = trigger.Index;
 
 		// We shouldn't start timer and reset data until MapTime has been saved - mostly concerns the Replays and trimming the correct parts
 		if (!player.ReplayRecorder.IsSaving)
@@ -249,7 +256,7 @@ public partial class SurfTimer
 
 	private void StartTouchHandleStageStartZone(Player player, CBaseTrigger trigger, [CallerMemberName] string methodName = "")
 	{
-		player.IsInStartZone = true;
+		player.CurrentStartZoneIndex = trigger.Index;
 
 		// Get velocities for DB queries
 		// Get the velocity of the player - we will be using this values to compare and write to DB
@@ -265,6 +272,10 @@ public partial class SurfTimer
 		bool failed_stage = false;
 		if (player.Timer.Stage == stage)
 			failed_stage = true;
+
+		// Captured before the stage-mode branch below resets the timer
+		bool finishedStageForRepeat = player.IsRepeatMode && stage > 1 && !failed_stage
+			&& player.Timer.IsRunning && !player.Timer.IsBonusMode;
 
 		// Reset/Stop the Stage timer
 		// Save a Stage run when `IsStageMode` is active - (`stage - 1` to get the previous stage data)
@@ -347,6 +358,9 @@ public partial class SurfTimer
 				player.Stats.ThisRun.Checkpoints[player.Timer.Checkpoint].Attempts++;
 			}
 		}
+
+		if (finishedStageForRepeat)
+			ScheduleRepeatTeleport(player, (short)(stage - 1));
 
 #if DEBUG
 		player.Controller.PrintToChat($"CS2 Surf DEBUG >> CBaseTrigger_{ChatColors.Lime}StartTouchFunc{ChatColors.Default} -> {ChatColors.Yellow}Stage {Regex.Match(trigger.Entity.Name, "[0-9][0-9]?").Value} Start Zone");
@@ -530,9 +544,10 @@ public partial class SurfTimer
 		player.ReplayRecorder.CurrentSituation = ReplayFrameSituation.END_ZONE_EXIT;
 	}
 
-	private static void EndTouchHandleMapStartZone(Player player, [CallerMemberName] string methodName = "")
+	private static void EndTouchHandleMapStartZone(Player player, CBaseTrigger trigger, [CallerMemberName] string methodName = "")
 	{
-		player.IsInStartZone = false;
+		if (player.CurrentStartZoneIndex == trigger.Index)
+			player.CurrentStartZoneIndex = 0;
 
 		VectorT velocity = player.Controller.PlayerPawn.Value!.AbsVelocity.ToVector_t();
 
@@ -569,7 +584,8 @@ public partial class SurfTimer
 
 	private static void EndTouchHandleStageStartZone(Player player, CBaseTrigger trigger, [CallerMemberName] string methodName = "")
 	{
-		player.IsInStartZone = false;
+		if (player.CurrentStartZoneIndex == trigger.Index)
+			player.CurrentStartZoneIndex = 0;
 
 #if DEBUG
 		player.Controller.PrintToChat($"CS2 Surf DEBUG >> CBaseTrigger_{ChatColors.LightRed}EndTouchFunc{ChatColors.Default} -> {ChatColors.Yellow}Stage {Regex.Match(trigger.Entity!.Name, "[0-9][0-9]?").Value} Start Zone");
