@@ -14,6 +14,8 @@
     Official Timer plugin for the CS2 Surf Initiative.
     Copyright (C) 2024  Liam C. (Infra)
     Copyright (C) 2025  tslashd
+    Copyright (C) 2026  z4lab
+    Copyright (C) 2026  13ace37
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -28,7 +30,8 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-    Source: https://github.com/CS2Surf/Timer
+    Original Source: https://github.com/CS2Surf/Timer
+	Modified Fork: https://github.com/z4lab/SurfTimer.Plugin
 */
 
 #define DEBUG
@@ -46,7 +49,7 @@ using SurfTimer.Shared.Data.MySql;
 
 namespace SurfTimer;
 
-// Gameplan: https://github.com/CS2Surf/Timer/tree/dev/README.md
+// Gameplan: https://github.com/z4lab/SurfTimer.Plugin/tree/dev/README.md
 [MinimumApiVersion(337)]
 public partial class SurfTimer : BasePlugin
 {
@@ -91,8 +94,8 @@ public partial class SurfTimer : BasePlugin
 					"{PluginLogo}\n"
 						+ "[CS2 Surf] {PluginName} v.{ModuleVersion} - loading map {MapName}.\n"
 						+ "[CS2 Surf] This software is licensed under the GNU Affero General Public License v3.0. See LICENSE for more information.\n"
-						+ "[CS2 Surf] ---> Source Code: https://github.com/CS2Surf/Timer\n"
-						+ "[CS2 Surf] ---> License Agreement: https://github.com/CS2Surf/Timer/blob/main/LICENSE\n",
+						+ "[CS2 Surf] ---> Source Code: https://github.com/z4lab/SurfTimer.Plugin\n"
+						+ "[CS2 Surf] ---> License Agreement: https://github.com/z4lab/SurfTimer.Plugin/blob/main/LICENSE\n",
 					Config.PluginLogo,
 					Config.PluginName,
 					ModuleVersion,
@@ -194,7 +197,7 @@ public partial class SurfTimer : BasePlugin
                 {PluginLogo}  
                 [CS2 Surf] {PluginName} plugin loaded. Version: {ModuleVersion}
                 [CS2 Surf] This plugin is licensed under the GNU Affero General Public License v3.0. See LICENSE for more information. 
-                Source code: https://github.com/CS2Surf/Timer
+                Source code: https://github.com/z4lab/SurfTimer.Plugin
             """,
 			Config.PluginLogo,
 			Config.PluginName,

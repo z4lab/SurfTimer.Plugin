@@ -1,9 +1,12 @@
-# EVERYONE IS WELCOME TO BUILD UP ON THIS PROJECT AND CONTRIBUTE. ISSUES ARE DISABLED FOR THE TIME BEING 
+# EVERYONE IS WELCOME TO BUILD UP ON THIS PROJECT AND CONTRIBUTE. ISSUES ARE DISABLED FOR THE TIME BEING
+
 ## Please join the Discord: https://discord.cs.surf
 
 # Timer
+
 Core plugin for CS2 Surf Servers. This project is aimed to be fully open-source with the goal of uniting all of CS2 surf towards building the game mode.
 <br>
+
 <details> 
   <summary>Center HUD Speedometer</summary>
   <p>Different time formatting is available in the code base but not implemented for players to change it themselves. Refer to <strong>PlayerTimer.TimeFormatStyle</strong> in codebase</p>
@@ -77,7 +80,6 @@ Core plugin for CS2 Surf Servers. This project is aimed to be fully open-source 
     </li>
   </ul>
 </details>
-
 
 <details> 
   <summary>Chat Messages</summary>
@@ -161,68 +163,71 @@ Core plugin for CS2 Surf Servers. This project is aimed to be fully open-source 
 </br>
 
 ## 🔗 Dependencies
-- [`CounterStrikeSharp`](https://github.com/roflmuffin/CounterStrikeSharp) - **required** minimum version [v1.0.337](https://github.com/roflmuffin/CounterStrikeSharp/releases/tag/v1.0.337).
-- [`SurfTimer.Shared`](https://github.com/tslashd/SurfTimer.Shared) – **required** shared library for DTOs, entities, and database integration.  
-- [`SurfTimer.Api`](https://github.com/tslashd/SurfTimer.Api) – *optional* REST API for faster, centralized communication with the database.
 
-# Main list with tasks (more details can be found [here](https://github.com/CS2Surf/Timer/blob/dev/TODO)):
-*Note: This is not definitive/complete and simply serves as a reference for what we should try to achieve. Subject to change.*
+- [`CounterStrikeSharp`](https://github.com/roflmuffin/CounterStrikeSharp) - **required** minimum version [v1.0.337](https://github.com/roflmuffin/CounterStrikeSharp/releases/tag/v1.0.337).
+- [`SurfTimer.Shared`](https://github.com/z4lab/SurfTimer.Shared) – **required** shared library for DTOs, entities, and database integration.
+- [`SurfTimer.Api`](https://github.com/z4lab/SurfTimer.Api) – _optional_ REST API for faster, centralized communication with the database.
+
+# Main list with tasks (more details can be found [here](https://github.com/z4lab/SurfTimer.Plugin/blob/dev/TODO)):
+
+_Note: This is not definitive/complete and simply serves as a reference for what we should try to achieve. Subject to change._
 Bold & Italics = being worked on.
+
 - [ ] Database
-  - [X] MySQL database schema ([Design Diagram](https://dbdiagram.io/d/Copy-of-CS2Surf-Timer-DB-Schema-6582e6e456d8064ca06328b9))
-  - [ ] Plugin auto-create tables for easier setup? 
-  - [X] Base database class implementation
-- [X] Maps
-  - [X] Implement map info object (DB)
-  - [X] Zoning
-    - [X] Hook zones from map triggers
-      - [X] Map start/end zones
-      - [X] Stage zones
-      - [X] Checkpoint zones (this is each stage for a Staged map)
-      - [X] Bonus zones
-    - [X] Support for stages/checkpoints
-      - [X] Hook to their start/end zones
-      - [X] Save/Compare checkpoint times
-      - [X] Save Stage times
-    - [X] Support for bonuses
-      - [X] Hook to their start/end zones
-      - [X] Save Bonus times
-    - [X] Start/End trigger touch hooks
-    - [X] Load zone information automatically from standardised triggers: https://github.com/CS2Surf/Timer/wiki/CS2-Surf-Mapping 
-    - [X] Support for stages (`/rs`, teleporting with `/s`)
-    - [X] Support for bonuses (`/rs`, teleporting with `/b #`)
-    - [X] Start/End touch hooks implemented for all zones
+  - [x] MySQL database schema ([Design Diagram](https://dbdiagram.io/d/Copy-of-CS2Surf-Timer-DB-Schema-6582e6e456d8064ca06328b9))
+  - [ ] Plugin auto-create tables for easier setup?
+  - [x] Base database class implementation
+- [x] Maps
+  - [x] Implement map info object (DB)
+  - [x] Zoning
+    - [x] Hook zones from map triggers
+      - [x] Map start/end zones
+      - [x] Stage zones
+      - [x] Checkpoint zones (this is each stage for a Staged map)
+      - [x] Bonus zones
+    - [x] Support for stages/checkpoints
+      - [x] Hook to their start/end zones
+      - [x] Save/Compare checkpoint times
+      - [x] Save Stage times
+    - [x] Support for bonuses
+      - [x] Hook to their start/end zones
+      - [x] Save Bonus times
+    - [x] Start/End trigger touch hooks
+    - [x] Load zone information automatically from standardised triggers: https://github.com/z4lab/SurfTimer.Plugin/wiki/CS2-Surf-Mapping
+    - [x] Support for stages (`/rs`, teleporting with `/s`)
+    - [x] Support for bonuses (`/rs`, teleporting with `/b #`)
+    - [x] Start/End touch hooks implemented for all zones
 - [ ] Surf configs
-  - [X] Server settings configuration
+  - [x] Server settings configuration
   - [ ] Plugin configuration
-  - [X] Database configuration
-- [X] Timing
-  - [X] Base timer class implementation
-  - [X] Base timer HUD implementation
-  - [X] Prespeed measurement and display
-  - [X] Save/load times
+  - [x] Database configuration
+- [x] Timing
+  - [x] Base timer class implementation
+  - [x] Base timer HUD implementation
+  - [x] Prespeed measurement and display
+  - [x] Save/load times
     - [x] Map times
     - [x] Checkpoint times
-    - [X] Stage times
-    - [X] Bonus times
-  - [X] Practice Mode implementation
+    - [x] Stage times
+    - [x] Bonus times
+  - [x] Practice Mode implementation
   - [ ] Announce records to Discord
   - [ ] Stretch goal: sub-tick timing
 - [ ] Player Data
-  - [X] Base player class
-  - [X] Player stat classes
-  - [X] Profile implementation (DB)
+  - [x] Base player class
+  - [x] Player stat classes
+  - [x] Profile implementation (DB)
   - [ ] Points/Skill Groups (DB)
   - [ ] Player settings (DB)
 - [x] Replays
-   - [x] Personal Best - Data for the PB replays is saved but no functionality to replay them yet is available
-      - [x] Map Record
-      - [X] Stage Record
-      - [X] Bonus Record
-   - [x] World Record
-      - [X] Map Record
-      - [X] Stage Record
-      - [X] Bonus Record
+  - [x] Personal Best - Data for the PB replays is saved but no functionality to replay them yet is available
+    - [x] Map Record
+    - [x] Stage Record
+    - [x] Bonus Record
+  - [x] World Record
+    - [x] Map Record
+    - [x] Stage Record
+    - [x] Bonus Record
 - [ ] Style implementation (SW, HSW, BW)
 - [ ] Paint (?)
-- [x] API Integration (Repo can be found [here](https://github.com/tslashd/SurfTimer.Api))
+- [x] API Integration (Repo can be found [here](https://github.com/z4lab/SurfTimer.Api))
