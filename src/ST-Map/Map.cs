@@ -58,20 +58,9 @@ public class Map : MapEntity
 	/// </summary>
 	public List<int> ConnectedMapTimes { get; set; } = new List<int>();
 
-	// Zone Origin Information
-	/* Map Start/End zones */
-	public VectorT StartZone { get; set; } = new VectorT(0, 0, 0);
-	public QAngleT StartZoneAngles { get; set; } = new QAngleT(0, 0, 0);
-	public VectorT EndZone { get; set; } = new VectorT(0, 0, 0);
-	/* Map Stage zones */
-	public VectorT[] StageStartZone { get; } = Enumerable.Repeat(0, 99).Select(x => new VectorT(0, 0, 0)).ToArray();
-	public QAngleT[] StageStartZoneAngles { get; } = Enumerable.Repeat(0, 99).Select(x => new QAngleT(0, 0, 0)).ToArray();
-	/* Map Bonus zones */
-	public VectorT[] BonusStartZone { get; } = Enumerable.Repeat(0, 99).Select(x => new VectorT(0, 0, 0)).ToArray(); // To-do: Implement bonuses
-	public QAngleT[] BonusStartZoneAngles { get; } = Enumerable.Repeat(0, 99).Select(x => new QAngleT(0, 0, 0)).ToArray(); // To-do: Implement bonuses
-	public VectorT[] BonusEndZone { get; } = Enumerable.Repeat(0, 99).Select(x => new VectorT(0, 0, 0)).ToArray(); // To-do: Implement bonuses
-	/* Map Checkpoint zones */
-	public VectorT[] CheckpointStartZone { get; } = Enumerable.Repeat(0, 99).Select(x => new VectorT(0, 0, 0)).ToArray();
+	// Zone registry for teleport targets and counts - a role+number (e.g. BonusEnd 1) can have several
+	// triggers. Not used to dispatch touches: round restarts re-create trigger entities with new indexes.
+	internal Dictionary<(ZoneType Type, short Number), List<ZoneInfo>> Zones { get; } = new();
 
 	public ReplayManager ReplayManager { get; set; } = null!;
 
@@ -158,133 +147,94 @@ public class Map : MapEntity
 	}
 
 	/// <summary>
-	/// Loops through all the hookzones found in the map and loads the respective zones
+	/// Registers every zone trigger in the map. A role+number can have several triggers (e.g. two
+	/// bonus1_end, one per side of a course) - each keeps its own teleport target. Counts are the
+	/// highest number found, not the number of triggers, so duplicates don't inflate them.
 	/// </summary>
-	// To-do: This loops through all the triggers. While that's great and comprehensive, some maps have two triggers with the exact same name, because there are two
-	//        for each side of the course (left and right, for example). We should probably work on automatically catching this. 
-	//        Maybe even introduce a new naming convention?
 	internal void MapLoadZones([CallerMemberName] string methodName = "")
 	{
-		// Gathering zones from the map
-		IEnumerable<CBaseTrigger> triggers = Utilities.FindAllEntitiesByDesignerName<CBaseTrigger>("trigger_multiple");
-		// Gathering info_teleport_destinations from the map
-		IEnumerable<CTriggerTeleport> teleports = Utilities.FindAllEntitiesByDesignerName<CTriggerTeleport>("info_teleport_destination");
+		var triggers = Utilities.FindAllEntitiesByDesignerName<CBaseTrigger>("trigger_multiple");
+		var destinations = Utilities.FindAllEntitiesByDesignerName<CBaseEntity>("info_teleport_destination").ToList();
+
 		foreach (CBaseTrigger trigger in triggers)
 		{
-			if (trigger.Entity!.Name != null)
-			{
-				// Map start zone
-				if (trigger.Entity!.Name.Contains("map_start") ||
-					trigger.Entity!.Name.Contains("stage1_start") ||
-					trigger.Entity!.Name.Contains("s1_start"))
-				{
-					bool foundPlayerSpawn = false; // Track whether a player spawn is found
-					foreach (CBaseEntity teleport in teleports)
-					{
-						if (teleport.Entity!.Name != null &&
-							(IsInZone(trigger.AbsOrigin!, trigger.Collision.BoundingRadius, teleport.AbsOrigin!) ||
-							teleport.Entity!.Name.Contains("spawn_map_start") ||
-							teleport.Entity!.Name.Contains("spawn_stage1_start") ||
-							teleport.Entity!.Name.Contains("spawn_s1_start")))
-						{
-							this.StartZone = new VectorT(teleport.AbsOrigin!.X, teleport.AbsOrigin!.Y, teleport.AbsOrigin!.Z);
-							this.StartZoneAngles = new QAngleT(teleport.AbsRotation!.X, teleport.AbsRotation!.Y, teleport.AbsRotation!.Z);
-							foundPlayerSpawn = true;
-							break;
-						}
-					}
+			string? name = trigger.Entity?.Name;
+			if (!ZoneName.TryParse(name, out ZoneType type, out short number))
+				continue;
 
-					if (!foundPlayerSpawn)
-					{
-						this.StartZone = new VectorT(trigger.AbsOrigin!.X, trigger.AbsOrigin!.Y, trigger.AbsOrigin!.Z);
-					}
-				}
+			var (teleport, angles) = FindTeleportTarget(trigger, type, number, destinations);
+			var zone = new ZoneInfo(trigger.Index, name!, type, number, teleport, angles);
 
-				// Map end zone
-				else if (trigger.Entity!.Name.Contains("map_end"))
-				{
-					this.EndZone = new VectorT(trigger.AbsOrigin!.X, trigger.AbsOrigin!.Y, trigger.AbsOrigin!.Z);
-				}
-
-				// Stage start zones
-				else if (Regex.Match(trigger.Entity.Name, "^s([1-9][0-9]?|tage[1-9][0-9]?)_start$").Success)
-				{
-					int stage = Int32.Parse(Regex.Match(trigger.Entity.Name, "[0-9][0-9]?").Value);
-
-					// Find an info_destination_teleport inside this zone to grab angles from
-					bool foundPlayerSpawn = false; // Track whether a player spawn is found
-					foreach (CBaseEntity teleport in teleports)
-					{
-						if (teleport.Entity!.Name != null &&
-							(IsInZone(trigger.AbsOrigin!, trigger.Collision.BoundingRadius, teleport.AbsOrigin!) || (Regex.Match(teleport.Entity.Name, "^spawn_s([1-9][0-9]?|tage[1-9][0-9]?)_start$").Success && Int32.Parse(Regex.Match(teleport.Entity.Name, "[0-9][0-9]?").Value) == stage)))
-						{
-							this.StageStartZone[stage] = new VectorT(teleport.AbsOrigin!.X, teleport.AbsOrigin!.Y, teleport.AbsOrigin!.Z);
-							this.StageStartZoneAngles[stage] = new QAngleT(teleport.AbsRotation!.X, teleport.AbsRotation!.Y, teleport.AbsRotation!.Z);
-							this.Stages++; // Count stage zones for the map to populate DB
-							foundPlayerSpawn = true;
-							break;
-						}
-					}
-
-					if (!foundPlayerSpawn)
-					{
-						this.StageStartZone[stage] = new VectorT(trigger.AbsOrigin!.X, trigger.AbsOrigin!.Y, trigger.AbsOrigin!.Z);
-						this.Stages++;
-					}
-				}
-
-				// Checkpoint start zones (linear maps)
-				else if (Regex.Match(trigger.Entity.Name, "^map_c(p[1-9][0-9]?|heckpoint[1-9][0-9]?)$").Success)
-				{
-					this.CheckpointStartZone[Int32.Parse(Regex.Match(trigger.Entity.Name, "[0-9][0-9]?").Value)] = new VectorT(trigger.AbsOrigin!.X, trigger.AbsOrigin!.Y, trigger.AbsOrigin!.Z);
-					this.TotalCheckpoints++; // Might be useful to have this in DB entry
-				}
-
-				// Bonus start zones
-				else if (Regex.Match(trigger.Entity.Name, "^b([1-9][0-9]?|onus[1-9][0-9]?)_start$").Success)
-				{
-					int bonus = Int32.Parse(Regex.Match(trigger.Entity.Name, "[0-9][0-9]?").Value);
-
-					// Find an info_destination_teleport inside this zone to grab angles from
-					bool foundPlayerSpawn = false; // Track whether a player spawn is found
-					foreach (CBaseEntity teleport in teleports)
-					{
-						if (teleport.Entity!.Name != null &&
-							(IsInZone(trigger.AbsOrigin!, trigger.Collision.BoundingRadius, teleport.AbsOrigin!) || (Regex.Match(teleport.Entity.Name, "^spawn_b([1-9][0-9]?|onus[1-9][0-9]?)_start$").Success && Int32.Parse(Regex.Match(teleport.Entity.Name, "[0-9][0-9]?").Value) == bonus)))
-						{
-							this.BonusStartZone[bonus] = new VectorT(teleport.AbsOrigin!.X, teleport.AbsOrigin!.Y, teleport.AbsOrigin!.Z);
-							this.BonusStartZoneAngles[bonus] = new QAngleT(teleport.AbsRotation!.X, teleport.AbsRotation!.Y, teleport.AbsRotation!.Z);
-							this.Bonuses++; // Count bonus zones for the map to populate DB
-							foundPlayerSpawn = true;
-							break;
-						}
-					}
-
-					if (!foundPlayerSpawn)
-					{
-						this.BonusStartZone[bonus] = new VectorT(trigger.AbsOrigin!.X, trigger.AbsOrigin!.Y, trigger.AbsOrigin!.Z);
-						this.Bonuses++;
-					}
-				}
-
-				else if (Regex.Match(trigger.Entity.Name, "^b([1-9][0-9]?|onus[1-9][0-9]?)_end$").Success)
-				{
-					this.BonusEndZone[Int32.Parse(Regex.Match(trigger.Entity.Name, "[0-9][0-9]?").Value)] = new VectorT(trigger.AbsOrigin!.X, trigger.AbsOrigin!.Y, trigger.AbsOrigin!.Z);
-				}
-			}
+			if (!this.Zones.TryGetValue((type, number), out var list))
+				this.Zones[(type, number)] = list = new List<ZoneInfo>();
+			list.Add(zone);
 		}
 
-		if (this.Stages > 0) // Account for stage 1, not counted above
-		{
-			this.TotalCheckpoints = this.Stages; // Stages are counted as Checkpoints on Staged maps during MAP runs
-			this.Stages += 1;
-		}
+		short HighestNumber(ZoneType type) =>
+			this.Zones.Keys.Where(k => k.Type == type).Select(k => k.Number).DefaultIfEmpty((short)0).Max();
 
-		_logger.LogTrace("[{ClassName}] {MethodName} -> Start zone: {StartZoneX}, {StartZoneY}, {StartZoneZ} | End zone: {EndZoneX}, {EndZoneY}, {EndZoneZ}",
-			nameof(Map), methodName, this.StartZone.X, this.StartZone.Y, this.StartZone.Z, this.EndZone.X, this.EndZone.Y, this.EndZone.Z
+		this.Stages = HighestNumber(ZoneType.StageStart); // Map start is stage 1, so the highest sN_start is the stage count
+		this.Bonuses = HighestNumber(ZoneType.BonusStart);
+		this.TotalCheckpoints = this.Stages > 0
+			? this.Stages - 1 // Stages are counted as Checkpoints on Staged maps during MAP runs
+			: HighestNumber(ZoneType.Checkpoint);
+
+		_logger.LogInformation("[{ClassName}] {MethodName} -> Registered {Triggers} zone triggers in {Roles} zones",
+			nameof(Map), methodName, this.Zones.Values.Sum(z => z.Count), this.Zones.Count
 		);
 
 		KillServerCommandEnts();
+	}
+
+	/// <summary>
+	/// Where to put a player teleporting into this trigger: an info_teleport_destination inside it,
+	/// else the matching named spawn (spawn_map_start, spawn_s2_start, ...) closest to it, else its origin.
+	/// </summary>
+	private static (VectorT Position, QAngleT? Angles) FindTeleportTarget(CBaseTrigger trigger, ZoneType type, short number, List<CBaseEntity> destinations)
+	{
+		VectorT origin = trigger.AbsOrigin!.ToVector_t();
+
+		var inside = destinations.FirstOrDefault(d => d.AbsOrigin != null && IsInsideTrigger(trigger, d.AbsOrigin.ToVector_t()));
+		var chosen = inside ?? destinations
+			.Where(d => d.AbsOrigin != null
+				&& ZoneName.TryParseSpawn(d.Entity?.Name, out var spawnType, out var spawnNumber)
+				&& spawnType == type && spawnNumber == number)
+			.OrderBy(d => (d.AbsOrigin!.ToVector_t() - origin).Length())
+			.FirstOrDefault();
+
+		if (chosen == null)
+			return (origin, null);
+
+		return (chosen.AbsOrigin!.ToVector_t(),
+			new QAngleT(chosen.AbsRotation!.X, chosen.AbsRotation!.Y, chosen.AbsRotation!.Z));
+	}
+
+	internal static bool IsInsideTrigger(CBaseTrigger trigger, VectorT point)
+	{
+		var origin = trigger.AbsOrigin!;
+		var mins = trigger.Collision.Mins;
+		var maxs = trigger.Collision.Maxs;
+		return point.X >= origin.X + mins.X && point.X <= origin.X + maxs.X
+			&& point.Y >= origin.Y + mins.Y && point.Y <= origin.Y + maxs.Y
+			&& point.Z >= origin.Z + mins.Z && point.Z <= origin.Z + maxs.Z;
+	}
+
+	internal bool HasZone(ZoneType type, short number) => this.Zones.ContainsKey((type, number));
+
+	/// <summary>
+	/// The trigger of a role+number closest to `from` (by teleport target). Without a position
+	/// (dead/spectating) the lowest trigger index is used so the choice is still deterministic.
+	/// </summary>
+	internal ZoneInfo? FindNearestZone(ZoneType type, short number, VectorT? from)
+	{
+		if (!this.Zones.TryGetValue((type, number), out var list) || list.Count == 0)
+			return null;
+
+		if (from == null)
+			return list.MinBy(z => z.TriggerIndex);
+
+		VectorT position = from.Value;
+		return list.MinBy(z => (z.Teleport - position).Length());
 	}
 
 	/// <summary>
@@ -669,16 +619,6 @@ public class Map : MapEntity
 
 		this.ReplayManager.Pool.RemoveAt(index);
 		Server.ExecuteCommand($"kickid {id_to_kick}; bot_quota {this.ReplayManager.Pool.Count}");
-	}
-
-	public static bool IsInZone(Vector zoneOrigin, float zoneCollisionRadius, Vector spawnOrigin)
-	{
-		if (spawnOrigin.X >= zoneOrigin.X - zoneCollisionRadius && spawnOrigin.X <= zoneOrigin.X + zoneCollisionRadius &&
-			spawnOrigin.Y >= zoneOrigin.Y - zoneCollisionRadius && spawnOrigin.Y <= zoneOrigin.Y + zoneCollisionRadius &&
-			spawnOrigin.Z >= zoneOrigin.Z - zoneCollisionRadius && spawnOrigin.Z <= zoneOrigin.Z + zoneCollisionRadius)
-			return true;
-		else
-			return false;
 	}
 
 	private void KillServerCommandEnts([CallerMemberName] string methodName = "")

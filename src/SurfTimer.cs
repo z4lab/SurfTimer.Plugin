@@ -123,6 +123,11 @@ public partial class SurfTimer : BasePlugin
 		ConVarHelper.RemoveCheatFlagFromConVar("bot_freeze");
 		ConVarHelper.RemoveCheatFlagFromConVar("bot_zombie");
 
+		// Round restarts re-create the map's triggers without firing EndTouch for the old ones, so any
+		// "inside zone" state would otherwise stay stuck (e.g. anti-prehop applying outside start zones)
+		foreach (var player in playerList.Values)
+			player.TouchingTriggers.Clear();
+
 		Server.ExecuteCommand("execifexists SurfTimer/server_settings.cfg");
 		_logger.LogTrace(
 			"[{Prefix}] Executed configuration: server_settings.cfg",

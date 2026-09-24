@@ -46,5 +46,7 @@
 	"spec_no_match": "{red}No player found matching '{yellow}{0}{red}'.",
 	"repeat_enabled": "Repeat mode {lime}enabled{default} - you'll be sent back to the start of each stage you finish.",
 	"repeat_disabled": "Repeat mode {red}disabled{default}.",
+	"hideself_on": "Your player model is now {lime}hidden{default}.",
+	"hideself_off": "Your player model is now {red}visible{default}.",
 	"spec_manual_hint": "Press {yellow}M{default} and choose {yellow}Spectator{default} - you'll be put on {lime}{0}{default} automatically."
 }

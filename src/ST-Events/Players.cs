@@ -13,7 +13,22 @@ public partial class SurfTimer
 	public HookResult OnPlayerSpawn(EventPlayerSpawn @event, GameEventInfo info)
 	{
 		var controller = @event.Userid;
-		if (!controller!.IsValid || !controller.IsBot || CurrentMap.ReplayManager.IsControllerConnectedToReplayPlayer(controller))
+		if (controller == null || !controller.IsValid)
+			return HookResult.Continue;
+
+		if (!controller.IsBot)
+		{
+			// Re-apply !hideself on every spawn - the game resets the pawn's render state. Slight
+			// delay so the spawn has finished setting up the model/weapons first.
+			AddTimer(0.1f, () =>
+			{
+				if (controller.IsValid && playerList.TryGetValue(controller.UserId ?? 0, out var spawnedPlayer))
+					spawnedPlayer.ApplySelfVisibility();
+			});
+			return HookResult.Continue;
+		}
+
+		if (CurrentMap.ReplayManager.IsControllerConnectedToReplayPlayer(controller))
 			return HookResult.Continue;
 
 		_logger.LogTrace("OnPlayerSpawn -> Player {Name} spawned.",

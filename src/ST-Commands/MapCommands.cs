@@ -181,7 +181,26 @@ public partial class SurfTimer
 		player.PrintToChat(msg);
 	}
 
-	[ConsoleCommand("css_triggers", "List all valid zone triggers in the map.")]
+	[ConsoleCommand("css_listtriggers", "Server console: list every trigger_multiple with name, zone type and bounds.")]
+	[CommandHelper(whoCanExecute: CommandUsage.SERVER_ONLY)]
+	public void ListTriggers(CCSPlayerController? player, CommandInfo command)
+	{
+		var triggers = Utilities.FindAllEntitiesByDesignerName<CBaseTrigger>("trigger_multiple")
+			.Select(t => (Trigger: t, Name: t.Entity?.Name ?? ""))
+			.OrderBy(t => t.Name, StringComparer.OrdinalIgnoreCase)
+			.ToList();
+
+		command.ReplyToCommand($"[{Config.PluginName}] {triggers.Count} trigger_multiple on {CurrentMap.Name}:");
+		foreach (var (trigger, name) in triggers)
+		{
+			string zone = ZoneName.TryParse(name, out var type, out var number) ? $"{type} {number}" : "-";
+			command.ReplyToCommand(
+				$"  #{trigger.Index,-5} name='{(string.IsNullOrEmpty(name) ? "<unnamed>" : name)}' zone={zone} " +
+				$"origin=({trigger.AbsOrigin}) mins=({trigger.Collision.Mins}) maxs=({trigger.Collision.Maxs})");
+		}
+	}
+
+	[ConsoleCommand("css_triggers", "List all registered zones in the map.")]
 	[RequiresPermissions("@css/root")]
 	[CommandHelper(whoCanExecute: CommandUsage.CLIENT_ONLY)]
 	public void Triggers(CCSPlayerController? player, CommandInfo command)
@@ -189,42 +208,12 @@ public partial class SurfTimer
 		if (player == null)
 			return;
 
-		IEnumerable<CBaseTrigger> triggers = Utilities.FindAllEntitiesByDesignerName<CBaseTrigger>("trigger_multiple");
-		player.PrintToChat($"Count of triggers: {triggers.Count()}");
-		foreach (CBaseTrigger trigger in triggers)
+		player.PrintToChat($"{Config.PluginPrefix} {CurrentMap.Zones.Values.Sum(z => z.Count)} zone triggers | Stages: {CurrentMap.Stages} | Bonuses: {CurrentMap.Bonuses} | Checkpoints: {CurrentMap.TotalCheckpoints}");
+		foreach (var ((type, number), zones) in CurrentMap.Zones.OrderBy(z => z.Key.Type).ThenBy(z => z.Key.Number))
 		{
-			if (trigger.Entity!.Name != null)
-			{
-				player.PrintToChat($"Trigger -> Origin: {trigger.AbsOrigin}, Radius: {trigger.Collision.BoundingRadius}, Name: {trigger.Entity!.Name}");
-			}
+			player.PrintToChat($"{type} {number} ({zones.Count}x):");
+			foreach (var zone in zones)
+				player.PrintToChat($"  #{zone.TriggerIndex} '{zone.Name}' -> teleport {zone.Teleport}{(zone.Angles is { } angles ? $" angles {angles}" : "")}");
 		}
-
-		player.PrintToChat($"Hooked Trigger -> Start -> {CurrentMap.StartZone} -> Angles {CurrentMap.StartZoneAngles}");
-		player.PrintToChat($"Hooked Trigger -> End -> {CurrentMap.EndZone}");
-		int i = 1;
-		foreach (VectorT stage in CurrentMap.StageStartZone)
-		{
-			if (stage.IsZero())
-				continue;
-			else
-			{
-				player.PrintToChat($"Hooked Trigger -> Stage {i} -> {stage} -> Angles {CurrentMap.StageStartZoneAngles[i]}");
-				i++;
-			}
-		}
-
-		i = 1;
-		foreach (VectorT bonus in CurrentMap.BonusStartZone)
-		{
-			if (bonus.IsZero())
-				continue;
-			else
-			{
-				player.PrintToChat($"Hooked Trigger -> Bonus {i} -> {bonus} -> Angles {CurrentMap.BonusStartZoneAngles[i]}");
-				i++;
-			}
-		}
-
-		return;
 	}
 }

@@ -10,17 +10,6 @@ namespace SurfTimer;
 
 public partial class SurfTimer
 {
-	internal enum ZoneType
-	{
-		MapEnd,
-		MapStart,
-		StageStart,
-		Checkpoint,
-		BonusStart,
-		BonusEnd,
-		Unknown
-	}
-
 	/// <summary>
 	/// Runs a save 1s later (so frames AFTER touching the zone exist for the replay trim) and blocks
 	/// resets from the moment it's scheduled until it finishes - otherwise a !r in that window clears
@@ -47,40 +36,21 @@ public partial class SurfTimer
 		});
 	}
 
-	/// <summary>
-	/// Determines the zone type based on the entity name.
-	/// </summary>
-	/// <param name="entityName">Name of the entity.</param>
-	/// <returns>ZoneType data</returns>
-	private static ZoneType GetZoneType(string entityName)
-	{
-		if (entityName == "map_end")
-			return ZoneType.MapEnd;
-		else if (entityName.Contains("map_start") || entityName.Contains("s1_start") || entityName.Contains("stage1_start"))
-			return ZoneType.MapStart;
-		else if (Regex.IsMatch(entityName, @"^s([1-9][0-9]?|tage[1-9][0-9]?)_start$"))
-			return ZoneType.StageStart;
-		else if (Regex.IsMatch(entityName, @"^map_c(p[1-9][0-9]?|heckpoint[1-9][0-9]?)$"))
-			return ZoneType.Checkpoint;
-		else if (Regex.IsMatch(entityName, @"^b([1-9][0-9]?|onus[1-9][0-9]?)_start$"))
-			return ZoneType.BonusStart;
-		else if (Regex.IsMatch(entityName, @"^b([1-9][0-9]?|onus[1-9][0-9]?)_end$"))
-			return ZoneType.BonusEnd;
-
-		return ZoneType.Unknown;
-	}
-
 	/* StartTouch */
 	private void StartTouchHandleMapEndZone(Player player, [CallerMemberName] string methodName = "")
 	{
+		// Only a running map/stage run finishes here. A second map_end trigger, re-entering one, or
+		// touching it during a bonus must not overwrite the end speed or save anything again.
+		if (!player.Timer.IsRunning || player.Timer.IsBonusMode)
+			return;
+
 		// Get velocities for DB queries
 		// Get the velocity of the player - we will be using this values to compare and write to DB
 		VectorT velocity = player.Controller.PlayerPawn.Value!.AbsVelocity.ToVector_t();
 		int pStyle = player.Timer.Style;
 
 		// The map end is also the last stage's finish - captured before the timer is stopped below
-		bool finishedStageForRepeat = player.IsRepeatMode && CurrentMap.Stages > 0
-			&& player.Timer.IsRunning && !player.Timer.IsBonusMode;
+		bool finishedStageForRepeat = player.IsRepeatMode && CurrentMap.Stages > 0;
 
 		player.Controller.PrintToCenter($"Map End");
 
@@ -229,10 +199,8 @@ public partial class SurfTimer
 #endif
 	}
 
-	private static void StartTouchHandleMapStartZone(Player player, CBaseTrigger trigger, [CallerMemberName] string methodName = "")
+	private static void StartTouchHandleMapStartZone(Player player, ZoneInfo zone, [CallerMemberName] string methodName = "")
 	{
-		player.CurrentStartZoneIndex = trigger.Index;
-
 		// We shouldn't start timer and reset data until MapTime has been saved - mostly concerns the Replays and trimming the correct parts
 		if (!player.ReplayRecorder.IsSaving)
 		{
@@ -242,7 +210,7 @@ public partial class SurfTimer
 			player.ReplayRecorder.MapSituations.Add(player.ReplayRecorder.Frames.Count);
 			player.Timer.Reset();
 			player.Stats.ThisRun.Checkpoints.Clear();
-			player.Controller.PrintToCenter($"Map Start ({trigger.Entity!.Name})");
+			player.Controller.PrintToCenter($"Map Start ({zone.Name})");
 
 #if DEBUG
 			player.Controller.PrintToChat($"CS2 Surf DEBUG >> CBaseTrigger_{ChatColors.Lime}StartTouchFunc{ChatColors.Default} -> {ChatColors.Green}Map Start Zone");
@@ -254,14 +222,12 @@ public partial class SurfTimer
 		}
 	}
 
-	private void StartTouchHandleStageStartZone(Player player, CBaseTrigger trigger, [CallerMemberName] string methodName = "")
+	private void StartTouchHandleStageStartZone(Player player, ZoneInfo zone, [CallerMemberName] string methodName = "")
 	{
-		player.CurrentStartZoneIndex = trigger.Index;
-
 		// Get velocities for DB queries
 		// Get the velocity of the player - we will be using this values to compare and write to DB
 		VectorT velocity = player.Controller.PlayerPawn.Value!.AbsVelocity.ToVector_t();
-		short stage = short.Parse(Regex.Match(trigger.Entity!.Name, "[0-9][0-9]?").Value);
+		short stage = zone.Number;
 
 		if (!player.ReplayRecorder.IsRecording)
 			player.ReplayRecorder.Start();
@@ -330,7 +296,7 @@ public partial class SurfTimer
 			player.Timer.Checkpoint = (short)(stage - 1); // Stage = Checkpoint when in a run on a Staged map
 
 #if DEBUG
-			Console.WriteLine($"============== Initial entity value: {Regex.Match(trigger.Entity.Name, "[0-9][0-9]?").Value} | Assigned to `stage`: {stage} | player.Timer.Checkpoint: {stage - 1}");
+			Console.WriteLine($"============== Initial entity value: {zone.Number} | Assigned to `stage`: {stage} | player.Timer.Checkpoint: {stage - 1}");
 			Console.WriteLine($"CS2 Surf DEBUG >> CBaseTrigger_StartTouchFunc (Stage start zones) -> player.Stats.PB[{player.Timer.Style}].Checkpoint.Count = {player.Stats.PB[player.Timer.Style].Checkpoints.Count}");
 #endif
 
@@ -363,16 +329,16 @@ public partial class SurfTimer
 			ScheduleRepeatTeleport(player, (short)(stage - 1));
 
 #if DEBUG
-		player.Controller.PrintToChat($"CS2 Surf DEBUG >> CBaseTrigger_{ChatColors.Lime}StartTouchFunc{ChatColors.Default} -> {ChatColors.Yellow}Stage {Regex.Match(trigger.Entity.Name, "[0-9][0-9]?").Value} Start Zone");
+		player.Controller.PrintToChat($"CS2 Surf DEBUG >> CBaseTrigger_{ChatColors.Lime}StartTouchFunc{ChatColors.Default} -> {ChatColors.Yellow}Stage {zone.Number} Start Zone");
 #endif
 	}
 
-	private void StartTouchHandleCheckpointZone(Player player, CBaseTrigger trigger, [CallerMemberName] string methodName = "")
+	private void StartTouchHandleCheckpointZone(Player player, ZoneInfo zone, [CallerMemberName] string methodName = "")
 	{
 		// Get velocities for DB queries
 		// Get the velocity of the player - we will be using this values to compare and write to DB
 		VectorT velocity = player.Controller.PlayerPawn.Value!.AbsVelocity.ToVector_t();
-		short checkpoint = short.Parse(Regex.Match(trigger.Entity!.Name, "[0-9][0-9]?").Value);
+		short checkpoint = zone.Number;
 
 		bool failed_checkpoint = player.Timer.Checkpoint == checkpoint;
 
@@ -385,7 +351,7 @@ public partial class SurfTimer
 		{
 #if DEBUG
 			int pStyle = player.Timer.Style;
-			Console.WriteLine($"============== Initial entity value: {Regex.Match(trigger.Entity.Name, "[0-9][0-9]?").Value} | Assigned to `checkpoint`: {Int32.Parse(Regex.Match(trigger.Entity.Name, "[0-9][0-9]?").Value)}");
+			Console.WriteLine($"============== Initial entity value: {zone.Number} | Assigned to `checkpoint`: {zone.Number}");
 			Console.WriteLine($"CS2 Surf DEBUG >> CBaseTrigger_StartTouchFunc (Checkpoint zones) -> player.Stats.PB[{pStyle}].Checkpoint.Count = {player.Stats.PB[pStyle].Checkpoints.Count}");
 #endif
 
@@ -441,13 +407,20 @@ public partial class SurfTimer
 		}
 
 #if DEBUG
-		player.Controller.PrintToChat($"CS2 Surf DEBUG >> CBaseTrigger_{ChatColors.Lime}StartTouchFunc{ChatColors.Default} -> {ChatColors.LightBlue}Checkpoint {Regex.Match(trigger.Entity.Name, "[0-9][0-9]?").Value} Zone");
+		player.Controller.PrintToChat($"CS2 Surf DEBUG >> CBaseTrigger_{ChatColors.Lime}StartTouchFunc{ChatColors.Default} -> {ChatColors.LightBlue}Checkpoint {zone.Number} Zone");
 #endif
 	}
 
-	private static void StartTouchHandleBonusStartZone(Player player, CBaseTrigger trigger, [CallerMemberName] string methodName = "")
+	private static void StartTouchHandleBonusStartZone(Player player, ZoneInfo zone, [CallerMemberName] string methodName = "")
 	{
-		short bonus = short.Parse(Regex.Match(trigger.Entity!.Name, "[0-9][0-9]?").Value);
+		// Same as the map start: don't reset the recorder/timer until a pending save has trimmed its replay
+		if (player.ReplayRecorder.IsSaving)
+		{
+			player.Controller.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["reset_delay"]}");
+			return;
+		}
+
+		short bonus = zone.Number;
 		player.Timer.Bonus = bonus;
 
 		player.Timer.Reset();
@@ -460,7 +433,7 @@ public partial class SurfTimer
 		player.ReplayRecorder.BonusSituations.Add(player.ReplayRecorder.Frames.Count);
 		Console.WriteLine($"START_ZONE_ENTER: player.ReplayRecorder.BonusSituations.Add({player.ReplayRecorder.Frames.Count})");
 
-		player.Controller.PrintToCenter($"Bonus Start ({trigger.Entity.Name})");
+		player.Controller.PrintToCenter($"Bonus Start ({zone.Name})");
 
 #if DEBUG
 		Console.WriteLine($"CS2 Surf DEBUG >> CBaseTrigger_StartTouchFunc (Bonus start zones) -> player.Timer.IsRunning: {player.Timer.IsRunning}");
@@ -468,14 +441,20 @@ public partial class SurfTimer
 #endif
 	}
 
-	private void StartTouchHandleBonusEndZone(Player player, CBaseTrigger trigger, [CallerMemberName] string methodName = "")
+	private void StartTouchHandleBonusEndZone(Player player, ZoneInfo zone, [CallerMemberName] string methodName = "")
 	{
+		short bonus_idx = zone.Number;
+
+		// Only the end of the bonus actually being run finishes it - not a map run passing through,
+		// another bonus, or a second end trigger of the same bonus after finishing
+		if (!player.Timer.IsRunning || !player.Timer.IsBonusMode || player.Timer.Bonus != bonus_idx
+			|| bonus_idx >= CurrentMap.BonusWR.Length)
+			return;
+
 		// Get velocities for DB queries
 		// Get the velocity of the player - we will be using this values to compare and write to DB
 		VectorT velocity = player.Controller.PlayerPawn.Value!.AbsVelocity.ToVector_t();
 		int pStyle = player.Timer.Style;
-		// To-do: verify the bonus trigger being hit!
-		short bonus_idx = short.Parse(Regex.Match(trigger.Entity!.Name, "[0-9][0-9]?").Value);
 
 		player.Timer.Stop();
 		player.ReplayRecorder.CurrentSituation = ReplayFrameSituation.END_ZONE_ENTER;
@@ -518,7 +497,7 @@ public partial class SurfTimer
 			saveBonusTime = true;
 			int timeImprove = player.Stats.BonusPB[bonus_idx][pStyle].RunTime - player.Timer.Ticks;
 			Server.PrintToChatAll($"{Config.PluginPrefix} {PracticeString}{LocalizationService.LocalizerNonNull["bonuspb_improved",
-				player.Controller.PlayerName, bonus_idx, PlayerHud.FormatTime(player.Timer.Ticks), PlayerHud.FormatTime(timeImprove), PlayerHud.FormatTime(player.Stats.PB[pStyle].RunTime)]}"
+				player.Controller.PlayerName, bonus_idx, PlayerHud.FormatTime(player.Timer.Ticks), PlayerHud.FormatTime(timeImprove), PlayerHud.FormatTime(player.Stats.BonusPB[bonus_idx][pStyle].RunTime)]}"
 			);
 		}
 		else // Player did not beat their existing personal best for the bonus
@@ -544,11 +523,8 @@ public partial class SurfTimer
 		player.ReplayRecorder.CurrentSituation = ReplayFrameSituation.END_ZONE_EXIT;
 	}
 
-	private static void EndTouchHandleMapStartZone(Player player, CBaseTrigger trigger, [CallerMemberName] string methodName = "")
+	private static void EndTouchHandleMapStartZone(Player player, ZoneInfo zone, [CallerMemberName] string methodName = "")
 	{
-		if (player.CurrentStartZoneIndex == trigger.Index)
-			player.CurrentStartZoneIndex = 0;
-
 		VectorT velocity = player.Controller.PlayerPawn.Value!.AbsVelocity.ToVector_t();
 
 		// MAP START ZONE
@@ -582,17 +558,14 @@ public partial class SurfTimer
 #endif
 	}
 
-	private static void EndTouchHandleStageStartZone(Player player, CBaseTrigger trigger, [CallerMemberName] string methodName = "")
+	private static void EndTouchHandleStageStartZone(Player player, ZoneInfo zone, [CallerMemberName] string methodName = "")
 	{
-		if (player.CurrentStartZoneIndex == trigger.Index)
-			player.CurrentStartZoneIndex = 0;
-
 #if DEBUG
-		player.Controller.PrintToChat($"CS2 Surf DEBUG >> CBaseTrigger_{ChatColors.LightRed}EndTouchFunc{ChatColors.Default} -> {ChatColors.Yellow}Stage {Regex.Match(trigger.Entity!.Name, "[0-9][0-9]?").Value} Start Zone");
+		player.Controller.PrintToChat($"CS2 Surf DEBUG >> CBaseTrigger_{ChatColors.LightRed}EndTouchFunc{ChatColors.Default} -> {ChatColors.Yellow}Stage {zone.Number} Start Zone");
 		Console.WriteLine($"===================== player.Timer.Checkpoint {player.Timer.Checkpoint} - player.Stats.ThisRun.Checkpoint.Count {player.Stats.ThisRun.Checkpoints.Count}");
 #endif
 		VectorT velocity = player.Controller.PlayerPawn.Value!.AbsVelocity.ToVector_t();
-		int stage = Int32.Parse(Regex.Match(trigger.Entity!.Name, "[0-9][0-9]?").Value);
+		short stage = zone.Number;
 
 		// Set replay situation
 		player.ReplayRecorder.CurrentSituation = ReplayFrameSituation.STAGE_ZONE_EXIT;
@@ -628,10 +601,10 @@ public partial class SurfTimer
 		}
 	}
 
-	private static void EndTouchHandleCheckpointZone(Player player, CBaseTrigger trigger, [CallerMemberName] string methodName = "")
+	private static void EndTouchHandleCheckpointZone(Player player, ZoneInfo zone, [CallerMemberName] string methodName = "")
 	{
 #if DEBUG
-		player.Controller.PrintToChat($"CS2 Surf DEBUG >> CBaseTrigger_{ChatColors.LightRed}EndTouchFunc{ChatColors.Default} -> {ChatColors.Yellow}Checkpoint {Regex.Match(trigger.Entity!.Name, "[0-9][0-9]?").Value} Start Zone");
+		player.Controller.PrintToChat($"CS2 Surf DEBUG >> CBaseTrigger_{ChatColors.LightRed}EndTouchFunc{ChatColors.Default} -> {ChatColors.Yellow}Checkpoint {zone.Number} Start Zone");
 		Console.WriteLine($"===================== player.Timer.Checkpoint {player.Timer.Checkpoint} - player.Stats.ThisRun.Checkpoint.Count {player.Stats.ThisRun.Checkpoints.Count}");
 #endif
 		VectorT velocity = player.Controller.PlayerPawn.Value!.AbsVelocity.ToVector_t();
@@ -664,14 +637,14 @@ public partial class SurfTimer
 			player.Stats.ThisRun.Checkpoints[player.Timer.Checkpoint].EndTouch = player.Timer.Ticks;
 
 			// Show Prespeed for stages - will be enabled/disabled by the user?
-			player.Controller.PrintToCenter($"Checkpoint {Regex.Match(trigger.Entity!.Name, "[0-9][0-9]?").Value} - Prespeed: {velocity.velMag():0} u/s");
+			player.Controller.PrintToCenter($"Checkpoint {zone.Number} - Prespeed: {velocity.velMag():0} u/s");
 		}
 	}
 
-	private static void EndTouchHandleBonusStartZone(Player player, CBaseTrigger trigger, [CallerMemberName] string methodName = "")
+	private static void EndTouchHandleBonusStartZone(Player player, ZoneInfo zone, [CallerMemberName] string methodName = "")
 	{
 #if DEBUG
-		player.Controller.PrintToChat($"CS2 Surf DEBUG >> CBaseTrigger_{ChatColors.LightRed}EndTouchFunc{ChatColors.Default} -> {ChatColors.Yellow}Bonus {Regex.Match(trigger.Entity!.Name, "[0-9][0-9]?").Value} Start Zone");
+		player.Controller.PrintToChat($"CS2 Surf DEBUG >> CBaseTrigger_{ChatColors.LightRed}EndTouchFunc{ChatColors.Default} -> {ChatColors.Yellow}Bonus {zone.Number} Start Zone");
 #endif
 		VectorT velocity = player.Controller.PlayerPawn.Value!.AbsVelocity.ToVector_t();
 
@@ -697,7 +670,7 @@ public partial class SurfTimer
 		}
 
 		// Prespeed display
-		player.Controller.PrintToCenter($"Prespeed: {velocity.velMag():0)} u/s");
+		player.Controller.PrintToCenter($"Prespeed: {velocity.velMag():0} u/s");
 		player.Stats.ThisRun.StartVelX = velocity.X; // Start pre speed for the Bonus run
 		player.Stats.ThisRun.StartVelY = velocity.Y; // Start pre speed for the Bonus run
 		player.Stats.ThisRun.StartVelZ = velocity.Z; // Start pre speed for the Bonus run
@@ -705,6 +678,6 @@ public partial class SurfTimer
 
 	private static void EndTouchHandleBonusEndZone(Player player, [CallerMemberName] string methodName = "")
 	{
-		throw new NotImplementedException();
+		player.ReplayRecorder.CurrentSituation = ReplayFrameSituation.END_ZONE_EXIT;
 	}
 }

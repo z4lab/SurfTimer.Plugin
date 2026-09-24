@@ -56,43 +56,34 @@ public partial class SurfTimer
 			throw exception;
 		}
 
-		if (trigger.Entity!.Name != null)
+		// Classified by name on every touch, not looked up by entity index: round restarts re-create the
+		// map's trigger entities with new indexes, which would leave an index-keyed lookup stale.
+		if (!ZoneInfo.TryFromTrigger(trigger, out ZoneInfo zone))
+			return HookResult.Continue; // Not a timer zone (filters, teleports, ...)
+
+		// Every entry counts, including a second trigger of the same zone
+		player.TouchingTriggers[zone.TriggerIndex] = zone;
+
+		switch (zone.Type)
 		{
-			ZoneType currentZone = GetZoneType(trigger.Entity.Name);
-
-			switch (currentZone)
-			{
-				// Map end zones -- hook into map_end
-				case ZoneType.MapEnd:
-					StartTouchHandleMapEndZone(player);
-					break;
-				// Map start zones -- hook into map_start, (s)tage1_start
-				case ZoneType.MapStart:
-					StartTouchHandleMapStartZone(player, trigger);
-					break;
-				// Stage start zones -- hook into (s)tage#_start
-				case ZoneType.StageStart:
-					StartTouchHandleStageStartZone(player, trigger);
-					break;
-				// Map checkpoint zones -- hook into map_(c)heck(p)oint#
-				case ZoneType.Checkpoint:
-					StartTouchHandleCheckpointZone(player, trigger);
-					break;
-				// Bonus start zones -- hook into (b)onus#_start
-				case ZoneType.BonusStart:
-					StartTouchHandleBonusStartZone(player, trigger);
-					break;
-				// Bonus end zones -- hook into (b)onus#_end
-				case ZoneType.BonusEnd:
-					StartTouchHandleBonusEndZone(player, trigger);
-					break;
-
-				default:
-					_logger.LogError("[{ClassName}] OnTriggerStartTouch -> Unknown MapZone detected in OnTriggerStartTouch. Name: {ZoneName}",
-						nameof(SurfTimer), trigger.Entity.Name
-					);
-					break;
-			}
+			case ZoneType.MapEnd:
+				StartTouchHandleMapEndZone(player);
+				break;
+			case ZoneType.MapStart:
+				StartTouchHandleMapStartZone(player, zone);
+				break;
+			case ZoneType.StageStart:
+				StartTouchHandleStageStartZone(player, zone);
+				break;
+			case ZoneType.Checkpoint:
+				StartTouchHandleCheckpointZone(player, zone);
+				break;
+			case ZoneType.BonusStart:
+				StartTouchHandleBonusStartZone(player, zone);
+				break;
+			case ZoneType.BonusEnd:
+				StartTouchHandleBonusEndZone(player, zone);
+				break;
 		}
 		return HookResult.Continue;
 	}

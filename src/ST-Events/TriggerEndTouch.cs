@@ -28,58 +28,49 @@ public partial class SurfTimer
 			);
 		}
 
-		if (client == null || !client.IsValid || client.UserId == -1 || !client.PawnIsAlive || !playerList.ContainsKey((int)client.UserId!)) // `client.IsBot` throws error in server console when going to spectator? + !playerList.ContainsKey((int)client.UserId!) make sure to not check for user_id that doesnt exists
-		{
+		if (client == null || !client.IsValid || client.UserId == -1 || !playerList.TryGetValue(client.UserId ?? 0, out Player? player))
 			return HookResult.Continue;
-		}
-		else
-		{
-			// Implement Trigger End Touch Here
-			Player player = playerList[client.UserId ?? 0];
+
+		if (!ZoneInfo.TryFromTrigger(trigger, out ZoneInfo zone))
+			return HookResult.Continue; // Not a timer zone (filters, teleports, ...)
+
+		// Always forget the trigger, even for a dead player, so no stale "inside" state is left behind
+		player.TouchingTriggers.Remove(zone.TriggerIndex);
+
+		// `client.IsBot` throws error in server console when going to spectator
+		if (!client.PawnIsAlive)
+			return HookResult.Continue;
+
+		// Still inside another trigger of the same zone (overlapping duplicates) - not a real exit yet
+		if (player.IsTouchingZone(zone.Type, zone.Number))
+			return HookResult.Continue;
+
 #if DEBUG
-			player.Controller.PrintToChat($"CS2 Surf DEBUG >> CBaseTrigger_EndTouchFunc -> {trigger.DesignerName} -> {trigger.Entity!.Name}");
+		player.Controller.PrintToChat($"CS2 Surf DEBUG >> CBaseTrigger_EndTouchFunc -> {trigger.DesignerName} -> {zone.Name}");
 #endif
 
-			if (trigger.Entity!.Name != null)
-			{
-				ZoneType currentZone = GetZoneType(trigger.Entity.Name);
-
-				switch (currentZone)
-				{
-					// Map end zones -- hook into map_end
-					case ZoneType.MapEnd:
-						EndTouchHandleMapEndZone(player);
-						break;
-					// Map start zones -- hook into map_start, (s)tage1_start
-					case ZoneType.MapStart:
-						EndTouchHandleMapStartZone(player, trigger);
-						break;
-					// Stage start zones -- hook into (s)tage#_start
-					case ZoneType.StageStart:
-						EndTouchHandleStageStartZone(player, trigger);
-						break;
-					// Map checkpoint zones -- hook into map_(c)heck(p)oint#
-					case ZoneType.Checkpoint:
-						EndTouchHandleCheckpointZone(player, trigger);
-						break;
-					// Bonus start zones -- hook into (b)onus#_start
-					case ZoneType.BonusStart:
-						EndTouchHandleBonusStartZone(player, trigger);
-						break;
-					// Bonus end zones -- hook into (b)onus#_end
-					case ZoneType.BonusEnd:
-						EndTouchHandleBonusEndZone(player);
-						break;
-
-					default:
-						_logger.LogError("[{ClassName}] OnTriggerStartTouch -> Unknown MapZone detected in OnTriggerStartTouch. Name: {ZoneName}",
-							nameof(SurfTimer), trigger.Entity.Name
-						);
-						break;
-				}
-			}
-
-			return HookResult.Continue;
+		switch (zone.Type)
+		{
+			case ZoneType.MapEnd:
+				EndTouchHandleMapEndZone(player);
+				break;
+			case ZoneType.MapStart:
+				EndTouchHandleMapStartZone(player, zone);
+				break;
+			case ZoneType.StageStart:
+				EndTouchHandleStageStartZone(player, zone);
+				break;
+			case ZoneType.Checkpoint:
+				EndTouchHandleCheckpointZone(player, zone);
+				break;
+			case ZoneType.BonusStart:
+				EndTouchHandleBonusStartZone(player, zone);
+				break;
+			case ZoneType.BonusEnd:
+				EndTouchHandleBonusEndZone(player);
+				break;
 		}
+
+		return HookResult.Continue;
 	}
 }

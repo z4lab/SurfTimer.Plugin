@@ -1,6 +1,7 @@
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Utils;
+using System.Drawing;
 
 namespace SurfTimer;
 
@@ -24,14 +25,21 @@ public class Player
 	// !repeat - send the player back to the start of each stage they finish (off on join)
 	internal bool IsRepeatMode { get; set; } = false;
 
+	// !hideself - player model hidden (on by default each join)
+	internal bool HideSelf { get; set; } = true;
+
 	// Anti-prehop/bhop state (map start zone + every stage start zone). Deliberately not on
 	// PlayerTimer - Timer.Reset() fires on every start-zone entry, which would wrongly clear this;
 	// this state must only clear when velocity actually drops below the cap.
-	// Index of the start-zone trigger the player is inside (0 = none). Tracks the entity rather
-	// than a bool so a late EndTouch from the zone they teleported out of (e.g. !r from a stage
-	// start) can't clear the zone they teleported into.
-	internal uint CurrentStartZoneIndex { get; set; } = 0;
-	internal bool IsInStartZone => this.CurrentStartZoneIndex != 0;
+	// Zone triggers the player is currently inside, by entity index. Several at once, so overlapping/
+	// duplicate triggers and late EndTouch events (e.g. !r out of a stage start) are handled.
+	internal Dictionary<uint, ZoneInfo> TouchingTriggers { get; } = new();
+
+	internal bool IsInStartZone => this.TouchingTriggers.Values.Any(zone =>
+		zone.Type is ZoneType.MapStart or ZoneType.StageStart or ZoneType.BonusStart);
+
+	internal bool IsTouchingZone(ZoneType type, short number) => this.TouchingTriggers.Values.Any(zone =>
+		zone.Type == type && zone.Number == number);
 	internal bool WasOnGroundLastTick { get; set; } = true;
 	internal int GroundTicks { get; set; } = 0;
 	internal int StartZoneJumpCount { get; set; } = 0;
@@ -70,6 +78,41 @@ public class Player
 			return false;
 
 		return observerServices.ObserverTarget.Raw == p.PlayerPawn.Raw;
+	}
+
+	/// <summary>
+	/// Hides or shows the player's model per HideSelf - hiding also removes their own first-person
+	/// legs. Render alpha is networked to everyone, so a hidden player is invisible to all players.
+	/// Shadow and carried weapons are hidden too so there's no floating shadow/gun.
+	/// </summary>
+	internal void ApplySelfVisibility()
+	{
+		var pawn = this.Controller.PlayerPawn.Value;
+		if (pawn == null || !pawn.IsValid)
+			return;
+
+		int alpha = this.HideSelf ? 0 : 255;
+		SetRenderAlpha(pawn, alpha);
+
+		pawn.ShadowStrength = this.HideSelf ? 0f : 1f;
+		Utilities.SetStateChanged(pawn, "CBaseModelEntity", "m_flShadowStrength");
+
+		var weapons = pawn.WeaponServices?.MyWeapons;
+		if (weapons == null)
+			return;
+
+		foreach (var handle in weapons)
+		{
+			var weapon = handle.Value;
+			if (weapon != null && weapon.IsValid)
+				SetRenderAlpha(weapon, alpha);
+		}
+	}
+
+	private static void SetRenderAlpha(CBaseModelEntity entity, int alpha)
+	{
+		entity.Render = Color.FromArgb(alpha, entity.Render.R, entity.Render.G, entity.Render.B);
+		Utilities.SetStateChanged(entity, "CBaseModelEntity", "m_clrRender");
 	}
 
 	/// <summary>

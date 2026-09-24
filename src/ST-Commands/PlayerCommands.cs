@@ -42,12 +42,31 @@ public partial class SurfTimer
 
 		oPlayer.Timer.Reset();
 		oPlayer.Stats.ThisRun.Checkpoints.Clear();
-		if (!CurrentMap.StartZone.IsZero())
-			Server.NextFrame(() =>
-			{
-				Extensions.Teleport(player.PlayerPawn.Value!, CurrentMap.StartZone, null, new VectorT(0, 0, 0));
-			}
-		);
+		TeleportToZone(player, ZoneType.MapStart, 1);
+	}
+
+	/// <summary>
+	/// Teleports the player (velocity zeroed) to the nearest trigger of a zone - maps can have several
+	/// per zone (e.g. one per side of a course). Returns false if the map has no such zone.
+	/// </summary>
+	private bool TeleportToZone(CCSPlayerController player, ZoneType type, short number)
+	{
+		var pawn = player.PlayerPawn.Value;
+		VectorT? from = player.PawnIsAlive && pawn != null && pawn.IsValid && pawn.AbsOrigin != null
+			? pawn.AbsOrigin.ToVector_t()
+			: null;
+
+		var zone = CurrentMap.FindNearestZone(type, number, from);
+		if (zone == null)
+			return false;
+
+		Server.NextFrame(() =>
+		{
+			var target = player.PlayerPawn.Value;
+			if (target != null && target.IsValid)
+				Extensions.Teleport(target, zone.Teleport, null, new VectorT(0, 0, 0));
+		});
+		return true;
 	}
 
 	[ConsoleCommand("css_rs", "Reset back to the start of the stage or bonus you were in.")]
@@ -80,20 +99,12 @@ public partial class SurfTimer
 		}
 
 
-		if (oPlayer.Timer.IsBonusMode)
-		{
-			if (oPlayer.Timer.Bonus != 0 && !CurrentMap.BonusStartZone[oPlayer.Timer.Bonus].IsZero())
-				Server.NextFrame(() => Extensions.Teleport(player.PlayerPawn.Value!, CurrentMap.BonusStartZone[oPlayer.Timer.Bonus], null, new VectorT(0, 0, 0)));
-			else // Reset back to map start
-				Server.NextFrame(() => Extensions.Teleport(player.PlayerPawn.Value!, CurrentMap.StartZone, null, new VectorT(0, 0, 0)));
-		}
-		else
-		{
-			if (oPlayer.Timer.Stage != 0 && !CurrentMap.StageStartZone[oPlayer.Timer.Stage].IsZero())
-				Server.NextFrame(() => Extensions.Teleport(player.PlayerPawn.Value!, CurrentMap.StageStartZone[oPlayer.Timer.Stage], null, new VectorT(0, 0, 0)));
-			else // Reset back to map start
-				Server.NextFrame(() => Extensions.Teleport(player.PlayerPawn.Value!, CurrentMap.StartZone, null, new VectorT(0, 0, 0)));
-		}
+		bool teleported = oPlayer.Timer.IsBonusMode
+			? oPlayer.Timer.Bonus != 0 && TeleportToZone(player, ZoneType.BonusStart, oPlayer.Timer.Bonus)
+			: oPlayer.Timer.Stage > 1 && TeleportToZone(player, ZoneType.StageStart, oPlayer.Timer.Stage);
+
+		if (!teleported) // Reset back to map start
+			TeleportToZone(player, ZoneType.MapStart, 1);
 	}
 
 	[ConsoleCommand("css_s", "Teleport to a stage")]
@@ -143,8 +154,8 @@ public partial class SurfTimer
 	/// </summary>
 	private bool TeleportToStage(CCSPlayerController player, short stage)
 	{
-		bool zoneExists = stage == 1 ? !CurrentMap.StartZone.IsZero() : !CurrentMap.StageStartZone[stage].IsZero();
-		if (!zoneExists)
+		ZoneType zoneType = stage == 1 ? ZoneType.MapStart : ZoneType.StageStart;
+		if (!CurrentMap.HasZone(zoneType, stage))
 			return false;
 
 		playerList[player.UserId ?? 0].Timer.Reset();
@@ -164,20 +175,28 @@ public partial class SurfTimer
 			);
 		}
 
-		if (stage == 1)
-		{
-			Server.NextFrame(() => Extensions.Teleport(player.PlayerPawn.Value!, CurrentMap.StartZone, null, new VectorT(0, 0, 0)));
-		}
-		else
+		if (stage > 1)
 		{
 			playerList[player.UserId ?? 0].Timer.Stage = stage;
-			Server.NextFrame(() => Extensions.Teleport(player.PlayerPawn.Value!, CurrentMap.StageStartZone[stage], null, new VectorT(0, 0, 0)));
 			playerList[player.UserId ?? 0].Timer.IsStageMode = true;
 		}
+		TeleportToZone(player, zoneType, stage);
 
 		// To-do: If you run this while you're in the start zone, endtouch for the start zone runs after you've teleported
 		//        causing the timer to start. This needs to be fixed.
 		return true;
+	}
+
+	[ConsoleCommand("css_hideself", "Toggle hiding your own player model (and first-person legs)")]
+	[CommandHelper(whoCanExecute: CommandUsage.CLIENT_ONLY)]
+	public void PlayerToggleHideSelf(CCSPlayerController? player, CommandInfo command)
+	{
+		if (player == null || !playerList.TryGetValue(player.UserId ?? 0, out var oPlayer))
+			return;
+
+		oPlayer.HideSelf = !oPlayer.HideSelf;
+		oPlayer.ApplySelfVisibility();
+		player.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull[oPlayer.HideSelf ? "hideself_on" : "hideself_off"]}");
 	}
 
 	[ConsoleCommand("css_repeat", "Toggle repeat mode - sends you back to the start of each stage you finish")]
@@ -266,10 +285,11 @@ public partial class SurfTimer
 			return;
 		}
 
-		if (!CurrentMap.BonusStartZone[bonus].IsZero())
+		if (CurrentMap.HasZone(ZoneType.BonusStart, (short)bonus))
 		{
 			playerList[player.UserId ?? 0].Timer.Reset();
 			playerList[player.UserId ?? 0].Timer.IsBonusMode = true;
+			playerList[player.UserId ?? 0].Timer.Bonus = (short)bonus;
 
 			if (player.Team == CsTeam.Spectator || player.Team == CsTeam.None)
 			{
@@ -286,7 +306,7 @@ public partial class SurfTimer
 				);
 			}
 
-			Server.NextFrame(() => Extensions.Teleport(player.PlayerPawn.Value!, CurrentMap.BonusStartZone[bonus], null, new VectorT(0, 0, 0)));
+			TeleportToZone(player, ZoneType.BonusStart, (short)bonus);
 		}
 		else
 			player.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["invalid_usage",

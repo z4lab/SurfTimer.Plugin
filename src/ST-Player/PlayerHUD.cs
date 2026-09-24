@@ -123,6 +123,21 @@ public class PlayerHud
 		return velocityModule;
 	}
 
+	// The HUD runs every tick, so a bonus/stage index that's unset (0) or has no data must fall back to
+	// the map values instead of throwing - one exception here aborts the whole tick for everyone.
+	private bool HasBonusData(int style) =>
+		HasEntry(_player.Stats.BonusPB, _player.Timer.Bonus, style)
+		&& HasEntry(SurfTimer.CurrentMap.BonusWR, _player.Timer.Bonus, style)
+		&& HasEntry(SurfTimer.CurrentMap.BonusCompletions, _player.Timer.Bonus, style);
+
+	private bool HasStageData(int style) =>
+		HasEntry(_player.Stats.StagePB, _player.Timer.Stage, style)
+		&& HasEntry(SurfTimer.CurrentMap.StageWR, _player.Timer.Stage, style)
+		&& HasEntry(SurfTimer.CurrentMap.StageCompletions, _player.Timer.Stage, style);
+
+	private static bool HasEntry<T>(Dictionary<int, T>[] byIndex, int index, int style) =>
+		index > 0 && index < byIndex.Length && byIndex[index] != null && byIndex[index].ContainsKey(style);
+
 	/// <summary>
 	/// Build the rank module with appropriate values based on mode
 	/// </summary>
@@ -133,7 +148,7 @@ public class PlayerHud
 
 		// Rank Module
 		string rankModule = FormatHUDElementHTML("Rank", $"N/A", RankColorPb);
-		if (_player.Timer.IsBonusMode)
+		if (_player.Timer.IsBonusMode && HasBonusData(style))
 		{
 			if (
 				_player.Stats.BonusPB[_player.Timer.Bonus][style].ID != -1
@@ -151,7 +166,7 @@ public class PlayerHud
 					RankColorPb
 				);
 		}
-		else if (_player.Timer.IsStageMode)
+		else if (_player.Timer.IsStageMode && HasStageData(style))
 		{
 			if (
 				_player.Stats.StagePB[_player.Timer.Stage][style].ID != -1
@@ -205,7 +220,7 @@ public class PlayerHud
 			RankColorPb
 		);
 
-		if (_player.Timer.Bonus > 0 && _player.Timer.IsBonusMode) // Show corresponding bonus values
+		if (_player.Timer.IsBonusMode && HasBonusData(style)) // Show corresponding bonus values
 		{
 			pbModule = FormatHUDElementHTML(
 				"PB",
@@ -215,7 +230,7 @@ public class PlayerHud
 				RankColorPb
 			);
 		}
-		else if (_player.Timer.IsStageMode) // Show corresponding stage values
+		else if (_player.Timer.IsStageMode && HasStageData(style)) // Show corresponding stage values
 		{
 			pbModule = FormatHUDElementHTML(
 				"PB",
@@ -246,7 +261,7 @@ public class PlayerHud
 			RankColorWr
 		);
 
-		if (_player.Timer.Bonus > 0 && _player.Timer.IsBonusMode) // Show corresponding bonus values
+		if (_player.Timer.IsBonusMode && HasBonusData(style)) // Show corresponding bonus values
 		{
 			wrModule = FormatHUDElementHTML(
 				"WR",
@@ -256,7 +271,7 @@ public class PlayerHud
 				RankColorWr
 			);
 		}
-		else if (_player.Timer.IsStageMode) // Show corresponding stage values
+		else if (_player.Timer.IsStageMode && HasStageData(style)) // Show corresponding stage values
 		{
 			wrModule = FormatHUDElementHTML(
 				"WR",
