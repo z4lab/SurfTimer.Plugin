@@ -35,8 +35,14 @@ public class Player
 	// duplicate triggers and late EndTouch events (e.g. !r out of a stage start) are handled.
 	internal Dictionary<uint, ZoneInfo> TouchingTriggers { get; } = new();
 
-	internal bool IsInStartZone => this.TouchingTriggers.Values.Any(zone =>
-		zone.Type is ZoneType.MapStart or ZoneType.StageStart or ZoneType.BonusStart);
+	// Start zones where the anti-prehop cap applies. On staged_linear maps stage starts (2+) are part
+	// of the run and may be bhopped through freely - only the map start (stage 1) and bonus starts count.
+	internal bool IsInStartZone => this.TouchingTriggers.Values.Any(zone => zone.Type switch
+	{
+		ZoneType.MapStart or ZoneType.BonusStart => true,
+		ZoneType.StageStart => !SurfTimer.CurrentMap.StagedLinear,
+		_ => false
+	});
 
 	internal bool IsTouchingZone(ZoneType type, short number) => this.TouchingTriggers.Values.Any(zone =>
 		zone.Type == type && zone.Number == number);

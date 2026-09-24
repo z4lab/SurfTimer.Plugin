@@ -321,6 +321,7 @@ public class Map : MapEntity
 			Author = mapInfo.Author;
 			Tier = mapInfo.Tier;
 			Ranked = mapInfo.Ranked;
+			StagedLinear = mapInfo.StagedLinear;
 			DateAdded = mapInfo.DateAdded;
 			LastPlayed = mapInfo.LastPlayed;
 		}

@@ -72,6 +72,7 @@ CREATE TABLE IF NOT EXISTS `Maps` (
     `stages`      TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '0 = linear, 1+ = count of stages',
     `bonuses`     TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '0 = none, 1+ = count of bonuses',
     `ranked`      TINYINT(1) NOT NULL DEFAULT 0,
+    `staged_linear` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '1 = stage starts (except stage 1) allow bhop without the start-zone speed cap',
     `date_added`  INT UNSIGNED NULL COMMENT 'Unix timestamp',
     `last_played` INT UNSIGNED NULL COMMENT 'Unix timestamp',
     PRIMARY KEY (`id`),
