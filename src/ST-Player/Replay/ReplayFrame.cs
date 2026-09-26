@@ -1,5 +1,8 @@
 using System;
 using System.Text.Json;
+using System.Text.Json.Serialization;
+using CounterStrikeSharp.API;
+using CounterStrikeSharp.API.Modules.Utils;
 using SurfTimer.Shared.Types;
 
 namespace SurfTimer;
@@ -35,6 +38,15 @@ public class ReplayFrame
 	public float[] ang { get; set; } = { 0, 0, 0 };
 	public ReplayFrameSituation Situation { get; set; } = ReplayFrameSituation.NONE;
 	public uint Flags { get; set; }
+	/// <summary>
+	/// Buttons held this tick (PlayerButtons). null in replays recorded before buttons were stored.
+	/// </summary>
+	[JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+	public ulong? Buttons { get; set; }
+
+	// Strafe sync prefix sums up to and including this frame (see PrepareSync) - not stored
+	[JsonIgnore] internal int SyncGood { get; set; }
+	[JsonIgnore] internal int SyncTotal { get; set; }
 
 	public VectorT GetPos()
 	{
@@ -53,6 +65,35 @@ public class ReplayFrame
 	{
 		JsonSerializerOptions options = new JsonSerializerOptions { WriteIndented = false, Converters = { new VectorTConverter(), new QAngleTConverter() } };
 		string json = Compressor.Decompress(data.ToString());
-		return JsonSerializer.Deserialize<List<ReplayFrame>>(json, options)!;
+		var frames = JsonSerializer.Deserialize<List<ReplayFrame>>(json, options)!;
+		PrepareSync(frames);
+		return frames;
+	}
+
+	/// <summary>
+	/// Fills each frame's strafe sync prefix sums (StrafeSync, same as live players), so the sync of
+	/// any frame window is a subtraction - works with pause and reverse playback. Replays without
+	/// recorded buttons are left at 0.
+	/// </summary>
+	internal static void PrepareSync(List<ReplayFrame> frames)
+	{
+		int good = 0, total = 0;
+		for (int i = 0; i < frames.Count; i++)
+		{
+			var frame = frames[i];
+			if (i > 0 && frame.Buttons != null)
+			{
+				bool onGround = (frame.Flags & (uint)PlayerFlags.FL_ONGROUND) != 0;
+				bool? inSync = StrafeSync.Evaluate(frames[i - 1].ang[1], frame.ang[1], onGround, (PlayerButtons)frame.Buttons.Value);
+				if (inSync != null)
+				{
+					total++;
+					if (inSync.Value)
+						good++;
+				}
+			}
+			frame.SyncGood = good;
+			frame.SyncTotal = total;
+		}
 	}
 }

@@ -73,7 +73,7 @@ public class CurrentRun : RunStatsEntity
 			stage: stage,
 			lastStage: stage == SurfTimer.CurrentMap.Stages,
 			checkpoint: checkpoint,
-			lastCheckpoint: checkpoint == SurfTimer.CurrentMap.TotalCheckpoints
+			lastCheckpoint: checkpoint == SurfTimer.CurrentMap.CheckpointSegments // Last segment ends at the map end
 		);
 
 		_logger.LogTrace("[{ClassName}] {MethodName} -> Sending total of {Frames} serialized and compressed replay frames.",

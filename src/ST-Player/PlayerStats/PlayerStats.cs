@@ -43,7 +43,7 @@ public class PlayerStats
 		this.BonusPB = new Dictionary<int, PersonalBest>[SurfTimer.CurrentMap.Bonuses + 1];
 		bool checkpointed = SurfTimer.CurrentMap.Stages == 0 && SurfTimer.CurrentMap.TotalCheckpoints > 0;
 		this.CheckpointPB = checkpointed
-			? new Dictionary<int, PersonalBest>[SurfTimer.CurrentMap.TotalCheckpoints + 1]
+			? new Dictionary<int, PersonalBest>[SurfTimer.CurrentMap.CheckpointSegments + 1]
 			: Array.Empty<Dictionary<int, PersonalBest>>();
 		int initStage = 0;
 		int initBonus = 0;
@@ -67,7 +67,7 @@ public class PlayerStats
 				initBonus++;
 			}
 
-			for (int i = 1; checkpointed && i <= SurfTimer.CurrentMap.TotalCheckpoints; i++)
+			for (int i = 1; checkpointed && i <= SurfTimer.CurrentMap.CheckpointSegments; i++)
 			{
 				this.CheckpointPB[i] ??= new Dictionary<int, PersonalBest>();
 				this.CheckpointPB[i][style] = new PersonalBest { Type = 3 };
@@ -140,6 +140,9 @@ public class PlayerStats
 #if DEBUG
 					_logger.LogDebug("[{ClassName}] {MethodName} -> LoadPlayerMapTimesData >> CheckpointPB with ID {ID}", nameof(PlayerStats), methodName, mapTime.ID);
 #endif
+					// Skip PBs for segments the map no longer has (zones changed)
+					if (mapTime.Stage < 1 || mapTime.Stage >= CheckpointPB.Length || CheckpointPB[mapTime.Stage] == null)
+						break;
 					CheckpointPB[mapTime.Stage][style].ID = mapTime.ID;
 					CheckpointPB[mapTime.Stage][style].RunTime = mapTime.RunTime;
 					CheckpointPB[mapTime.Stage][style].Type = mapTime.Type;

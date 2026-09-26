@@ -313,6 +313,7 @@ public class PlayerHud
 			1 => $"Bonus {replay.Stage} {kind} Replay",
 			2 => $"Stage {replay.Stage} {kind} Replay",
 			3 => $"Checkpoint {replay.Stage} {kind} Replay",
+			ReplayManager.BestSegmentsType => $"{ReplayManager.BestSegmentsLabel} Replay",
 			_ => "",
 		};
 	}
@@ -451,20 +452,32 @@ public class PlayerHud
 		if (!visible)
 			return; // Keep the last texts - they're hidden anyway
 
+		// The same values from a live player or a replay - the fields below don't care which
 		int ticks;
 		string timerColor;
 		float velocity;
+		float? prespeedSpeed;
+		PlayerButtons? buttons;
+		float? syncPercent;
 		if (subject != null)
 		{
 			ticks = subject.Timer.Ticks;
 			timerColor = TimerColorOf(subject);
 			velocity = Extensions.GetVelocityFromController(subject.Controller);
+			// Prespeed: live while in a start zone, then the exit speed
+			prespeedSpeed = subject.IsTouchingAnyStartZone ? velocity : subject.LastPrespeed;
+			buttons = subject.Controller.Buttons;
+			syncPercent = subject.SyncPercent;
 		}
 		else
 		{
 			ticks = replay!.ReplayCurrentRunTime;
 			timerColor = ReplayTimerColor(replay);
 			velocity = Extensions.GetVelocityFromController(replay.Controller!);
+			prespeedSpeed = replay.Prespeed(velocity);
+			// Replays recorded before buttons were stored: keys stay released, sync N/A
+			buttons = replay.CurrentButtons();
+			syncPercent = replay.CurrentSync();
 		}
 
 		var timer = new HudField("Timer",
@@ -472,23 +485,19 @@ public class PlayerHud
 		var speed = new HudField("Speed",
 			[new FieldSegment(velocity.ToString("0", CultureInfo.InvariantCulture), CustomHud.SpeedColorClass(velocity), Mono: true)]);
 
-		// Prespeed: live while in a start zone, then the exit speed
-		FieldSegment prespeedValue = NotAvailable;
-		if (subject != null)
-		{
-			float? shown = subject.IsTouchingAnyStartZone ? velocity : subject.LastPrespeed;
-			if (shown != null)
-				prespeedValue = new FieldSegment(shown.Value.ToString("0", CultureInfo.InvariantCulture), CustomHud.SpeedColorClass(shown.Value), Mono: true);
-		}
-		var prespeed = new HudField("Prespeed", [prespeedValue]);
+		var prespeed = new HudField("Prespeed",
+			[prespeedSpeed != null
+				? new FieldSegment(prespeedSpeed.Value.ToString("0", CultureInfo.InvariantCulture), CustomHud.SpeedColorClass(prespeedSpeed.Value), Mono: true)
+				: NotAvailable]);
 
-		// Keys: replays don't record buttons, so they stay released
-		var buttons = subject?.Controller.Buttons ?? 0;
+		var held = buttons ?? 0;
 		var keys = new HudField("Keys",
-			Keys.Select(k => new FieldSegment(k.Letter, Dim: !buttons.HasFlag(k.Button), Key: true)).ToList());
+			Keys.Select(k => new FieldSegment(k.Letter, Dim: !held.HasFlag(k.Button), Key: true)).ToList());
 
 		var sync = new HudField("Sync",
-			[subject != null ? new FieldSegment(subject.SyncPercent.ToString("00.00", CultureInfo.InvariantCulture) + "%", Mono: true) : NotAvailable]);
+			[syncPercent != null
+				? new FieldSegment(syncPercent.Value.ToString("00.00", CultureInfo.InvariantCulture) + "%", Mono: true)
+				: NotAvailable]);
 
 		List<List<HudField>> rows =
 		[
@@ -668,7 +677,8 @@ public class PlayerHud
 				row,
 				[
 					new("", ReplayTypeLabel(replay), SpectatorColor, Label: true),
-					new("", replay.RecordPlayerName ?? "", "", Size: HudSize.Small),
+					// The best segments replay has no single player - its label already says what it is
+					new("", replay.Type == ReplayManager.BestSegmentsType ? "" : replay.RecordPlayerName ?? "", "", Size: HudSize.Small),
 					new("", FormatTime(replay.RecordRunTime, PlayerTimer.TimeFormatStyle.Full), RankColorWr, Size: HudSize.Small),
 					new("Cycle", $"{replay.RepeatCount}", SpectatorColor, Size: HudSize.Small),
 				],
@@ -979,6 +989,10 @@ public class PlayerHud
 	{
 		int style = _player.Timer.Style;
 		float exitSpeed = exitVelocity.velMag();
+
+		// Runs inside zone touch handlers - an unknown segment must not throw and abort the handler
+		if (!HasEntry(_player.Stats.CheckpointPB, checkpoint, style) || !HasEntry(SurfTimer.CurrentMap.CheckpointWR, checkpoint, style))
+			return;
 
 		string strPbDifference =
 			$"{ChatColors.Grey}N/A{ChatColors.Default} ({ChatColors.Grey}N/A{ChatColors.Default})";

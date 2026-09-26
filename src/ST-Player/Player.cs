@@ -168,9 +168,8 @@ public class Player
 	}
 
 	/// <summary>
-	/// Strafe sync: of the ticks in the air where the player turns, how many turn the same way as the
-	/// strafe key held (left with only A, right with only D). Only counted while the timer runs, so it
-	/// covers the current run and freezes when it ends; reset when a run starts.
+	/// Strafe sync (see StrafeSync). Only counted while the timer runs, so it covers the current run
+	/// and freezes when it ends; reset when a run starts.
 	/// </summary>
 	internal void TickSync()
 	{
@@ -179,27 +178,19 @@ public class Player
 			return;
 
 		float yaw = pawn.EyeAngles.Y;
-		float delta = yaw - _lastYaw;
+		float prevYaw = _lastYaw;
 		_lastYaw = yaw;
-		// Wrap across the -180/180 seam
-		if (delta > 180f)
-			delta -= 360f;
-		else if (delta < -180f)
-			delta += 360f;
 
-		if (!this.Timer.IsRunning || MathF.Abs(delta) < 0.001f)
+		if (!this.Timer.IsRunning || pawn.MoveType is MoveType_t.MOVETYPE_LADDER or MoveType_t.MOVETYPE_NOCLIP)
 			return;
 
-		if ((pawn.Flags & (uint)PlayerFlags.FL_ONGROUND) != 0
-			|| pawn.MoveType is MoveType_t.MOVETYPE_LADDER or MoveType_t.MOVETYPE_NOCLIP)
+		bool onGround = (pawn.Flags & (uint)PlayerFlags.FL_ONGROUND) != 0;
+		bool? inSync = StrafeSync.Evaluate(prevYaw, yaw, onGround, this.Controller.Buttons);
+		if (inSync == null)
 			return;
-
-		var buttons = this.Controller.Buttons;
-		bool left = buttons.HasFlag(PlayerButtons.Moveleft) && !buttons.HasFlag(PlayerButtons.Moveright);
-		bool right = buttons.HasFlag(PlayerButtons.Moveright) && !buttons.HasFlag(PlayerButtons.Moveleft);
 
 		this.SyncTotalTicks++;
-		if ((delta > 0 && left) || (delta < 0 && right)) // Positive yaw delta = turning left
+		if (inSync.Value)
 			this.SyncGoodTicks++;
 	}
 

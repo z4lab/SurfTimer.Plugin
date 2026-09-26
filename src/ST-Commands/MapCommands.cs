@@ -216,4 +216,26 @@ public partial class SurfTimer
 				player.PrintToChat($"  #{zone.TriggerIndex} '{zone.Name}' -> teleport {zone.Teleport}{(zone.Angles is { } angles ? $" angles {angles}" : "")}");
 		}
 	}
+
+	[ConsoleCommand("css_map", "Change to a map from the workshop collection.")]
+	[ConsoleCommand("css_changemap", "Change to a map from the workshop collection.")]
+	[RequiresPermissions("@css/root")]
+	[CommandHelper(minArgs: 1, usage: "<map name>", whoCanExecute: CommandUsage.CLIENT_AND_SERVER)]
+	public void ChangeMap(CCSPlayerController? player, CommandInfo command)
+	{
+		string mapName = command.GetArg(1).Trim();
+
+		// Only a map name - it goes into a server command, so nothing like "surf_x; quit" gets through
+		if (!Regex.IsMatch(mapName, "^[A-Za-z0-9_\\-]+$"))
+		{
+			command.ReplyToCommand($"{Config.PluginPrefix} Invalid map name '{mapName}'.");
+			return;
+		}
+
+		Server.PrintToChatAll($"{Config.PluginPrefix} Changing map to {ChatColors.Green}{mapName}{ChatColors.Default}...");
+
+		// A moment for the chat message to arrive; ds_workshop_changelevel needs the map in the
+		// server's workshop collection (host_workshop_collection)
+		AddTimer(2.0f, () => Server.ExecuteCommand($"ds_workshop_changelevel {mapName}"));
+	}
 }

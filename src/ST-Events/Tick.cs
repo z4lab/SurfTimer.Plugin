@@ -1,10 +1,15 @@
+using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Modules.Cvars;
 using CounterStrikeSharp.API.Modules.Entities.Constants;
+using Microsoft.Extensions.Logging;
 
 namespace SurfTimer;
 
 public partial class SurfTimer
 {
+	// Tick errors are logged at most once per 5s, so a broken piece shows up without flooding the console
+	private int _nextTickErrorLogTick;
+
 	public void OnTick()
 	{
 		if (CurrentMap == null)
@@ -15,19 +20,32 @@ public partial class SurfTimer
 			if (!player.Controller.IsValid)
 				continue;
 
-			// Spectators/dead players have no live PlayerPawn - the timer, recorder and speed cap
-			// all read it, and one exception here would abort the tick for everyone.
-			if (player.Controller.PawnIsAlive)
+			// One player's failure must not stop the rest of the tick (other players, bot quota,
+			// replay playback) - it's logged instead.
+			try
 			{
-				player.Timer.Tick();
-				player.ReplayRecorder.Tick(player);
-				player.TickStartZoneSpeedCap();
-				player.TickRemoveLandingSlowdown();
-				player.TickSync();
-			}
+				// Spectators/dead players have no live PlayerPawn - the timer, recorder and speed cap
+				// all read it.
+				if (player.Controller.PawnIsAlive)
+				{
+					player.Timer.Tick();
+					player.ReplayRecorder.Tick(player);
+					player.TickStartZoneSpeedCap();
+					player.TickRemoveLandingSlowdown();
+					player.TickSync();
+				}
 
-			player.HUD.Display(playerList.Values);
+				player.HUD.Display(playerList.Values);
+			}
+			catch (Exception ex)
+			{
+				LogTickError(ex, $"player '{player.Controller.PlayerName}'");
+			}
 		}
+
+		// Maps can change bot settings so bots can't join - set them back about once a second
+		if (Server.TickCount % 64 == 0)
+			EnforceBotConVars();
 
 		// Need to disable maps from executing their cfgs. Currently idk how (But seriusly it a security issue)
 		ConVar? bot_quota = ConVar.Find("bot_quota");
@@ -39,6 +57,9 @@ public partial class SurfTimer
 
 			if (cbq != replaybot_count)
 			{
+				// If a replay bot never joins after this, the server refused it (e.g. the map has no nav mesh)
+				_logger.LogInformation("[{ClassName}] bot_quota {Old} -> {New} (replay pool slots: {Slots}, awaiting a bot: {Awaiting})",
+					nameof(SurfTimer), cbq, replaybot_count, replaybot_count, CurrentMap.ReplayManager.Pool.Count(s => s.Controller == null));
 				bot_quota.SetValue(replaybot_count);
 			}
 		}
@@ -51,7 +72,14 @@ public partial class SurfTimer
 			if (slot.Controller == null)
 				continue; // Still awaiting the bot to actually spawn - claimed in Players.cs OnPlayerSpawn
 
-			slot.Tick();
+			try
+			{
+				slot.Tick();
+			}
+			catch (Exception ex)
+			{
+				LogTickError(ex, $"replay '{slot.RecordPlayerName}' (type {slot.Type}, frame {slot.CurrentFrameTick}/{slot.Frames.Count})");
+			}
 
 			if (slot.IsPlaying && slot.RepeatCount == 0)
 			{
@@ -65,5 +93,14 @@ public partial class SurfTimer
 				CurrentMap.KickReplayBot(i);
 			}
 		}
+	}
+
+	private void LogTickError(Exception ex, string what)
+	{
+		if (Server.TickCount < _nextTickErrorLogTick)
+			return;
+
+		_nextTickErrorLogTick = Server.TickCount + 64 * 5;
+		_logger.LogError(ex, "[{ClassName}] OnTick failed for {What}", nameof(SurfTimer), what);
 	}
 }

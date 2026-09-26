@@ -18,6 +18,12 @@ public class Map : MapEntity
 {
 	public int TotalCheckpoints { get; set; } = 0;
 	/// <summary>
+	/// Checkpoint segment records on linear maps: segment 1 is map start -> cp1, segment N is
+	/// cp(N-1) -> cpN, and the last one (TotalCheckpoints + 1) is the last cp -> map end.
+	/// 0 on staged maps and maps without checkpoints.
+	/// </summary>
+	public int CheckpointSegments => this.Stages == 0 && this.TotalCheckpoints > 0 ? this.TotalCheckpoints + 1 : 0;
+	/// <summary>
 	/// Map Completion Count - Refer to as MapCompletions[style]
 	/// </summary>
 	public Dictionary<int, int> MapCompletions { get; set; } = new Dictionary<int, int>();
@@ -97,10 +103,10 @@ public class Map : MapEntity
 		this.BonusWR = new Dictionary<int, PersonalBest>[this.Bonuses + 1];
 		this.BonusCompletions = new Dictionary<int, int>[this.Bonuses + 1];
 		this.CheckpointWR = checkpointed
-			? new Dictionary<int, PersonalBest>[this.TotalCheckpoints + 1]
+			? new Dictionary<int, PersonalBest>[this.CheckpointSegments + 1]
 			: Array.Empty<Dictionary<int, PersonalBest>>();
 		this.CheckpointCompletions = checkpointed
-			? new Dictionary<int, int>[this.TotalCheckpoints + 1]
+			? new Dictionary<int, int>[this.CheckpointSegments + 1]
 			: Array.Empty<Dictionary<int, int>>();
 		int initStages = 0;
 		int initBonuses = 0;
@@ -129,7 +135,7 @@ public class Map : MapEntity
 				initBonuses++;
 			}
 
-			for (int i = 1; checkpointed && i <= this.TotalCheckpoints; i++)
+			for (int i = 1; checkpointed && i <= this.CheckpointSegments; i++)
 			{
 				this.CheckpointWR[i] ??= new Dictionary<int, PersonalBest>();
 				this.CheckpointWR[i][style] = new PersonalBest { Type = 3 };
@@ -418,6 +424,9 @@ public class Map : MapEntity
 					break;
 
 				case 3: // Checkpoint segment WR data and total completions (non-staged maps only)
+					// Skip records for segments the map no longer has (zones changed)
+					if (run.Stage < 1 || run.Stage >= CheckpointWR.Length || CheckpointWR[run.Stage] == null)
+						break;
 					CheckpointWR[run.Stage][run.Style].ID = run.ID;
 					CheckpointWR[run.Stage][run.Style].RunTime = run.RunTime;
 					CheckpointWR[run.Stage][run.Style].StartVelX = run.StartVelX;
@@ -573,7 +582,9 @@ public class Map : MapEntity
 				}
 				break;
 			case 3: // Checkpoint segment Replays (non-staged maps only)
-					// Skip if the same checkpoint run already exists
+				if (stage < 1 || stage >= this.ReplayManager.AllCheckpointWR.Length || this.ReplayManager.AllCheckpointWR[stage] == null)
+					break; // Segment the map no longer has (zones changed)
+				// Skip if the same checkpoint run already exists
 				if (this.ReplayManager.AllCheckpointWR[stage][style].RecordRunTime == this.CheckpointWR[stage][style].RunTime)
 					break;
 #if DEBUG
@@ -619,6 +630,7 @@ public class Map : MapEntity
 			return;
 
 		this.ReplayManager.Pool.RemoveAt(index);
+		SurfTimer.AllowPluginKick(id_to_kick.Value); // Past the replay bot protection against map kicks
 		Server.ExecuteCommand($"kickid {id_to_kick}; bot_quota {this.ReplayManager.Pool.Count}");
 	}
 

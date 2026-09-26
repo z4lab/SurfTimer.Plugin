@@ -104,7 +104,6 @@ public class ReplayRecorder
 		var player_pos = player.Controller.Pawn.Value!.AbsOrigin!;
 		var player_angle = player.Controller.PlayerPawn.Value!.EyeAngles;
 		var player_flags = player.Controller.Pawn.Value.Flags;
-		/// var player_button = player.Controller.Pawn.Value.MovementServices!.Buttons.ButtonStates[0];
 		/// var player_move_type = player.Controller.Pawn.Value.MoveType;
 
 		var frame = new ReplayFrame
@@ -113,6 +112,7 @@ public class ReplayRecorder
 			ang = [player_angle.X, player_angle.Y, player_angle.Z],
 			Situation = this.CurrentSituation,
 			Flags = player_flags,
+			Buttons = (ulong)player.Controller.Buttons,
 		};
 
 		this.Frames.Add(frame);

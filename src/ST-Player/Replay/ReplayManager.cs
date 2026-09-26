@@ -94,9 +94,9 @@ public class ReplayManager
 
 		if (checkpointed)
 		{
-			this.AllCheckpointWR = new Dictionary<int, ReplayPlayer>[SurfTimer.CurrentMap.TotalCheckpoints + 1];
+			this.AllCheckpointWR = new Dictionary<int, ReplayPlayer>[SurfTimer.CurrentMap.CheckpointSegments + 1];
 
-			for (int i = 1; i <= SurfTimer.CurrentMap.TotalCheckpoints; i++)
+			for (int i = 1; i <= SurfTimer.CurrentMap.CheckpointSegments; i++)
 			{
 				AllCheckpointWR[i] = new Dictionary<int, ReplayPlayer>();
 				foreach (int x in Config.Styles)
@@ -107,6 +107,111 @@ public class ReplayManager
 		}
 
 		Pool = new List<ReplayPlayer>();
+	}
+
+	/// <summary>
+	/// Replay type of the "best segments" replay: every stage (staged maps) or checkpoint segment
+	/// (linear maps) WR chained into one run.
+	/// </summary>
+	internal const int BestSegmentsType = 4;
+
+	internal static string BestSegmentsLabel => SurfTimer.CurrentMap.Stages > 0 ? "Best Stage WRs" : "Best Checkpoint WRs";
+
+	/// <summary>
+	/// The WR replay of every segment in order - null unless every segment has one.
+	/// </summary>
+	private List<ReplayPlayer>? BestSegmentTemplates(int style)
+	{
+		var map = SurfTimer.CurrentMap;
+		Dictionary<int, ReplayPlayer>[] source;
+		int count;
+		if (map.Stages > 0)
+		{
+			source = this.AllStageWR;
+			count = map.Stages;
+		}
+		else
+		{
+			source = this.AllCheckpointWR;
+			count = map.CheckpointSegments;
+		}
+
+		if (count < 2)
+			return null;
+
+		var templates = new List<ReplayPlayer>(count);
+		for (int i = 1; i <= count; i++)
+		{
+			if (i >= source.Length || source[i] == null || !source[i].TryGetValue(style, out var template)
+				|| template.MapTimeID == -1 || template.Frames.Count == 0 || template.RecordRunTime <= 0)
+				return null;
+			templates.Add(template);
+		}
+		return templates;
+	}
+
+	/// <summary>
+	/// What the segment WRs add up to - null when a segment has no WR replay.
+	/// </summary>
+	internal int? BestSegmentsTime(int style) => BestSegmentTemplates(style)?.Sum(t => t.RecordRunTime);
+
+	/// <summary>
+	/// Builds one replay out of every segment's WR replay: the first segment from its pre-start
+	/// frames, every segment's own run (zone exit to next zone enter), and the last one through its
+	/// end zone. Frames are copied (the templates keep their own sync data) and only the overall start
+	/// and end are kept as zone markers, so it plays and times like a normal map run. Built on demand.
+	/// </summary>
+	internal ReplayPlayer? BuildBestSegmentsReplay(int style)
+	{
+		var segments = BestSegmentTemplates(style);
+		if (segments == null)
+			return null;
+
+		var frames = new List<ReplayFrame>();
+		for (int i = 0; i < segments.Count; i++)
+		{
+			var segment = segments[i];
+			var (start, end) = segment.GetRunWindow();
+			bool first = i == 0;
+			bool last = i == segments.Count - 1;
+
+			int from = first ? 0 : start;
+			int to = last ? segment.Frames.Count : end; // Exclusive - the next segment starts where this one ends
+
+			for (int f = from; f < to; f++)
+			{
+				var source = segment.Frames[f];
+				var situation = ReplayFrameSituation.NONE;
+				if (first && f == start)
+					situation = ReplayFrameSituation.START_ZONE_EXIT;
+				else if (last && f == end)
+					situation = ReplayFrameSituation.END_ZONE_ENTER;
+
+				frames.Add(new ReplayFrame
+				{
+					pos = source.pos,
+					ang = source.ang,
+					Situation = situation,
+					Flags = source.Flags,
+					Buttons = source.Buttons,
+				});
+			}
+		}
+
+		ReplayFrame.PrepareSync(frames);
+
+		return new ReplayPlayer
+		{
+			Type = BestSegmentsType,
+			Stage = 0,
+			Style = style,
+			MapID = SurfTimer.CurrentMap.ID,
+			MapTimeID = -10 - style, // Not a stored run - unique per style so the pool can reuse a playing one
+			RecordRank = 1,
+			RecordPlayerName = BestSegmentsLabel,
+			RecordRunTime = segments.Sum(s => s.RecordRunTime),
+			Frames = frames,
+		};
 	}
 
 	public bool IsControllerConnectedToReplayPlayer(CCSPlayerController controller)

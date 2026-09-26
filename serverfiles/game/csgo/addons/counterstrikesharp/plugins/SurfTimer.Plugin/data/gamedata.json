@@ -1,0 +1,7 @@
+{
+	"CreateBot": {
+		"comment": "Replay bots are created with this (works on maps without a nav mesh). Find it via the string \"Unable to create bot: CreateFakeClient() returned null.\" in server.dll / libserver.so, or copy \"CreateBot\" from cs2kz-metamod gamedata/cs2kz-core.games.txt. Space-separated hex, ? = wildcard.",
+		"windows": "48 89 5C 24 10 48 89 6C 24 18 57 48 81 EC C0 00 00 00 41 0F B6 D8",
+		"linux": "55 48 89 E5 41 57 41 56 41 55 49 89 FD 41 54 41 89 D4 53 48 81 EC C8 00 00 00"
+	}
+}

@@ -27,6 +27,24 @@ public static class Config
 	public static readonly string CustomHudLayout = TimerSettings.GetCustomHudLayout();
 
 	/// <summary>
+	/// Blocks chat the map sends through the server console (`say` from map scripts, e.g. ads).
+	/// Note: also blocks `say` typed into the server console / RCON.
+	/// </summary>
+	public static readonly bool BlockMapChat = TimerSettings.GetBool("block_map_chat", true);
+
+	/// <summary>
+	/// Blocks bot kicks the plugin didn't ask for (`bot_kick`, `kick`/`kickid` on a bot) - maps that
+	/// kick every bot would otherwise remove replay bots.
+	/// </summary>
+	public static readonly bool ProtectReplayBots = TimerSettings.GetBool("protect_replay_bots", true);
+
+	/// <summary>
+	/// Creates replay bots through the game's CreateBot function (works on maps without a nav mesh,
+	/// where bot_add/bot_quota do nothing). Falls back to bot_quota when off or the signature breaks.
+	/// </summary>
+	public static readonly bool ReplayBotDirectSpawn = TimerSettings.GetBool("replay_bot_direct_spawn", true);
+
+	/// <summary>
 	/// Maximum number of distinct replays that can play concurrently via !replay.
 	/// </summary>
 	public const int ReplayPoolCap = 3;
@@ -78,6 +96,14 @@ public static class Config
 		public static bool GetCustomHudEnabled()
 		{
 			return ConfigDocument.RootElement.TryGetProperty("custom_hud_enabled", out var value) && value.GetBoolean();
+		}
+
+		public static bool GetBool(string key, bool defaultValue)
+		{
+			return ConfigDocument.RootElement.TryGetProperty(key, out var value)
+				&& value.ValueKind is JsonValueKind.True or JsonValueKind.False
+				? value.GetBoolean()
+				: defaultValue;
 		}
 
 		public static string GetCustomHudLayout()

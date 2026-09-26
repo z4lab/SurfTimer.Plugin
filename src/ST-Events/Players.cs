@@ -30,7 +30,8 @@ public partial class SurfTimer
 			return HookResult.Continue;
 		}
 
-		if (CurrentMap.ReplayManager.IsControllerConnectedToReplayPlayer(controller))
+		// No map during a map change / the replay nav reload
+		if (CurrentMap == null || CurrentMap.ReplayManager.IsControllerConnectedToReplayPlayer(controller))
 			return HookResult.Continue;
 
 		_logger.LogTrace("OnPlayerSpawn -> Player {Name} spawned.",
@@ -46,6 +47,8 @@ public partial class SurfTimer
 			slot.SetController(controller, Config.ReplayRepeatCount);
 			slot.LoadReplayData(Config.ReplayRepeatCount);
 
+			// CS2 kicks bots without a pending spectator team when another player joins (cs2kz-metamod)
+			controller.PendingTeamNum = 1;
 			controller.SwitchTeam(CsTeam.Terrorist);
 
 			AddTimer(1.5f, () =>
@@ -102,6 +105,9 @@ public partial class SurfTimer
 			_logger.LogInformation("[{ClassName}] OnPlayerTeam -> Bot {BotName} joined team {Team}",
 				nameof(SurfTimer), controller.PlayerName, @event.Team
 			);
+
+			if (CurrentMap == null)
+				return HookResult.Continue; // Map change - no replay slots
 
 			bool slotAwaitingBot = CurrentMap.ReplayManager.Pool.Any(s => s.Controller == null);
 			if (!slotAwaitingBot || CurrentMap.ReplayManager.IsControllerConnectedToReplayPlayer(controller))
@@ -203,7 +209,8 @@ public partial class SurfTimer
 			return HookResult.Continue;
 		}
 
-		for (int i = CurrentMap.ReplayManager.Pool.Count - 1; i >= 0; i--)
+		// No map during a map change (players are disconnected after the old map is cleaned up)
+		for (int i = (CurrentMap?.ReplayManager.Pool.Count ?? 0) - 1; i >= 0; i--)
 		{
 			if (CurrentMap.ReplayManager.Pool[i].Controller != null && CurrentMap.ReplayManager.Pool[i].Controller!.Equals(player))
 			{
@@ -214,6 +221,13 @@ public partial class SurfTimer
 
 		if (player.IsBot || !player.IsValid)
 		{
+			if (player.IsBot)
+			{
+				// Reason is the engine's disconnect reason code - a kick right after "Bot connected" means
+				// something removed it (e.g. a map script)
+				_logger.LogInformation("[{ClassName}] Bot disconnected: {Name} (reason {Reason})",
+					nameof(SurfTimer), @event.Name, @event.Reason);
+			}
 			return HookResult.Continue;
 		}
 		else

@@ -177,6 +177,8 @@ public partial class SurfTimer : BasePlugin
 		RegisterListener<Listeners.OnMapEnd>(OnMapEnd);
 		// Tick listener
 		RegisterListener<Listeners.OnTick>(OnTick);
+		// Block map scripts' chat and bot kicks (see MapCommandFilter.cs)
+		RegisterMapCommandFilter();
 		// The custom HUD layout comes from a Workshop addon, not the map, so precache it. The manifest
 		// wants the compiled resource type (.vxml); the entity itself takes the source name (.xml).
 		RegisterListener<Listeners.OnServerPrecacheResources>(manifest =>

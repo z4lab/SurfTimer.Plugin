@@ -128,29 +128,44 @@ public partial class SurfTimer
 						// This calculation is wrong unless we wait for a bit in order for the `END_ZONE_ENTER` to be available in the `Frames` object
 						int stage_run_time = player.ReplayRecorder.Frames.FindLastIndex(f => f.Situation == ReplayFrameSituation.END_ZONE_ENTER) - player.ReplayRecorder.Frames.FindLastIndex(f => f.Situation == ReplayFrameSituation.STAGE_ZONE_EXIT);
 
+						// Before the save: still on the main thread (chat can't be printed after an await),
+						// and compared against the previous PB rather than the one being saved
+						player.HUD.DisplayStageMessage(CurrentMap.Stages, stage_run_time, velocity);
+
 						await CurrentRun.SaveStageTime(player, CurrentMap.Stages, stage_run_time, true,
 							startVelX: lastStageEntryVelX, startVelY: lastStageEntryVelY, startVelZ: lastStageEntryVelZ,
 							endVelX: velocity.X, endVelY: velocity.Y, endVelZ: velocity.Z);
-
-						player.HUD.DisplayStageMessage(CurrentMap.Stages, stage_run_time, velocity);
 					});
 				}
-				// Should we also save a last checkpoint segment run? (non-staged maps only)
-				else if (CurrentMap.Stages == 0 && CurrentMap.TotalCheckpoints > 0)
+				// Should we also save the last checkpoint segment (last cp -> map end)? (non-staged maps only)
+				// Only when this run actually passed the last cp - otherwise there's no segment start and the
+				// whole run would be saved as the last segment
+				else if (CurrentMap.CheckpointSegments > 0 && player.Stats.ThisRun.Checkpoints.ContainsKey(CurrentMap.TotalCheckpoints))
 				{
 					float lastCheckpointEntryVelX = player.Timer.CheckpointEntryVelX;
 					float lastCheckpointEntryVelY = player.Timer.CheckpointEntryVelY;
 					float lastCheckpointEntryVelZ = player.Timer.CheckpointEntryVelZ;
+					short lastSegment = (short)CurrentMap.CheckpointSegments;
 					ScheduleRunSave(player, "SaveCheckpointTime (last)", async () =>
 					{
 						// This calculation is wrong unless we wait for a bit in order for the `END_ZONE_ENTER` to be available in the `Frames` object
-						int checkpoint_run_time = player.ReplayRecorder.Frames.FindLastIndex(f => f.Situation == ReplayFrameSituation.END_ZONE_ENTER) - player.ReplayRecorder.Frames.FindLastIndex(f => f.Situation == ReplayFrameSituation.CHECKPOINT_ZONE_EXIT);
+						int endEnter = player.ReplayRecorder.Frames.FindLastIndex(f => f.Situation == ReplayFrameSituation.END_ZONE_ENTER);
+						int lastCheckpointExit = player.ReplayRecorder.Frames.FindLastIndex(f => f.Situation == ReplayFrameSituation.CHECKPOINT_ZONE_EXIT);
+						if (endEnter < 0 || lastCheckpointExit < 0 || lastCheckpointExit >= endEnter)
+						{
+							_logger.LogWarning("[{ClassName}] Last checkpoint segment not saved for '{Name}' - no checkpoint exit before the end zone (exit {Exit}, end {End})",
+								nameof(SurfTimer), player.Profile.Name, lastCheckpointExit, endEnter);
+							return;
+						}
+						int checkpoint_run_time = endEnter - lastCheckpointExit;
 
-						await CurrentRun.SaveCheckpointTime(player, (short)CurrentMap.TotalCheckpoints, checkpoint_run_time, true,
+						// Before the save: still on the main thread (chat can't be printed after an await),
+						// and compared against the previous PB rather than the one being saved
+						player.HUD.DisplayCheckpointSegmentMessage(lastSegment, checkpoint_run_time, velocity);
+
+						await CurrentRun.SaveCheckpointTime(player, lastSegment, checkpoint_run_time, true,
 							startVelX: lastCheckpointEntryVelX, startVelY: lastCheckpointEntryVelY, startVelZ: lastCheckpointEntryVelZ,
 							endVelX: velocity.X, endVelY: velocity.Y, endVelZ: velocity.Z);
-
-						player.HUD.DisplayCheckpointSegmentMessage((short)CurrentMap.TotalCheckpoints, checkpoint_run_time, velocity);
 					});
 				}
 
@@ -297,7 +312,7 @@ public partial class SurfTimer
 
 #if DEBUG
 			Console.WriteLine($"============== Initial entity value: {zone.Number} | Assigned to `stage`: {stage} | player.Timer.Checkpoint: {stage - 1}");
-			Console.WriteLine($"CS2 Surf DEBUG >> CBaseTrigger_StartTouchFunc (Stage start zones) -> player.Stats.PB[{player.Timer.Style}].Checkpoint.Count = {player.Stats.PB[player.Timer.Style].Checkpoints.Count}");
+			Console.WriteLine($"CS2 Surf DEBUG >> CBaseTrigger_StartTouchFunc (Stage start zones) -> player.Stats.PB[{player.Timer.Style}].Checkpoint.Count = {player.Stats.PB[player.Timer.Style].Checkpoints?.Count ?? 0}");
 #endif
 
 			// Print Stage completion message (staged maps show Stage records, never the generic
@@ -352,7 +367,7 @@ public partial class SurfTimer
 #if DEBUG
 			int pStyle = player.Timer.Style;
 			Console.WriteLine($"============== Initial entity value: {zone.Number} | Assigned to `checkpoint`: {zone.Number}");
-			Console.WriteLine($"CS2 Surf DEBUG >> CBaseTrigger_StartTouchFunc (Checkpoint zones) -> player.Stats.PB[{pStyle}].Checkpoint.Count = {player.Stats.PB[pStyle].Checkpoints.Count}");
+			Console.WriteLine($"CS2 Surf DEBUG >> CBaseTrigger_StartTouchFunc (Checkpoint zones) -> player.Stats.PB[{pStyle}].Checkpoint.Count = {player.Stats.PB[pStyle].Checkpoints?.Count ?? 0}");
 #endif
 
 			if (player.Timer.IsRunning && player.ReplayRecorder.IsRecording)
@@ -361,29 +376,32 @@ public partial class SurfTimer
 				player.ReplayRecorder.CheckpointEnterSituations.Add(player.Timer.Ticks);
 			}
 
-			int checkpoint_run_time = player.Timer.Ticks - player.Stats.ThisRun.RunTime; // player.Stats.ThisRun.RunTime should be the Tick we left the previous Checkpoint zone
-			short completedCheckpoint = (short)(checkpoint - 1);
+			// Reaching cp N completes checkpoint segment N: from the previous cp (or the map start for
+			// cp 1) to here. The last segment (last cp -> map end) is saved in the map end handler.
+			// player.Stats.ThisRun.RunTime is the tick we left the previous checkpoint zone / the map start.
+			int checkpoint_run_time = player.Timer.Ticks - player.Stats.ThisRun.RunTime;
+
+			// Print Checkpoint completion message (non-staged maps compare against the standalone
+			// Checkpoint PB/WR records; the rare staged-map-with-checkpoint-zones case falls back to
+			// the generic per-run split message since no standalone Checkpoint records exist there).
+			// Printed before the save so it compares against the previous PB.
+			if (SurfTimer.CurrentMap.Stages == 0)
+				player.HUD.DisplayCheckpointSegmentMessage(checkpoint, checkpoint_run_time, velocity);
+			else
+				player.HUD.DisplayCheckpointMessages();
 
 			// Save Checkpoint segment MapTime during a Map run (non-staged maps only)
-			if (SurfTimer.CurrentMap.Stages == 0 && checkpoint > 1 && !failed_checkpoint && !player.Timer.IsPracticeMode)
+			if (SurfTimer.CurrentMap.Stages == 0 && !failed_checkpoint && !player.Timer.IsPracticeMode)
 			{
 				float entryVelX = player.Timer.CheckpointEntryVelX;
 				float entryVelY = player.Timer.CheckpointEntryVelY;
 				float entryVelZ = player.Timer.CheckpointEntryVelZ;
 
-				ScheduleRunSave(player, $"SaveCheckpointTime (checkpoint {completedCheckpoint})", () =>
-					CurrentRun.SaveCheckpointTime(player, completedCheckpoint, checkpoint_run_time,
+				ScheduleRunSave(player, $"SaveCheckpointTime (checkpoint {checkpoint})", () =>
+					CurrentRun.SaveCheckpointTime(player, checkpoint, checkpoint_run_time,
 						startVelX: entryVelX, startVelY: entryVelY, startVelZ: entryVelZ,
 						endVelX: velocity.X, endVelY: velocity.Y, endVelZ: velocity.Z));
 			}
-
-			// Print Checkpoint completion message (non-staged maps compare against the standalone
-			// Checkpoint PB/WR records; the rare staged-map-with-checkpoint-zones case falls back to
-			// the generic per-run split message since no standalone Checkpoint records exist there)
-			if (SurfTimer.CurrentMap.Stages == 0)
-				player.HUD.DisplayCheckpointSegmentMessage(completedCheckpoint, checkpoint_run_time, velocity);
-			else
-				player.HUD.DisplayCheckpointMessages();
 
 			if (!player.Stats.ThisRun.Checkpoints.ContainsKey(checkpoint))
 			{
@@ -616,13 +634,14 @@ public partial class SurfTimer
 		player.Timer.CheckpointEntryVelY = velocity.Y;
 		player.Timer.CheckpointEntryVelZ = velocity.Z;
 
-		// This will populate the End velocities for the given Checkpoint zone (Stage = Checkpoint when in a Map Run)
-		if (player.Timer.Checkpoint != 0 && player.Timer.Checkpoint <= player.Stats.ThisRun.Checkpoints.Count)
+		// This will populate the End velocities for the given Checkpoint zone (Stage = Checkpoint when in a Map Run).
+		// Looked up by key - checkpoint numbers don't have to be contiguous, so a Count comparison isn't safe.
+		if (player.Timer.Checkpoint != 0 && player.Stats.ThisRun.Checkpoints.TryGetValue(player.Timer.Checkpoint, out var currentCheckpoint))
 		{
 #if DEBUG
-			Console.WriteLine($"currentCheckpoint.EndVelX {player.Stats.ThisRun.Checkpoints[player.Timer.Checkpoint].EndVelX} - velocity.X {velocity.X}");
-			Console.WriteLine($"currentCheckpoint.EndVelY {player.Stats.ThisRun.Checkpoints[player.Timer.Checkpoint].EndVelY} - velocity.Y {velocity.Y}");
-			Console.WriteLine($"currentCheckpoint.EndVelZ {player.Stats.ThisRun.Checkpoints[player.Timer.Checkpoint].EndVelZ} - velocity.Z {velocity.Z}");
+			Console.WriteLine($"currentCheckpoint.EndVelX {currentCheckpoint.EndVelX} - velocity.X {velocity.X}");
+			Console.WriteLine($"currentCheckpoint.EndVelY {currentCheckpoint.EndVelY} - velocity.Y {velocity.Y}");
+			Console.WriteLine($"currentCheckpoint.EndVelZ {currentCheckpoint.EndVelZ} - velocity.Z {velocity.Z}");
 #endif
 
 			if (player.Timer.IsRunning && player.ReplayRecorder.IsRecording)
@@ -631,11 +650,16 @@ public partial class SurfTimer
 				player.ReplayRecorder.CheckpointExitSituations.Add(player.Timer.Ticks);
 			}
 
+			// The next checkpoint segment starts here (mirrors the stage start exit) - without this the
+			// segment times counted from the map start
+			if (player.Timer.IsRunning && !player.Timer.IsStageMode && !player.Timer.IsBonusMode)
+				player.Stats.ThisRun.RunTime = player.Timer.Ticks;
+
 			// Update the Checkpoint object values
-			player.Stats.ThisRun.Checkpoints[player.Timer.Checkpoint].EndVelX = velocity.X;
-			player.Stats.ThisRun.Checkpoints[player.Timer.Checkpoint].EndVelY = velocity.Y;
-			player.Stats.ThisRun.Checkpoints[player.Timer.Checkpoint].EndVelZ = velocity.Z;
-			player.Stats.ThisRun.Checkpoints[player.Timer.Checkpoint].EndTouch = player.Timer.Ticks;
+			currentCheckpoint.EndVelX = velocity.X;
+			currentCheckpoint.EndVelY = velocity.Y;
+			currentCheckpoint.EndVelZ = velocity.Z;
+			currentCheckpoint.EndTouch = player.Timer.Ticks;
 
 			// Show Prespeed for stages - will be enabled/disabled by the user?
 			player.HUD.NotifyPrespeed($"Checkpoint {zone.Number}", velocity.velMag());
