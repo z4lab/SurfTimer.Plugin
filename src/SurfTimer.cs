@@ -167,21 +167,19 @@ public partial class SurfTimer : BasePlugin
 		if (accessService)
 		{
 			_logger.LogInformation(
-				"[{Prefix}] {AccessService} connection established.",
-				Config.PluginName,
-				Config.Api.GetApiOnly() ? "API" : "DB"
+				"[{Prefix}] DB connection established.",
+				Config.PluginName
 			);
 		}
 		else
 		{
 			_logger.LogCritical(
-				"[{Prefix}] Error connecting to the {AccessService}.",
-				Config.PluginName,
-				Config.Api.GetApiOnly() ? "API" : "DB"
+				"[{Prefix}] Error connecting to the DB.",
+				Config.PluginName
 			);
 
 			Exception exception = new(
-				$"[{Config.PluginName}] Error connecting to the {(Config.Api.GetApiOnly() ? "API" : "DB")}"
+				$"[{Config.PluginName}] Error connecting to the DB"
 			);
 			throw exception;
 		}

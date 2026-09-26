@@ -344,8 +344,8 @@ public class Map : MapEntity
 		stopwatch.Stop();
 
 #if DEBUG
-		_logger.LogDebug("[{ClassName}] {MethodName} -> Finished LoadMapRecordRuns in {Elapsed}ms | API = {API}",
-			nameof(Map), methodName, stopwatch.ElapsedMilliseconds, Config.Api.GetApiOnly());
+		_logger.LogDebug("[{ClassName}] {MethodName} -> Finished LoadMapRecordRuns in {Elapsed}ms",
+			nameof(Map), methodName, stopwatch.ElapsedMilliseconds);
 #endif
 	}
 
@@ -440,8 +440,8 @@ public class Map : MapEntity
 			if (MapCompletions[style] > 0 && WR[style].ID != -1)
 			{
 #if DEBUG
-				_logger.LogDebug("[{ClassName}] {MethodName} -> LoadMapRecordRuns : Map -> [{DBorAPI}] Loaded {MapCompletions} runs (MapID {MapID} | Style {Style}). WR by {PlayerName} - {Time}",
-					nameof(Map), methodName, Config.Api.GetApiOnly() ? "API" : "DB", this.MapCompletions[style], this.ID, style, this.WR[style].Name, PlayerHud.FormatTime(this.WR[style].RunTime)
+				_logger.LogDebug("[{ClassName}] {MethodName} -> LoadMapRecordRuns : Map -> Loaded {MapCompletions} runs (MapID {MapID} | Style {Style}). WR by {PlayerName} - {Time}",
+					nameof(Map), methodName, this.MapCompletions[style], this.ID, style, this.WR[style].Name, PlayerHud.FormatTime(this.WR[style].RunTime)
 				);
 #endif
 
@@ -449,8 +449,8 @@ public class Map : MapEntity
 				await this.WR[style].LoadCheckpoints(); // Load the checkpoints for the WR and Style combo
 				stopwatch.Stop();
 
-				_logger.LogInformation("[{ClassName}] {MethodName} -> Finished WR.[{Style}].LoadCheckpoints() in {ElapsedMilliseconds}ms | API = {API}",
-					nameof(Map), methodName, style, stopwatch.ElapsedMilliseconds, Config.Api.GetApiOnly()
+				_logger.LogInformation("[{ClassName}] {MethodName} -> Finished WR.[{Style}].LoadCheckpoints() in {ElapsedMilliseconds}ms",
+					nameof(Map), methodName, style, stopwatch.ElapsedMilliseconds
 				);
 			}
 		}

@@ -150,8 +150,8 @@ public class CurrentRun : RunStatsEntity
 		}
 
 		stopwatch.Stop();
-		_logger.LogInformation("[{Class}] {Method} -> Finished SaveMapTime for '{Name}' (ID {ID}) in {Elapsed}ms | API = {API}",
-			nameof(CurrentRun), methodName, player.Profile.Name, mapTimeId, stopwatch.ElapsedMilliseconds, Config.Api.GetApiOnly()
+		_logger.LogInformation("[{Class}] {Method} -> Finished SaveMapTime for '{Name}' (ID {ID}) in {Elapsed}ms",
+			nameof(CurrentRun), methodName, player.Profile.Name, mapTimeId, stopwatch.ElapsedMilliseconds
 		);
 	}
 

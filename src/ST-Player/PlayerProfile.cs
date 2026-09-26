@@ -42,8 +42,8 @@ public class PlayerProfile : PlayerProfileEntity
 	{
 		await GetPlayerProfile();
 
-		_logger.LogTrace("[{ClassName}] {MethodName} -> InitializeAsync -> [{ConnType}] We got ProfileID {ProfileID} ({PlayerName})",
-			nameof(PlayerProfile), methodName, Config.Api.GetApiOnly() ? "API" : "DB", this.ID, this.Name
+		_logger.LogTrace("[{ClassName}] {MethodName} -> InitializeAsync ->We got ProfileID {ProfileID} ({PlayerName})",
+			nameof(PlayerProfile), methodName, this.ID, this.Name
 		);
 	}
 
@@ -70,8 +70,8 @@ public class PlayerProfile : PlayerProfileEntity
 		}
 
 #if DEBUG
-		_logger.LogDebug("[{ClassName}] {MethodName} -> GetPlayerProfile -> [{ConnType}] Loaded player {PlayerName} ({SteamID}) with ID {ProfileID}.",
-			nameof(PlayerProfile), methodName, Config.Api.GetApiOnly() ? "API" : "DB", this.Name, this.SteamID, this.ID
+		_logger.LogDebug("[{ClassName}] {MethodName} -> GetPlayerProfile ->Loaded player {PlayerName} ({SteamID}) with ID {ProfileID}.",
+			nameof(PlayerProfile), methodName, this.Name, this.SteamID, this.ID
 		);
 #endif
 	}
@@ -92,8 +92,8 @@ public class PlayerProfile : PlayerProfileEntity
 		this.ID = await _dataService.InsertPlayerProfileAsync(profile);
 
 #if DEBUG
-		_logger.LogDebug("[{ClassName}] {MethodName} -> InsertPlayerProfile -> [{ConnType}] New player {PlayerName} ({SteamID}) added with ID {ProfileID}.",
-			nameof(PlayerProfile), methodName, Config.Api.GetApiOnly() ? "API" : "DB", this.Name, this.SteamID, this.ID
+		_logger.LogDebug("[{ClassName}] {MethodName} -> InsertPlayerProfile ->New player {PlayerName} ({SteamID}) added with ID {ProfileID}.",
+			nameof(PlayerProfile), methodName, this.Name, this.SteamID, this.ID
 		);
 #endif
 	}
@@ -115,8 +115,8 @@ public class PlayerProfile : PlayerProfileEntity
 		await _dataService.UpdatePlayerProfileAsync(dto, this.ID);
 
 #if DEBUG
-		_logger.LogDebug("[{ClassName}] {MethodName} -> UpdatePlayerProfile -> [{ConnType}] Updated player {PlayerName} ({SteamID}) with ID {ProfileID}.",
-			nameof(PlayerProfile), methodName, Config.Api.GetApiOnly() ? "API" : "DB", this.Name, this.SteamID, this.ID
+		_logger.LogDebug("[{ClassName}] {MethodName} -> UpdatePlayerProfile ->Updated player {PlayerName} ({SteamID}) with ID {ProfileID}.",
+			nameof(PlayerProfile), methodName, this.Name, this.SteamID, this.ID
 		);
 #endif
 	}

@@ -5,28 +5,6 @@ using System.Text.Json.Serialization;
 
 namespace SurfTimer;
 
-internal static class JsonSelp
-{
-	public static Dictionary<string, string> ConstructJsonDictFromString(string str)
-	{
-		using (JsonDocument document = JsonDocument.Parse(str))
-		{
-			// Access the root element
-			JsonElement root = document.RootElement;
-
-			// Create a dictionary to store the parsed JSON data
-			Dictionary<string, string> dictionary = new Dictionary<string, string>();
-
-			foreach (JsonProperty property in root.EnumerateObject())
-			{
-				dictionary[property.Name] = property.Value.ToString();
-			}
-
-			return dictionary;
-		}
-	}
-}
-
 internal class VectorTConverter : JsonConverter<VectorT>
 {
 	public override VectorT Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
@@ -123,6 +101,9 @@ internal class QAngleTConverter : JsonConverter<QAngleT>
 	}
 }
 
+/// <summary>
+/// GZip + base64 for replay frames: a 4-byte length prefix followed by the compressed payload.
+/// </summary>
 internal static class Compressor
 {
 	public static byte[] Compress(byte[] input)

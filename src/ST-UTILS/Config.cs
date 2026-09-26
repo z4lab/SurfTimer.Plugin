@@ -18,7 +18,6 @@ public static class Config
 	public static readonly string PluginPrefix = LocalizationService.LocalizerNonNull["prefix"];
 	public static string PluginPath =>
 		$"{Server.GameDirectory}/csgo/addons/counterstrikesharp/plugins/{PluginName}/";
-	public static string ApiUrl => Api.GetApiUrl();
 
 	/// <summary>
 	/// Placeholder for amount of styles
@@ -74,68 +73,6 @@ public static class Config
 		public static int GetReplaysPre()
 		{
 			return ConfigDocument.RootElement.GetProperty("replays_pre").GetInt32();
-		}
-	}
-
-	public static class Api
-	{
-		private const string API_CONFIG_PATH = "/csgo/cfg/SurfTimer/api_config.json";
-		private static JsonDocument ConfigDocument =>
-			ConfigLoader.GetConfigDocument(API_CONFIG_PATH);
-
-		/// <summary>
-		///   Retrieves the `api_url` string from the configuration path
-		/// </summary>
-		/// <returns>A <see cref="string"/> value containing the URL.</returns>
-		public static string GetApiUrl()
-		{
-			return ConfigDocument.RootElement.GetProperty("api_url").GetString()!;
-		}
-
-		/// <summary>
-		///   Retrieves the `api_enabled` value from the configuration path
-		/// </summary>
-		/// <returns>A <see cref="bool"/> value for whether the API should be used.</returns>
-		public static bool GetApiOnly()
-		{
-			return ConfigDocument.RootElement.GetProperty("api_enabled").GetBoolean();
-		}
-
-		/// <summary>
-		///   Contains all the endpoints used by the API for the SurfTimer plugin.
-		/// </summary>
-		public static class Endpoints
-		{
-			public const string ENDPOINT_PING = "/api/Utilities/ping/clientUnix={0}";
-
-			// Map.cs related endpoints
-			public const string ENDPOINT_MAP_GET_INFO = "/api/Map/mapName={0}";
-			public const string ENDPOINT_MAP_INSERT_INFO = "/api/Map";
-			public const string ENDPOINT_MAP_UPDATE_INFO = "/api/Map/mapId={0}";
-			public const string ENDPOINT_MAP_GET_RUNS = "/api/Map/mapId={0}";
-			public const string ENDPOINT_MAP_GET_RUN_CPS =
-				"/api/PersonalBest/checkpoints/mapTimeId={0}";
-
-			// CurrentRun.cs
-			public const string ENDPOINT_CR_SAVE_MAP_TIME = "/api/CurrentRun/saveMapTime";
-			public const string ENDPOINT_CR_UPDATE_MAP_TIME =
-				"/api/CurrentRun/updateMapTime/mapTimeId={0}";
-			public const string ENDPOINT_CR_SAVE_STAGE_TIME = "/surftimer/savestagetime";
-
-			// PersonalBest.cs
-			public const string ENDPOINT_MAP_GET_PB_BY_PLAYER =
-				"/api/PersonalBest/playerId={0}&mapId={1}&type={2}&style={3}";
-			public const string ENDPOINT_MAP_GET_PB_BY_ID =
-				"/api/PersonalBest/runById/mapTimeId={0}";
-
-			// PlayerProfile.cs
-			public const string ENDPOINT_PP_GET_PROFILE = "/api/PlayerProfile/steamId={0}";
-			public const string ENDPOINT_PP_INSERT_PROFILE = "/api/PlayerProfile";
-			public const string ENDPOINT_PP_UPDATE_PROFILE = "/api/PlayerProfile/playerId={0}";
-
-			// PlayerStats.cs
-			public const string ENDPOINT_PS_GET_PLAYER_MAP_DATA =
-				"/api/PlayerStats/playerId={0}&mapId={1}";
 		}
 	}
 

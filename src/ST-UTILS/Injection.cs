@@ -48,12 +48,9 @@ public class Injection : IPluginServiceCollection<SurfTimer>
 		serviceCollection.AddScoped<PersonalBest>(); // Multiple instances for different players
 		serviceCollection.AddScoped<PlayerStats>(); // Multiple instances for different players
 		serviceCollection.AddScoped<PlayerProfile>(); // Multiple instances for different players
-		serviceCollection.AddScoped<ApiMethod>(); // Multiple instances for different players
 		serviceCollection.AddSingleton<Map>(); // Single instance for 1 Map object
 
-		serviceCollection.AddScoped<IDataAccessService>(provider =>
-			Config.Api.GetApiOnly() ? new ApiDataAccessService() : new MySqlDataAccessService()
-		);
+		serviceCollection.AddScoped<IDataAccessService>(provider => new MySqlDataAccessService());
 	}
 }
 
