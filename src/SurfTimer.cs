@@ -11,14 +11,6 @@
     by the Free Software Foundation, either version 3 of the License, or
     (at your option) any later version.
 
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU Affero General Public License for more details.
-
-    You should have received a copy of the GNU Affero General Public License
-    along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
     Original Source: https://github.com/CS2Surf/Timer
 	Modified Fork: https://github.com/z4lab/SurfTimer.Plugin
 */
@@ -55,10 +47,10 @@ public partial class SurfTimer : BasePlugin
 	}
 
 	// Metadata
-	public override string ModuleName => $"CS2 {Config.PluginName}";
+	public override string ModuleName => $"z4lab/{Config.PluginName}";
 	public override string ModuleVersion => "1.0.1";
-	public override string ModuleDescription => "Official Surf Timer by the CS2 Surf Initiative.";
-	public override string ModuleAuthor => "The CS2 Surf Initiative - github.com/cs2surf";
+	public override string ModuleDescription => Config.PluginName;
+	public override string ModuleAuthor => "z4lab";
 
 	// Globals
 	private readonly ConcurrentDictionary<int, Player> playerList = new();
@@ -71,26 +63,11 @@ public partial class SurfTimer : BasePlugin
 		// Initialise Map Object
 		if ((CurrentMap == null || CurrentMap.Name!.Equals(mapName)) && mapName.Contains("surf_"))
 		{
-			_logger.LogInformation(
-				"[{Prefix}] New map {MapName} started. Initializing Map object.....",
-				Config.PluginName,
-				mapName
-			);
+			_logger.LogInformation($"[CS2 Surf] {Config.PluginName} Initializing Map object for {mapName}");
 
 			Server.NextWorldUpdateAsync(async () => // NextWorldUpdate runs even during server hibernation
 			{
-				_logger.LogInformation(
-					"{PluginLogo}\n"
-						+ "[CS2 Surf] {PluginName} v.{ModuleVersion} - loading map {MapName}.\n"
-						+ "[CS2 Surf] This software is licensed under the GNU Affero General Public License v3.0. See LICENSE for more information.\n"
-						+ "[CS2 Surf] ---> Source Code: https://github.com/z4lab/SurfTimer.Plugin\n"
-						+ "[CS2 Surf] ---> License Agreement: https://github.com/z4lab/SurfTimer.Plugin/blob/main/LICENSE\n",
-					Config.PluginLogo,
-					Config.PluginName,
-					ModuleVersion,
-					mapName
-				);
-
+				_logger.LogInformation($"[CS2 Surf] {Config.PluginName} {ModuleVersion} - loading map {mapName}");
 				CurrentMap = new Map(mapName);
 				await CurrentMap.InitializeAsync();
 			});
@@ -185,13 +162,11 @@ public partial class SurfTimer : BasePlugin
 		}
 
 		_logger.LogInformation(
-			"""  
-                {PluginLogo}  
+			"""
                 [CS2 Surf] {PluginName} plugin loaded. Version: {ModuleVersion}
                 [CS2 Surf] This plugin is licensed under the GNU Affero General Public License v3.0. See LICENSE for more information. 
                 Source code: https://github.com/z4lab/SurfTimer.Plugin
             """,
-			Config.PluginLogo,
 			Config.PluginName,
 			ModuleVersion
 		);
