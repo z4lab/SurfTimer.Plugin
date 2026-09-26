@@ -21,6 +21,12 @@ public static class Config
 	public static readonly int ReplaysPre = TimerSettings.GetReplaysPre();
 
 	/// <summary>
+	/// Server-driven HUD via a custom_hud_layout entity - needs the SurfTimer HUD Workshop addon on clients.
+	/// </summary>
+	public static readonly bool CustomHudEnabled = TimerSettings.GetCustomHudEnabled();
+	public static readonly string CustomHudLayout = TimerSettings.GetCustomHudLayout();
+
+	/// <summary>
 	/// Maximum number of distinct replays that can play concurrently via !replay.
 	/// </summary>
 	public const int ReplayPoolCap = 3;
@@ -66,6 +72,19 @@ public static class Config
 		public static int GetReplaysPre()
 		{
 			return ConfigDocument.RootElement.GetProperty("replays_pre").GetInt32();
+		}
+
+		// Optional keys - older configs without them keep the classic center HTML HUD
+		public static bool GetCustomHudEnabled()
+		{
+			return ConfigDocument.RootElement.TryGetProperty("custom_hud_enabled", out var value) && value.GetBoolean();
+		}
+
+		public static string GetCustomHudLayout()
+		{
+			return ConfigDocument.RootElement.TryGetProperty("custom_hud_layout", out var value)
+				? value.GetString()!
+				: "panorama/layout/custom_game/surftimer_hud.xml"; // Source name - clients reject ".vxml" here
 		}
 	}
 

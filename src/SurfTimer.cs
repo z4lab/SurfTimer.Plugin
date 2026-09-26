@@ -177,6 +177,23 @@ public partial class SurfTimer : BasePlugin
 		RegisterListener<Listeners.OnMapEnd>(OnMapEnd);
 		// Tick listener
 		RegisterListener<Listeners.OnTick>(OnTick);
+		// The custom HUD layout comes from a Workshop addon, not the map, so precache it. The manifest
+		// wants the compiled resource type (.vxml); the entity itself takes the source name (.xml).
+		RegisterListener<Listeners.OnServerPrecacheResources>(manifest =>
+		{
+			if (Config.CustomHudEnabled)
+				manifest.AddResource(Path.ChangeExtension(Config.CustomHudLayout, ".vxml"));
+		});
+		// Maps show their own center messages ("Stage 7") through hint/text entities - with the custom
+		// HUD those would cover it, so they're removed as they spawn (map load and round restarts)
+		RegisterListener<Listeners.OnEntitySpawned>(entity =>
+		{
+			if (!Config.CustomHudEnabled || !CustomHud.MapMessageEntities.Contains(entity.DesignerName))
+				return;
+
+			var handle = entity.EntityHandle;
+			Server.NextFrame(() => CustomHud.RemoveMapMessageEntity(handle.Value));
+		});
 
 		HookEntityOutput("trigger_multiple", "OnStartTouch", OnTriggerStartTouch);
 		HookEntityOutput("trigger_multiple", "OnEndTouch", OnTriggerEndTouch);

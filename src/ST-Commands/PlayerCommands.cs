@@ -583,7 +583,10 @@ public partial class SurfTimer
 		}
 
 		if (!p.Timer.IsRunning)
+		{
 			p.Timer.Start();
+			p.ResetSync();
+		}
 
 		if (!p.Timer.IsPracticeMode)
 		{

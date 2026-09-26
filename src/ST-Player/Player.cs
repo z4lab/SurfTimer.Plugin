@@ -46,6 +46,19 @@ public class Player
 
 	internal bool IsTouchingZone(ZoneType type, short number) => this.TouchingTriggers.Values.Any(zone =>
 		zone.Type == type && zone.Number == number);
+
+	// Any zone a run/stage/bonus starts from - the HUD's prespeed field shows live speed inside these
+	internal bool IsTouchingAnyStartZone => this.TouchingTriggers.Values.Any(zone =>
+		zone.Type is ZoneType.MapStart or ZoneType.StageStart or ZoneType.BonusStart);
+
+	// Speed when last leaving a start zone (HUD prespeed field) - null until the first exit
+	internal float? LastPrespeed { get; set; }
+
+	// Strafe sync of the current run: air ticks turning in the direction of the held strafe key
+	internal int SyncGoodTicks { get; private set; }
+	internal int SyncTotalTicks { get; private set; }
+	internal float SyncPercent => this.SyncTotalTicks > 0 ? 100f * this.SyncGoodTicks / this.SyncTotalTicks : 0f;
+	private float _lastYaw;
 	internal bool WasOnGroundLastTick { get; set; } = true;
 	internal int GroundTicks { get; set; } = 0;
 	internal int StartZoneJumpCount { get; set; } = 0;
@@ -146,6 +159,48 @@ public class Player
 			movement.Stamina = 0f;
 			Utilities.SetStateChanged(pawn, "CBasePlayerPawn", "m_pMovementServices");
 		}
+	}
+
+	internal void ResetSync()
+	{
+		this.SyncGoodTicks = 0;
+		this.SyncTotalTicks = 0;
+	}
+
+	/// <summary>
+	/// Strafe sync: of the ticks in the air where the player turns, how many turn the same way as the
+	/// strafe key held (left with only A, right with only D). Only counted while the timer runs, so it
+	/// covers the current run and freezes when it ends; reset when a run starts.
+	/// </summary>
+	internal void TickSync()
+	{
+		var pawn = this.Controller.PlayerPawn.Value;
+		if (pawn == null || !pawn.IsValid)
+			return;
+
+		float yaw = pawn.EyeAngles.Y;
+		float delta = yaw - _lastYaw;
+		_lastYaw = yaw;
+		// Wrap across the -180/180 seam
+		if (delta > 180f)
+			delta -= 360f;
+		else if (delta < -180f)
+			delta += 360f;
+
+		if (!this.Timer.IsRunning || MathF.Abs(delta) < 0.001f)
+			return;
+
+		if ((pawn.Flags & (uint)PlayerFlags.FL_ONGROUND) != 0
+			|| pawn.MoveType is MoveType_t.MOVETYPE_LADDER or MoveType_t.MOVETYPE_NOCLIP)
+			return;
+
+		var buttons = this.Controller.Buttons;
+		bool left = buttons.HasFlag(PlayerButtons.Moveleft) && !buttons.HasFlag(PlayerButtons.Moveright);
+		bool right = buttons.HasFlag(PlayerButtons.Moveright) && !buttons.HasFlag(PlayerButtons.Moveleft);
+
+		this.SyncTotalTicks++;
+		if ((delta > 0 && left) || (delta < 0 && right)) // Positive yaw delta = turning left
+			this.SyncGoodTicks++;
 	}
 
 	/// <summary>

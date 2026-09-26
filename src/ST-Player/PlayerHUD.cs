@@ -1,5 +1,8 @@
+using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Modules.Utils;
 using SurfTimer.Shared.Entities;
+using System.Globalization;
+using System.Net;
 
 namespace SurfTimer;
 
@@ -12,6 +15,7 @@ public class PlayerHud
 	private readonly string RankColorPb = "#7986CB";
 	private readonly string RankColorWr = "#FFD700";
 	private readonly string SpectatorColor = "#9E9E9E";
+	private readonly string SlowerColor = "#E53935";
 
 	internal PlayerHud(Player Player)
 	{
@@ -72,316 +76,681 @@ public class PlayerHud
 	}
 
 	/// <summary>
-	/// Build the timer module with appropriate prefix based on mode
+	/// One HUD value, independent of how it's drawn: rendered as HTML for the classic center HUD, or
+	/// as plain label segments (title / body / suffix) with colour classes for the custom HUD.
 	/// </summary>
-	/// <returns>string timerModule</returns>
-	internal string BuildTimerWithPrefix()
+	/// <param name="Color">Body colour as hex (HTML HUD)</param>
+	/// <param name="ColorClass">Body colour class for the custom HUD - derived from Color when null</param>
+	/// <param name="Size">Value size - the HTML HUD only distinguishes small from the rest</param>
+	/// <param name="Label">Draw the body as a label (small caps, muted) in the custom HUD, e.g. headers</param>
+	internal readonly record struct HudElement(string Title, string Body, string Color, string Suffix = "",
+		HudSize Size = HudSize.Medium, string? ColorClass = null, bool Label = false);
+
+	internal enum HudSize { Small, Medium, Large, XLarge }
+
+	// Values can contain player names, so they're escaped for the HTML HUD (the custom HUD is plain text)
+	private static string ToHtml(HudElement e) =>
+		FormatHUDElementHTML(WebUtility.HtmlEncode(e.Title), WebUtility.HtmlEncode(e.Body), e.Color, e.Size == HudSize.Small ? "s" : "m")
+		+ WebUtility.HtmlEncode(e.Suffix);
+
+	// ---- Center notifications (zone messages) ----
+
+	/// <summary>
+	/// Zone info messages ("Map Start", ...). Shown in CS2's center print with the classic HUD; the
+	/// custom HUD drops them - its top bar already shows where the player is.
+	/// </summary>
+	internal void Notify(string text)
 	{
-		// Timer Module
-		string timerColor = TimerColor;
-
-		if (_player.Timer.IsRunning)
-		{
-			if (_player.Timer.IsPracticeMode)
-				timerColor = TimerColorPractice;
-			else
-				timerColor = TimerColorActive;
-		}
-
-		string prefix = "";
-
-		if (_player.Timer.IsPracticeMode)
-			prefix += "[P] ";
-
-		if (_player.Timer.IsBonusMode)
-			prefix += $"[B{_player.Timer.Bonus}] ";
-		else if (_player.Timer.IsStageMode)
-			prefix += $"[S{_player.Timer.Stage}] ";
-
-		string timerModule = FormatHUDElementHTML(
-			"",
-			prefix + FormatTime(_player.Timer.Ticks),
-			timerColor
-		);
-
-		return timerModule;
+		if (!CustomHud.IsActive)
+			_player.Controller.PrintToCenter(text);
 	}
 
 	/// <summary>
-	/// Build the velocity module
+	/// Prespeed when leaving a start zone - kept for the custom HUD's prespeed field, and center printed
+	/// with the classic HUD.
 	/// </summary>
-	/// <returns>string velocityModule</returns>
-	internal string BuildVelocityModule()
+	/// <param name="context">"Stage 2", "Checkpoint 3", ... or empty</param>
+	internal void NotifyPrespeed(string context, float velocity)
 	{
-		float velocity = Extensions.GetVelocityFromController(_player.Controller);
-		string velocityModule =
-			FormatHUDElementHTML(
-				"Speed",
-				velocity.ToString("0"),
-				Extensions.GetSpeedColorGradient(velocity)
-			) + " u/s";
-		return velocityModule;
+		_player.LastPrespeed = velocity;
+
+		if (!CustomHud.IsActive)
+			_player.Controller.PrintToCenter($"{(context != "" ? context + " - " : "")}Prespeed: {velocity:0} u/s");
 	}
+
+	/// <summary>
+	/// Timer colour: idle, running or running in practice mode.
+	/// </summary>
+	private string TimerColorOf(Player p)
+	{
+		if (!p.Timer.IsRunning)
+			return TimerColor;
+		return p.Timer.IsPracticeMode ? TimerColorPractice : TimerColorActive;
+	}
+
+	/// <summary>
+	/// The timer with a prefix based on mode ([P], [B#], [S#])
+	/// </summary>
+	private HudElement TimerElement(Player p)
+	{
+		string prefix = "";
+
+		if (p.Timer.IsPracticeMode)
+			prefix += "[P] ";
+
+		if (p.Timer.IsBonusMode)
+			prefix += $"[B{p.Timer.Bonus}] ";
+		else if (p.Timer.IsStageMode)
+			prefix += $"[S{p.Timer.Stage}] ";
+
+		return new HudElement("", prefix + FormatTime(p.Timer.Ticks), TimerColorOf(p), Size: HudSize.XLarge);
+	}
+
+	private static HudElement SpeedElement(float velocity) =>
+		new("Speed", velocity.ToString("0"), Extensions.GetSpeedColorGradient(velocity), " u/s",
+			Size: HudSize.Large, ColorClass: CustomHud.SpeedColorClass(velocity));
 
 	// The HUD runs every tick, so a bonus/stage index that's unset (0) or has no data must fall back to
 	// the map values instead of throwing - one exception here aborts the whole tick for everyone.
-	private bool HasBonusData(int style) =>
-		HasEntry(_player.Stats.BonusPB, _player.Timer.Bonus, style)
-		&& HasEntry(SurfTimer.CurrentMap.BonusWR, _player.Timer.Bonus, style)
-		&& HasEntry(SurfTimer.CurrentMap.BonusCompletions, _player.Timer.Bonus, style);
+	private static bool HasBonusData(Player p, int style) =>
+		HasEntry(p.Stats.BonusPB, p.Timer.Bonus, style)
+		&& HasEntry(SurfTimer.CurrentMap.BonusWR, p.Timer.Bonus, style)
+		&& HasEntry(SurfTimer.CurrentMap.BonusCompletions, p.Timer.Bonus, style);
 
-	private bool HasStageData(int style) =>
-		HasEntry(_player.Stats.StagePB, _player.Timer.Stage, style)
-		&& HasEntry(SurfTimer.CurrentMap.StageWR, _player.Timer.Stage, style)
-		&& HasEntry(SurfTimer.CurrentMap.StageCompletions, _player.Timer.Stage, style);
+	private static bool HasStageData(Player p, int style) =>
+		HasEntry(p.Stats.StagePB, p.Timer.Stage, style)
+		&& HasEntry(SurfTimer.CurrentMap.StageWR, p.Timer.Stage, style)
+		&& HasEntry(SurfTimer.CurrentMap.StageCompletions, p.Timer.Stage, style);
 
 	private static bool HasEntry<T>(Dictionary<int, T>[] byIndex, int index, int style) =>
 		index > 0 && index < byIndex.Length && byIndex[index] != null && byIndex[index].ContainsKey(style);
 
 	/// <summary>
-	/// Build the rank module with appropriate values based on mode
+	/// Rank for the current mode (map / stage / bonus)
 	/// </summary>
-	/// <returns>string rankModule</returns>
-	internal string BuildRankModule()
+	private HudElement RankElement(Player p)
 	{
-		int style = _player.Timer.Style;
+		int style = p.Timer.Style;
+		var map = SurfTimer.CurrentMap;
 
-		// Rank Module
-		string rankModule = FormatHUDElementHTML("Rank", $"N/A", RankColorPb);
-		if (_player.Timer.IsBonusMode && HasBonusData(style))
-		{
-			if (
-				_player.Stats.BonusPB[_player.Timer.Bonus][style].ID != -1
-				&& SurfTimer.CurrentMap.BonusWR[_player.Timer.Bonus][style].ID != -1
-			)
-				rankModule = FormatHUDElementHTML(
-					"Rank",
-					$"{_player.Stats.BonusPB[_player.Timer.Bonus][style].Rank}/{SurfTimer.CurrentMap.BonusCompletions[_player.Timer.Bonus][style]}",
-					RankColorPb
-				);
-			else if (SurfTimer.CurrentMap.BonusWR[_player.Timer.Bonus][style].ID != -1)
-				rankModule = FormatHUDElementHTML(
-					"Rank",
-					$"-/{SurfTimer.CurrentMap.BonusCompletions[_player.Timer.Bonus][style]}",
-					RankColorPb
-				);
-		}
-		else if (_player.Timer.IsStageMode && HasStageData(style))
-		{
-			if (
-				_player.Stats.StagePB[_player.Timer.Stage][style].ID != -1
-				&& SurfTimer.CurrentMap.StageWR[_player.Timer.Stage][style].ID != -1
-			)
-				rankModule = FormatHUDElementHTML(
-					"Rank",
-					$"{_player.Stats.StagePB[_player.Timer.Stage][style].Rank}/{SurfTimer.CurrentMap.StageCompletions[_player.Timer.Stage][style]}",
-					RankColorPb
-				);
-			else if (SurfTimer.CurrentMap.StageWR[_player.Timer.Stage][style].ID != -1)
-				rankModule = FormatHUDElementHTML(
-					"Rank",
-					$"-/{SurfTimer.CurrentMap.StageCompletions[_player.Timer.Stage][style]}",
-					RankColorPb
-				);
-		}
-		else
-		{
-			if (_player.Stats.PB[style].ID != -1 && SurfTimer.CurrentMap.WR[style].ID != -1)
-				rankModule = FormatHUDElementHTML(
-					"Rank",
-					$"{_player.Stats.PB[style].Rank}/{SurfTimer.CurrentMap.MapCompletions[style]}",
-					RankColorPb
-				);
-			else if (SurfTimer.CurrentMap.WR[style].ID != -1)
-				rankModule = FormatHUDElementHTML(
-					"Rank",
-					$"-/{SurfTimer.CurrentMap.MapCompletions[style]}",
-					RankColorPb
-				);
-		}
+		if (p.Timer.IsBonusMode && HasBonusData(p, style))
+			return RankOf(p.Stats.BonusPB[p.Timer.Bonus][style], map.BonusWR[p.Timer.Bonus][style].ID, map.BonusCompletions[p.Timer.Bonus][style]);
 
-		return rankModule;
+		if (p.Timer.IsStageMode && HasStageData(p, style))
+			return RankOf(p.Stats.StagePB[p.Timer.Stage][style], map.StageWR[p.Timer.Stage][style].ID, map.StageCompletions[p.Timer.Stage][style]);
+
+		return RankOf(p.Stats.PB[style], map.WR[style].ID, map.MapCompletions[style]);
+	}
+
+	// "rank/completions", "-/completions" without a PB, "N/A" without any record
+	private HudElement RankOf(PersonalBest pb, int wrId, int completions)
+	{
+		if (wrId == -1)
+			return new HudElement("Rank", "N/A", RankColorPb);
+		return new HudElement("Rank", pb.ID != -1 ? $"{pb.Rank}/{completions}" : $"-/{completions}", RankColorPb);
 	}
 
 	/// <summary>
-	/// Build the PB module with appropriate values based on mode
+	/// PB for the current mode (map / stage / bonus)
 	/// </summary>
-	/// <returns>string pbModule</returns>
-	internal string BuildPbModule()
+	private HudElement PbElement(Player p, PlayerTimer.TimeFormatStyle timeFormat = PlayerTimer.TimeFormatStyle.Compact)
 	{
-		int style = _player.Timer.Style;
+		int style = p.Timer.Style;
 
-		// PB & WR Modules
-		string pbModule = FormatHUDElementHTML(
-			"PB",
-			_player.Stats.PB[style].RunTime > 0
-				? FormatTime(_player.Stats.PB[style].RunTime)
-				: "N/A",
-			RankColorPb
-		);
+		int runTime = p.Stats.PB[style].RunTime;
+		if (p.Timer.IsBonusMode && HasBonusData(p, style)) // Show corresponding bonus values
+			runTime = p.Stats.BonusPB[p.Timer.Bonus][style].RunTime;
+		else if (p.Timer.IsStageMode && HasStageData(p, style)) // Show corresponding stage values
+			runTime = p.Stats.StagePB[p.Timer.Stage][style].RunTime;
 
-		if (_player.Timer.IsBonusMode && HasBonusData(style)) // Show corresponding bonus values
-		{
-			pbModule = FormatHUDElementHTML(
-				"PB",
-				_player.Stats.BonusPB[_player.Timer.Bonus][style].RunTime > 0
-					? FormatTime(_player.Stats.BonusPB[_player.Timer.Bonus][style].RunTime)
-					: "N/A",
-				RankColorPb
-			);
-		}
-		else if (_player.Timer.IsStageMode && HasStageData(style)) // Show corresponding stage values
-		{
-			pbModule = FormatHUDElementHTML(
-				"PB",
-				_player.Stats.StagePB[_player.Timer.Stage][style].RunTime > 0
-					? FormatTime(_player.Stats.StagePB[_player.Timer.Stage][style].RunTime)
-					: "N/A",
-				RankColorPb
-			);
-		}
-
-		return pbModule;
+		return new HudElement("PB", runTime > 0 ? FormatTime(runTime, timeFormat) : "N/A", RankColorPb);
 	}
 
 	/// <summary>
-	/// Build the WR module with appropriate values based on mode
+	/// WR for the current mode (map / stage / bonus)
 	/// </summary>
-	/// <returns>string wrModule</returns>
-	internal string BuildWrModule()
+	private HudElement WrElement(Player p, PlayerTimer.TimeFormatStyle timeFormat = PlayerTimer.TimeFormatStyle.Compact)
 	{
-		int style = _player.Timer.Style;
+		int style = p.Timer.Style;
+		var map = SurfTimer.CurrentMap;
 
-		// WR Module
-		string wrModule = FormatHUDElementHTML(
-			"WR",
-			SurfTimer.CurrentMap.WR[style].RunTime > 0
-				? FormatTime(SurfTimer.CurrentMap.WR[style].RunTime)
-				: "N/A",
-			RankColorWr
-		);
+		int runTime = map.WR[style].RunTime;
+		if (p.Timer.IsBonusMode && HasBonusData(p, style)) // Show corresponding bonus values
+			runTime = map.BonusWR[p.Timer.Bonus][style].RunTime;
+		else if (p.Timer.IsStageMode && HasStageData(p, style)) // Show corresponding stage values
+			runTime = map.StageWR[p.Timer.Stage][style].RunTime;
 
-		if (_player.Timer.IsBonusMode && HasBonusData(style)) // Show corresponding bonus values
-		{
-			wrModule = FormatHUDElementHTML(
-				"WR",
-				SurfTimer.CurrentMap.BonusWR[_player.Timer.Bonus][style].RunTime > 0
-					? FormatTime(SurfTimer.CurrentMap.BonusWR[_player.Timer.Bonus][style].RunTime)
-					: "N/A",
-				RankColorWr
-			);
-		}
-		else if (_player.Timer.IsStageMode && HasStageData(style)) // Show corresponding stage values
-		{
-			wrModule = FormatHUDElementHTML(
-				"WR",
-				SurfTimer.CurrentMap.StageWR[_player.Timer.Stage][style].RunTime > 0
-					? FormatTime(SurfTimer.CurrentMap.StageWR[_player.Timer.Stage][style].RunTime)
-					: "N/A",
-				RankColorWr
-			);
-		}
-
-		return wrModule;
+		return new HudElement("WR", runTime > 0 ? FormatTime(runTime, timeFormat) : "N/A", RankColorWr);
 	}
 
 	/// <summary>
-	/// Displays the Center HUD for the client
+	/// Displays the HUD for the client - through the custom HUD slots when that's active, otherwise
+	/// as the classic center HTML HUD.
 	/// </summary>
-	internal void Display()
+	/// <param name="allPlayers">Everyone on the server - used to list who's spectating this player</param>
+	internal void Display(ICollection<Player> allPlayers)
 	{
 		if (!_player.Controller.IsValid)
 			return;
 
+		if (CustomHud.IsActive)
+		{
+			if (Server.TickCount % CustomHudUpdateTicks == 0)
+				DisplayCustomHud(allPlayers);
+			return;
+		}
+
+		string hud = BuildCenterHud();
+		if (!string.IsNullOrEmpty(hud))
+			_player.Controller.PrintToCenterHtml(hud);
+	}
+
+	/// <summary>
+	/// The classic center HTML HUD as rows of elements: timer, speed, PB + rank and WR while alive, or
+	/// the replay info while spectating a replay bot.
+	/// </summary>
+	private List<List<HudElement>> CenterRows()
+	{
 		if (_player.Controller.PawnIsAlive)
 		{
-			string timerModule = BuildTimerWithPrefix();
-
-			// Velocity Module
-			string velocityModule = BuildVelocityModule();
-
-			// Rank Module
-			string rankModule = BuildRankModule();
-
-			// PB & WR Modules
-			string pbModule = BuildPbModule();
-			string wrModule = BuildWrModule();
-
-			// Build HUD
-			string hud =
-				$"{timerModule}<br>{velocityModule}<br>{pbModule} | {rankModule}<br>{wrModule}";
-
-			// Display HUD
-			_player.Controller.PrintToCenterHtml(hud);
+			return
+			[
+				[TimerElement(_player)],
+				[SpeedElement(Extensions.GetVelocityFromController(_player.Controller))],
+				[PbElement(_player), RankElement(_player)],
+				[WrElement(_player)],
+			];
 		}
-		else if (_player.Controller.Team == CsTeam.Spectator)
+
+		if (_player.Controller.Team == CsTeam.Spectator)
 		{
-			DisplaySpectatorHud();
+			ReplayPlayer? specReplay = SurfTimer.CurrentMap.ReplayManager.Pool.Find(x =>
+				x.Controller != null && _player.IsSpectating(x.Controller)
+			);
+			if (specReplay != null)
+				return ReplayRows(specReplay);
 		}
+
+		return [];
 	}
 
-	/// <summary>
-	/// Displays the Spectator HUD for the client if they are spectating a replay bot from the pool
-	/// </summary>
-	internal void DisplaySpectatorHud()
-	{
-		ReplayPlayer? specReplay = SurfTimer.CurrentMap.ReplayManager.Pool.Find(x =>
-			x.Controller != null && _player.IsSpectating(x.Controller)
-		);
-
-		if (specReplay == null)
-			return;
-
-		string hud = BuildReplayModule(specReplay);
-		if (!string.IsNullOrEmpty(hud))
-		{
-			_player.Controller.PrintToCenterHtml(hud);
-		}
-	}
+	private string BuildCenterHud() =>
+		string.Join("<br>", CenterRows().Select(row => string.Join(" | ", row.Select(ToHtml))));
 
 	/// <summary>
-	/// Build the spectator HUD module for whichever replay a pool slot is currently playing -
-	/// covers Map/Stage/Bonus/Checkpoint content, both WR and a specific player's PB.
+	/// The spectator HUD for whichever replay a pool slot is currently playing - covers
+	/// Map/Stage/Bonus/Checkpoint content, both WR and a specific player's PB.
 	/// </summary>
 	/// <param name="specReplay">Pool slot to use</param>
-	internal string BuildReplayModule(ReplayPlayer specReplay)
+	private List<List<HudElement>> ReplayRows(ReplayPlayer specReplay)
 	{
-		string kind = specReplay.RequestedByPlayerId == -1 ? "WR" : "PB";
-		string replayType = specReplay.Type switch
-		{
-			0 => $"Map {kind} Replay",
-			1 => $"Bonus {specReplay.Stage} {kind} Replay",
-			2 => $"Stage {specReplay.Stage} {kind} Replay",
-			3 => $"Checkpoint {specReplay.Stage} {kind} Replay",
-			_ => "",
-		};
+		string replayType = ReplayTypeLabel(specReplay);
 		if (replayType == "")
-			return ""; // Invalid type
+			return []; // Invalid type
 
 		float velocity = Extensions.GetVelocityFromController(specReplay.Controller!);
-		string timerColor = specReplay.ReplayCurrentRunTime > 0 ? TimerColorActive : RankColorWr;
+		string timerColor = ReplayTimerColor(specReplay);
 
-		string replayModule = FormatHUDElementHTML("", replayType, SpectatorColor, "m");
-		string nameModule = FormatHUDElementHTML("", $"{specReplay.RecordPlayerName}", RankColorWr);
-		string timeModule = FormatHUDElementHTML(
-			"",
-			$"{FormatTime(specReplay.ReplayCurrentRunTime)} / {FormatTime(specReplay.RecordRunTime)}",
-			timerColor
-		);
-		string velocityModule =
-			FormatHUDElementHTML(
-				"Speed",
-				velocity.ToString("0"),
-				Extensions.GetSpeedColorGradient(velocity)
-			) + " u/s";
-		string cycleModule = FormatHUDElementHTML(
-			"Cycle",
-			$"{specReplay.RepeatCount}",
-			SpectatorColor,
-			"s"
-		);
+		return
+		[
+			[new HudElement("", replayType, SpectatorColor, Label: true)],
+			[new HudElement("", specReplay.RecordPlayerName ?? "", RankColorWr)],
+			[new HudElement("", $"{FormatTime(specReplay.ReplayCurrentRunTime)} / {FormatTime(specReplay.RecordRunTime)}", timerColor, Size: HudSize.Large)],
+			[SpeedElement(velocity)],
+			[new HudElement("Cycle", $"{specReplay.RepeatCount}", SpectatorColor, Size: HudSize.Small)],
+		];
+	}
 
-		return $"{replayModule}<br>{nameModule}<br>{timeModule}<br>{velocityModule}<br>{cycleModule}";
+	/// <summary>
+	/// "Map WR Replay", "Stage 3 PB Replay", ... - empty for an unknown replay type.
+	/// </summary>
+	private static string ReplayTypeLabel(ReplayPlayer replay)
+	{
+		string kind = replay.RequestedByPlayerId == -1 ? "WR" : "PB";
+		return replay.Type switch
+		{
+			0 => $"Map {kind} Replay",
+			1 => $"Bonus {replay.Stage} {kind} Replay",
+			2 => $"Stage {replay.Stage} {kind} Replay",
+			3 => $"Checkpoint {replay.Stage} {kind} Replay",
+			_ => "",
+		};
+	}
+
+	// Green while playing, gold when idle at the end
+	private string ReplayTimerColor(ReplayPlayer replay) =>
+		replay.ReplayCurrentRunTime > 0 ? TimerColorActive : RankColorWr;
+
+	// ---- Custom HUD (custom_hud_layout) ----
+	// The layout's labels only take plain text (no HTML), so each slot is a grid of rows x segments:
+	// every segment has its own text variable and colour class (see hud_addon/ and CustomHud.cs).
+
+	/// <param name="Kind">lbl (small caps label), val (value) or unit - null for an unused segment</param>
+	/// <param name="Size">sm / md / lg / xl - null for an unused segment</param>
+	private readonly record struct HudSegment(string Text, string? ColorClass, string? Kind, string? Size);
+
+	// Slot updates are sent 16x/s at most, and each segment's text/class only when it changed
+	private const int CustomHudUpdateTicks = 4;
+	private const int MaxSplitLines = 6;
+	private const int MaxSpectatorLines = 8;
+	private int _customHudGeneration = -1;
+	private readonly Dictionary<string, string> _sentText = new();
+	private readonly Dictionary<(string Id, string Class), bool> _sentClass = new();
+	private readonly Dictionary<(string Id, string Group), string?> _sentExclusive = new();
+
+	private void DisplayCustomHud(ICollection<Player> allPlayers)
+	{
+		// New HUD entity or forced resend (e.g. a player joined) - the client may have lost everything
+		if (_customHudGeneration != CustomHud.Generation)
+		{
+			_sentText.Clear();
+			_sentClass.Clear();
+			_sentExclusive.Clear();
+			_customHudGeneration = CustomHud.Generation;
+#if DEBUG
+			CustomHud.LogDebug("[CustomHud] Full HUD send for {Player} (slot {Slot}, generation {Generation})",
+				_player.Controller.PlayerName, _player.Controller.Slot, CustomHud.Generation);
+#endif
+		}
+
+		// Whose data to show: our own while alive, otherwise whoever we spectate (player or replay bot)
+		var (subject, replay) = ResolveSubject(allPlayers);
+
+		SendCenter(subject, replay);
+		SendSlot(CustomHud.Top, TopRows(subject, replay));
+		SendSlot(CustomHud.Left, subject != null ? SplitRows(subject) : []);
+		SendSlot(CustomHud.Right, SpectatorRows(allPlayers));
+
+#if DEBUG
+		if (Server.TickCount >= _debugNextSummaryTick)
+		{
+			_debugNextSummaryTick = Server.TickCount + 64 * 5;
+			try // Diagnostics must never break the tick
+			{
+				string shown = subject != null ? subject.Controller.PlayerName : replay != null ? $"replay ({replay.RecordPlayerName})" : "(nothing)";
+				CustomHud.LogDebug("[CustomHud] {Player} (slot {Slot}): sent {Texts} texts / {Classes} class changes in the last 5s | showing: {Shown} | entity: {State}",
+					_player.Controller.PlayerName, _player.Controller.Slot, _debugTextsSent, _debugClassesSent, shown, CustomHud.DescribeEntityState());
+			}
+			catch (Exception ex)
+			{
+				CustomHud.LogDebug("[CustomHud] Debug summary failed: {Error}", ex.Message);
+			}
+			_debugTextsSent = 0;
+			_debugClassesSent = 0;
+		}
+#endif
+	}
+
+#if DEBUG
+	private int _debugNextSummaryTick;
+	private int _debugTextsSent;
+	private int _debugClassesSent;
+#endif
+
+	/// <summary>
+	/// The player whose HUD data is shown: ourselves while alive, otherwise the player or replay bot
+	/// we're spectating. (null, null) when there's nothing to show.
+	/// </summary>
+	private (Player? Player, ReplayPlayer? Replay) ResolveSubject(ICollection<Player> allPlayers)
+	{
+		if (_player.Controller.PawnIsAlive)
+			return (_player, null);
+
+		var target = _player.Controller.ObserverPawn.Value?.ObserverServices?.ObserverTarget;
+		if (target == null || !target.IsValid)
+			return (null, null);
+
+		uint targetRaw = target.Raw;
+
+		var replay = SurfTimer.CurrentMap.ReplayManager.Pool.Find(x =>
+			x.Controller != null && x.Controller.IsValid && x.Controller.PlayerPawn.Raw == targetRaw);
+		if (replay != null)
+			return (null, replay);
+
+		var spectated = allPlayers.FirstOrDefault(p =>
+			p != _player && p.Controller.IsValid && p.Controller.PawnIsAlive && p.Controller.PlayerPawn.Raw == targetRaw);
+		return (spectated, null);
+	}
+
+	/// <summary>
+	/// One value segment in a center field.
+	/// </summary>
+	/// <param name="Dim">Released key</param>
+	/// <param name="Key">Keyboard letter (spacing)</param>
+	/// <param name="Mono">Monospace font (changing numbers)</param>
+	private readonly record struct FieldSegment(string Text, string? ColorClass = null, bool Dim = false, bool Key = false, bool Mono = false);
+
+	private static readonly (PlayerButtons Button, string Letter)[] Keys =
+	[
+		(PlayerButtons.Forward, "W"),
+		(PlayerButtons.Moveleft, "A"),
+		(PlayerButtons.Back, "S"),
+		(PlayerButtons.Moveright, "D"),
+		(PlayerButtons.Jump, "J"),
+		(PlayerButtons.Duck, "C"),
+	];
+
+	private static readonly FieldSegment NotAvailable = new("N/A", "col-grey");
+
+	/// <summary>
+	/// One center field: a small caps label over its value segments.
+	/// </summary>
+	/// <param name="Wide">Spans the width of two fields</param>
+	private readonly record struct HudField(string Label, List<FieldSegment> Segments, bool Wide = false);
+
+	/// <summary>
+	/// Bottom center, as rows of fields: timer (wide) and speed, then prespeed, keys and sync.
+	/// </summary>
+	private void SendCenter(Player? subject, ReplayPlayer? replay)
+	{
+		string slotId = CustomHud.SlotId(CustomHud.Center);
+		bool visible = subject != null || (replay != null && ReplayTypeLabel(replay) != "");
+
+		SendClass(slotId, "hidden", !visible);
+		SendClass(slotId, $"shift-{CustomHud.SlotShift[CustomHud.Center]}", true);
+		if (!visible)
+			return; // Keep the last texts - they're hidden anyway
+
+		int ticks;
+		string timerColor;
+		float velocity;
+		if (subject != null)
+		{
+			ticks = subject.Timer.Ticks;
+			timerColor = TimerColorOf(subject);
+			velocity = Extensions.GetVelocityFromController(subject.Controller);
+		}
+		else
+		{
+			ticks = replay!.ReplayCurrentRunTime;
+			timerColor = ReplayTimerColor(replay);
+			velocity = Extensions.GetVelocityFromController(replay.Controller!);
+		}
+
+		var timer = new HudField("Timer",
+			[new FieldSegment(FormatTime(ticks, PlayerTimer.TimeFormatStyle.Full), CustomHud.ColorClass(timerColor), Mono: true)], Wide: true);
+		var speed = new HudField("Speed",
+			[new FieldSegment(velocity.ToString("0", CultureInfo.InvariantCulture), CustomHud.SpeedColorClass(velocity), Mono: true)]);
+
+		// Prespeed: live while in a start zone, then the exit speed
+		FieldSegment prespeedValue = NotAvailable;
+		if (subject != null)
+		{
+			float? shown = subject.IsTouchingAnyStartZone ? velocity : subject.LastPrespeed;
+			if (shown != null)
+				prespeedValue = new FieldSegment(shown.Value.ToString("0", CultureInfo.InvariantCulture), CustomHud.SpeedColorClass(shown.Value), Mono: true);
+		}
+		var prespeed = new HudField("Prespeed", [prespeedValue]);
+
+		// Keys: replays don't record buttons, so they stay released
+		var buttons = subject?.Controller.Buttons ?? 0;
+		var keys = new HudField("Keys",
+			Keys.Select(k => new FieldSegment(k.Letter, Dim: !buttons.HasFlag(k.Button), Key: true)).ToList());
+
+		var sync = new HudField("Sync",
+			[subject != null ? new FieldSegment(subject.SyncPercent.ToString("00.00", CultureInfo.InvariantCulture) + "%", Mono: true) : NotAvailable]);
+
+		List<List<HudField>> rows =
+		[
+			[timer, speed],
+			[prespeed, keys, sync],
+		];
+
+		for (int r = 0; r < CustomHud.FieldRows; r++)
+		{
+			List<HudField> row = r < rows.Count ? rows[r] : [];
+			SendClass(CustomHud.FieldRowId(r), "hidden", row.Count == 0);
+
+			for (int f = 0; f < CustomHud.FieldsPerRow; f++)
+				SendField(r, f, f < row.Count ? row[f] : null);
+		}
+	}
+
+	/// <param name="field">null hides the field</param>
+	private void SendField(int row, int index, HudField? field)
+	{
+		string fieldId = CustomHud.FieldId(row, index);
+		SendClass(fieldId, "hidden", field == null);
+		if (field == null)
+			return;
+
+		SendClass(fieldId, "wide", field.Value.Wide);
+		SendText(CustomHud.FieldLabelId(row, index), field.Value.Label);
+
+		var segments = field.Value.Segments;
+		for (int s = 0; s < CustomHud.FieldSegments; s++)
+		{
+			string id = CustomHud.FieldSegmentId(row, index, s);
+			FieldSegment segment = s < segments.Count ? segments[s] : new FieldSegment("");
+
+			SendText(id, segment.Text);
+			SendClass(id, "hidden", segment.Text.Length == 0);
+			if (segment.Text.Length == 0)
+				continue;
+
+			SendExclusive(id, "color", segment.ColorClass);
+			SendExclusive(id, "font", segment.Mono ? CustomHud.MonoFontClass : null);
+			SendClass(id, "dim", segment.Dim);
+			SendClass(id, "key", segment.Key);
+		}
+	}
+
+	private static string SizeClass(HudSize size) => size switch
+	{
+		HudSize.Small => "sm",
+		HudSize.Large => "lg",
+		HudSize.XLarge => "xl",
+		_ => "md",
+	};
+
+	/// <summary>
+	/// Title, body and suffix of each element become separate segments, styled like CS2's own HUD:
+	/// the title as a small caps label, the body as the (coloured) value, the suffix as a unit.
+	/// </summary>
+	private static List<HudSegment> ToSegments(List<HudElement> row)
+	{
+		var segments = new List<HudSegment>();
+		foreach (var e in row)
+		{
+			if (e.Title != "")
+				segments.Add(new HudSegment(e.Title, null, "lbl", "sm"));
+			segments.Add(new HudSegment(e.Body, e.ColorClass ?? CustomHud.ColorClass(e.Color),
+				e.Label ? "lbl" : "val", e.Label ? "sm" : SizeClass(e.Size)));
+			if (e.Suffix.Trim() != "")
+				segments.Add(new HudSegment(e.Suffix.Trim(), null, "unit", "sm"));
+		}
+		return segments;
+	}
+
+	private void SendSlot(string slot, List<List<HudElement>> rows)
+	{
+		var (maxRows, maxSegments) = CustomHud.Grid[slot];
+		string slotId = CustomHud.SlotId(slot);
+
+		// Empty slots collapse
+		SendClass(slotId, "hidden", rows.Count == 0);
+		SendClass(slotId, $"shift-{CustomHud.SlotShift[slot]}", true);
+
+		for (int r = 0; r < maxRows; r++)
+		{
+			List<HudSegment> segments = r < rows.Count ? ToSegments(rows[r]) : [];
+			string rowId = CustomHud.RowId(slot, r);
+			SendClass(rowId, "hidden", segments.Count == 0);
+			// A row of only labels is a header (no row background in the side panels)
+			SendClass(rowId, "hdr", segments.Count > 0 && segments.All(s => s.Kind == "lbl"));
+			// Top bar: every row gets its own fading band, rows after the first are smaller
+			if (slot == CustomHud.Top)
+			{
+				SendClass(rowId, "band", segments.Count > 0);
+				SendClass(rowId, "sub", r > 0);
+			}
+
+			for (int s = 0; s < maxSegments; s++)
+			{
+				string id = CustomHud.SegmentId(slot, r, s);
+				HudSegment segment = s < segments.Count ? segments[s] : new HudSegment("", null, null, null);
+
+				SendText(id, segment.Text);
+				SendClass(id, "hidden", segment.Text.Length == 0);
+				if (segment.Text.Length == 0)
+					continue; // Hidden - keep its old style classes instead of sending more changes
+
+				SendExclusive(id, "kind", segment.Kind);
+				SendExclusive(id, "size", segment.Size);
+				SendExclusive(id, "color", segment.ColorClass);
+			}
+		}
+	}
+
+	private void SendText(string id, string text)
+	{
+		if (_sentText.TryGetValue(id, out var last) && last == text)
+			return;
+
+		_sentText[id] = text;
+		CustomHud.SetText(_player.Controller, id, text);
+#if DEBUG
+		_debugTextsSent++;
+#endif
+	}
+
+	private void SendClass(string id, string cssClass, bool enabled)
+	{
+		if (_sentClass.TryGetValue((id, cssClass), out var last) && last == enabled)
+			return;
+
+		_sentClass[(id, cssClass)] = enabled;
+		CustomHud.SetClass(_player.Controller, id, cssClass, enabled);
+#if DEBUG
+		_debugClassesSent++;
+#endif
+	}
+
+	// One class out of a group (colour, kind, size) per segment: switch the old one off and the new
+	// one on. null = no class from that group (e.g. default colour).
+	private void SendExclusive(string id, string group, string? cssClass)
+	{
+		var key = (id, group);
+		_sentExclusive.TryGetValue(key, out var last);
+		if (_sentExclusive.ContainsKey(key) && last == cssClass)
+			return;
+
+		if (last != null)
+			CustomHud.SetClass(_player.Controller, id, last, false);
+		if (cssClass != null)
+			CustomHud.SetClass(_player.Controller, id, cssClass, true);
+		_sentExclusive[key] = cssClass;
+#if DEBUG
+		_debugClassesSent++;
+#endif
+	}
+
+	/// <summary>
+	/// Row 0: map, tier and where the shown player is (stage / bonus), plus mode flags.
+	/// Row 1 (smaller): PB, rank and WR for the current mode - or what replay is playing.
+	/// </summary>
+	private List<List<HudElement>> TopRows(Player? subject, ReplayPlayer? replay)
+	{
+		var map = SurfTimer.CurrentMap;
+		var row = new List<HudElement>
+		{
+			new("", map.Name ?? "", ""),
+			new("Tier", $"{map.Tier}", RankColorWr),
+		};
+
+		if (subject == null)
+		{
+			if (replay == null || ReplayTypeLabel(replay) == "")
+				return [row];
+
+			return
+			[
+				row,
+				[
+					new("", ReplayTypeLabel(replay), SpectatorColor, Label: true),
+					new("", replay.RecordPlayerName ?? "", "", Size: HudSize.Small),
+					new("", FormatTime(replay.RecordRunTime, PlayerTimer.TimeFormatStyle.Full), RankColorWr, Size: HudSize.Small),
+					new("Cycle", $"{replay.RepeatCount}", SpectatorColor, Size: HudSize.Small),
+				],
+			];
+		}
+
+		if (subject.Timer.IsBonusMode && subject.Timer.Bonus > 0)
+			row.Add(new("Bonus", $"{subject.Timer.Bonus}/{map.Bonuses}", TimerColor));
+		else if (map.Stages > 0)
+			row.Add(new("Stage", $"{Math.Max((short)1, subject.Timer.Stage)}/{map.Stages}", TimerColor));
+
+		var flags = new List<string>();
+		if (subject.Timer.IsPracticeMode)
+			flags.Add("Practice");
+		if (subject.IsRepeatMode)
+			flags.Add("Repeat");
+		if (flags.Count > 0)
+			row.Add(new("", string.Join(" · ", flags), TimerColorPractice, Label: true));
+
+		var records = new List<HudElement>
+		{
+			PbElement(subject, PlayerTimer.TimeFormatStyle.Full) with { Size = HudSize.Small },
+			RankElement(subject) with { Size = HudSize.Small },
+			WrElement(subject, PlayerTimer.TimeFormatStyle.Full) with { Size = HudSize.Small },
+		};
+
+		return [row, records];
+	}
+
+	/// <summary>
+	/// The current map run's last stage/checkpoint splits, compared to the PB run's splits.
+	/// </summary>
+	private List<List<HudElement>> SplitRows(Player p)
+	{
+		if (!p.Controller.PawnIsAlive || !p.Timer.IsRunning
+			|| p.Timer.IsStageMode || p.Timer.IsBonusMode
+			|| p.Stats.ThisRun.Checkpoints.Count == 0)
+			return [];
+
+		string label = SurfTimer.CurrentMap.Stages > 0 ? "Stage" : "CP";
+		var pbSplits = p.Stats.PB[p.Timer.Style].Checkpoints;
+
+		var rows = new List<List<HudElement>> { new() { new("", "Splits", SpectatorColor, Label: true) } };
+		foreach (var cp in p.Stats.ThisRun.Checkpoints.OrderByDescending(cp => cp.Key).Take(MaxSplitLines).OrderBy(cp => cp.Key))
+		{
+			var row = new List<HudElement>
+			{
+				new($"{label} {cp.Key}", FormatTime(cp.Value.RunTime), ""),
+			};
+
+			if (pbSplits != null && pbSplits.TryGetValue(cp.Key, out var pbSplit) && pbSplit.RunTime > 0)
+			{
+				int diff = cp.Value.RunTime - pbSplit.RunTime;
+				row.Add(new("", $"{(diff <= 0 ? "-" : "+")}{FormatTime(Math.Abs(diff))}",
+					diff <= 0 ? TimerColorActive : SlowerColor, Size: HudSize.Small));
+			}
+
+			rows.Add(row);
+		}
+
+		return rows;
+	}
+
+	/// <summary>
+	/// Everyone currently spectating this player.
+	/// </summary>
+	private List<List<HudElement>> SpectatorRows(ICollection<Player> allPlayers)
+	{
+		if (!_player.Controller.PawnIsAlive)
+			return [];
+
+		var spectators = allPlayers
+			.Where(p => p != _player && p.Controller.IsValid && p.IsSpectating(_player.Controller))
+			.Select(p => p.Controller.PlayerName)
+			.ToList();
+
+		if (spectators.Count == 0)
+			return [];
+
+		var rows = new List<List<HudElement>> { new() { new("", $"Spectators · {spectators.Count}", SpectatorColor, Label: true) } };
+		rows.AddRange(spectators.Take(MaxSpectatorLines).Select(name => new List<HudElement> { new("", name, "", Size: HudSize.Small) }));
+		return rows;
 	}
 
 	/// <summary>

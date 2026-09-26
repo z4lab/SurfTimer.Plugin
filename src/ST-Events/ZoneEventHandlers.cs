@@ -52,7 +52,7 @@ public partial class SurfTimer
 		// The map end is also the last stage's finish - captured before the timer is stopped below
 		bool finishedStageForRepeat = player.IsRepeatMode && CurrentMap.Stages > 0;
 
-		player.Controller.PrintToCenter($"Map End");
+		player.HUD.Notify("Map End");
 
 		player.ReplayRecorder.CurrentSituation = ReplayFrameSituation.END_ZONE_ENTER;
 		player.ReplayRecorder.MapSituations.Add(player.Timer.Ticks);
@@ -210,7 +210,7 @@ public partial class SurfTimer
 			player.ReplayRecorder.MapSituations.Add(player.ReplayRecorder.Frames.Count);
 			player.Timer.Reset();
 			player.Stats.ThisRun.Checkpoints.Clear();
-			player.Controller.PrintToCenter($"Map Start ({zone.Name})");
+			player.HUD.Notify($"Map Start ({zone.Name})");
 
 #if DEBUG
 			player.Controller.PrintToChat($"CS2 Surf DEBUG >> CBaseTrigger_{ChatColors.Lime}StartTouchFunc{ChatColors.Default} -> {ChatColors.Green}Map Start Zone");
@@ -433,7 +433,7 @@ public partial class SurfTimer
 		player.ReplayRecorder.BonusSituations.Add(player.ReplayRecorder.Frames.Count);
 		Console.WriteLine($"START_ZONE_ENTER: player.ReplayRecorder.BonusSituations.Add({player.ReplayRecorder.Frames.Count})");
 
-		player.Controller.PrintToCenter($"Bonus Start ({zone.Name})");
+		player.HUD.Notify($"Bonus Start ({zone.Name})");
 
 #if DEBUG
 		Console.WriteLine($"CS2 Surf DEBUG >> CBaseTrigger_StartTouchFunc (Bonus start zones) -> player.Timer.IsRunning: {player.Timer.IsRunning}");
@@ -531,6 +531,7 @@ public partial class SurfTimer
 		if (!player.Timer.IsStageMode && !player.Timer.IsBonusMode)
 		{
 			player.Timer.Start();
+			player.ResetSync();
 			player.Stats.ThisRun.RunTime = player.Timer.Ticks;
 			player.ReplayRecorder.CurrentSituation = ReplayFrameSituation.START_ZONE_EXIT;
 			player.ReplayRecorder.MapSituations.Add(player.ReplayRecorder.Frames.Count);
@@ -541,8 +542,7 @@ public partial class SurfTimer
 		}
 
 		// Prespeed display
-		string prespeedPrefix = CurrentMap.Stages > 0 ? "Stage 1 - " : "";
-		player.Controller.PrintToCenter($"{prespeedPrefix}Prespeed: {velocity.velMag():0} u/s");
+		player.HUD.NotifyPrespeed(CurrentMap.Stages > 0 ? "Stage 1" : "", velocity.velMag());
 		player.Stats.ThisRun.StartVelX = velocity.X; // Start pre speed for the Map run
 		player.Stats.ThisRun.StartVelY = velocity.Y; // Start pre speed for the Map run
 		player.Stats.ThisRun.StartVelZ = velocity.Z; // Start pre speed for the Map run
@@ -577,12 +577,13 @@ public partial class SurfTimer
 		player.Timer.StageEntryVelX = velocity.X;
 		player.Timer.StageEntryVelY = velocity.Y;
 		player.Timer.StageEntryVelZ = velocity.Z;
-		player.Controller.PrintToCenter($"Stage {stage} - Prespeed: {velocity.velMag().ToString("0")} u/s");
+		player.HUD.NotifyPrespeed($"Stage {stage}", velocity.velMag());
 
 		// Start the Stage timer
 		if (player.Timer.IsStageMode && player.Timer.Stage == stage)
 		{
 			player.Timer.Start();
+			player.ResetSync();
 		}
 		else if (player.Timer.IsRunning && player.Stats.ThisRun.Checkpoints.TryGetValue(player.Timer.Checkpoint, out CheckpointEntity? currentCheckpoint))
 		{
@@ -637,7 +638,7 @@ public partial class SurfTimer
 			player.Stats.ThisRun.Checkpoints[player.Timer.Checkpoint].EndTouch = player.Timer.Ticks;
 
 			// Show Prespeed for stages - will be enabled/disabled by the user?
-			player.Controller.PrintToCenter($"Checkpoint {zone.Number} - Prespeed: {velocity.velMag():0} u/s");
+			player.HUD.NotifyPrespeed($"Checkpoint {zone.Number}", velocity.velMag());
 		}
 	}
 
@@ -659,6 +660,7 @@ public partial class SurfTimer
 		if (!player.Timer.IsStageMode && player.Timer.IsBonusMode)
 		{
 			player.Timer.Start();
+			player.ResetSync();
 			// Set the CurrentRunData values
 			player.Stats.ThisRun.RunTime = player.Timer.Ticks;
 
@@ -670,7 +672,7 @@ public partial class SurfTimer
 		}
 
 		// Prespeed display
-		player.Controller.PrintToCenter($"Prespeed: {velocity.velMag():0} u/s");
+		player.HUD.NotifyPrespeed("", velocity.velMag());
 		player.Stats.ThisRun.StartVelX = velocity.X; // Start pre speed for the Bonus run
 		player.Stats.ThisRun.StartVelY = velocity.Y; // Start pre speed for the Bonus run
 		player.Stats.ThisRun.StartVelZ = velocity.Z; // Start pre speed for the Bonus run

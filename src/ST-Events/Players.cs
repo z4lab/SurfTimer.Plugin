@@ -9,6 +9,8 @@ namespace SurfTimer;
 
 public partial class SurfTimer
 {
+	private bool _customHudRecreatePending;
+
 	[GameEventHandler]
 	public HookResult OnPlayerSpawn(EventPlayerSpawn @event, GameEventInfo info)
 	{
@@ -156,6 +158,21 @@ public partial class SurfTimer
 
 		// No lock - we use thread-safe method AddOrUpdate
 		playerList.AddOrUpdate(player.UserId ?? 0, p, (_, _) => p);
+
+		// CS2 can drop custom HUD texts for existing players when someone joins - resend everyone's
+		CustomHud.ResendAll();
+
+		// The joining client only shows the HUD if the entity spawns while it's in game - re-create it
+		// once its HUD has loaded (debounced, so several joins at once re-create it only once)
+		if (Config.CustomHudEnabled && !player.IsBot && !_customHudRecreatePending)
+		{
+			_customHudRecreatePending = true;
+			AddTimer(1.0f, () =>
+			{
+				_customHudRecreatePending = false;
+				CustomHud.Recreate();
+			});
+		}
 
 		_ = p.Stats.LoadPlayerMapTimesData(p);
 

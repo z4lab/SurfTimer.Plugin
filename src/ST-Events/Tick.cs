@@ -23,9 +23,10 @@ public partial class SurfTimer
 				player.ReplayRecorder.Tick(player);
 				player.TickStartZoneSpeedCap();
 				player.TickRemoveLandingSlowdown();
+				player.TickSync();
 			}
 
-			player.HUD.Display();
+			player.HUD.Display(playerList.Values);
 		}
 
 		// Need to disable maps from executing their cfgs. Currently idk how (But seriusly it a security issue)

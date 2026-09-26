@@ -1,0 +1,278 @@
+using CounterStrikeSharp.API;
+using CounterStrikeSharp.API.Core;
+using CounterStrikeSharp.API.Modules.Extensions;
+using CounterStrikeSharp.API.Modules.Utils;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
+namespace SurfTimer;
+
+/// <summary>
+/// Owns the map's custom_hud_layout entity. The layout (hud_addon/, published once as a Workshop
+/// addon) only contains generic slots. custom_hud_layout labels take plain text only (no HTML), so
+/// each slot is a grid of rows x segments: every segment is a label with its own text variable and
+/// server-toggled colour class. All content is decided here on the server and pushed per player, so
+/// the addon never needs to change.
+/// Ids: slot "st_{slot}", row "st_{slot}_{row}", segment "st_{slot}_{row}_{seg}" - each segment's
+/// dialog variable has the same name as its id. Must match hud_addon/.../surftimer_hud.xml.
+/// </summary>
+internal static class CustomHud
+{
+	internal const string Top = "top";
+	internal const string Center = "center";
+	internal const string Left = "left";
+	internal const string Right = "right";
+
+	/// <summary>
+	/// Rows x segments per grid slot - fixed by the published layout. The center slot isn't a grid:
+	/// it has main values (MainId) and fields (FieldId).
+	/// </summary>
+	internal static readonly IReadOnlyDictionary<string, (int Rows, int Segments)> Grid =
+		new Dictionary<string, (int, int)>
+		{
+			[Top] = (2, 8),
+			[Left] = (7, 4),
+			[Right] = (9, 2),
+		};
+
+	/// <summary>
+	/// Center slot: rows of fields, each a label plus value segments. Which field shows what (and which
+	/// ones are wide) is decided in PlayerHud.SendCenter.
+	/// </summary>
+	internal const int FieldRows = 2;
+	internal const int FieldsPerRow = 4;
+	internal const int FieldSegments = 6;
+
+	/// <summary>
+	/// Font class for the changing numbers (timer, speed, prespeed, sync): "font-mono" (Noto Mono,
+	/// shipped with CS2) or "font-digit" (Stratum2 with fixed-width digits - legacy font, may fall
+	/// back to regular Stratum2). Switchable without republishing the addon.
+	/// </summary>
+	internal const string MonoFontClass = "font-mono";
+
+	/// <summary>
+	/// Vertical position per slot as a shift-0..shift-10 class (see the layout CSS for the offsets) -
+	/// adjustable here without republishing the addon.
+	/// Top: 40px + 20/step from the top | Center: 100px + 20/step from the bottom | Sides: 200px + 40/step from the top.
+	/// </summary>
+	internal static readonly IReadOnlyDictionary<string, int> SlotShift = new Dictionary<string, int>
+	{
+		[Top] = 4,    // 120px - below the round timer / team scores
+		[Center] = 3, // 160px - above the health / weapon bar
+		[Left] = 5,   // 400px
+		[Right] = 5,  // 400px
+	};
+
+	internal static string SlotId(string slot) => $"st_{slot}";
+	internal static string RowId(string slot, int row) => $"st_{slot}_{row}";
+	internal static string SegmentId(string slot, int row, int segment) => $"st_{slot}_{row}_{segment}";
+	/// <summary>
+	/// Map entities that print their own center messages - removed while the custom HUD is enabled.
+	/// </summary>
+	internal static readonly HashSet<string> MapMessageEntities = ["env_hudhint", "game_text"];
+
+	internal static string FieldRowId(int row) => $"st_fields_{row}";
+	internal static string FieldId(int row, int field) => $"st_field_{row}_{field}";
+	internal static string FieldLabelId(int row, int field) => $"st_field_{row}_{field}_lbl";
+	internal static string FieldSegmentId(int row, int field, int segment) => $"st_field_{row}_{field}_{segment}";
+
+	/// <summary>
+	/// Colour classes available in the layout's CSS, by the HUD's hex colours. Unknown = default white.
+	/// </summary>
+	internal static string? ColorClass(string hex) => hex.ToUpperInvariant() switch
+	{
+		"#4FC3F7" => "col-blue",
+		"#BA68C8" => "col-purple",
+		"#43A047" => "col-green",
+		"#7986CB" => "col-indigo",
+		"#FFD700" => "col-gold",
+		"#9E9E9E" => "col-grey",
+		"#E53935" => "col-red",
+		_ => null,
+	};
+
+	/// <summary>
+	/// The speed gradient (Extensions.GetSpeedColorGradient) as 9 fixed steps spd-0..spd-8.
+	/// </summary>
+	internal static string SpeedColorClass(float velocity, float minSpeed = 240f, float maxSpeed = 4000f)
+	{
+		float t = (Math.Clamp(velocity, minSpeed, maxSpeed) - minSpeed) / (maxSpeed - minSpeed);
+		return $"spd-{(int)Math.Round(t * 8)}";
+	}
+
+	private static CCSCustomHudLayout? _entity;
+	private static int _nextSpawnAttemptTick;
+	private static bool _removedStaleEntities;
+
+	/// <summary>
+	/// Bumped whenever the entity is (re)created or clients may have lost their state - players'
+	/// caches compare against it and resend everything when it changes.
+	/// </summary>
+	internal static int Generation { get; private set; }
+
+	/// <summary>
+	/// True when the custom HUD is enabled and its entity exists. The entity doesn't survive map
+	/// changes (and may be removed by round restarts), so it's re-created on demand.
+	/// </summary>
+	internal static bool IsActive
+	{
+		get
+		{
+#if DEBUG
+			if (!Config.CustomHudEnabled && !_loggedDisabled)
+			{
+				_loggedDisabled = true;
+				Logger.LogDebug("[CustomHud] Disabled (custom_hud_enabled is false or missing in timer_settings.json) - using the center HTML HUD");
+			}
+#endif
+			return Config.CustomHudEnabled && EnsureSpawned();
+		}
+	}
+
+	private static ILogger? _logger;
+	private static ILogger Logger => _logger ??=
+		SurfTimer.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("CustomHud");
+
+#if DEBUG
+	private static bool _loggedDisabled;
+#endif
+
+	private static bool EnsureSpawned()
+	{
+		if (_entity != null && _entity.IsValid)
+			return true;
+
+		if (Server.TickCount < _nextSpawnAttemptTick)
+			return false;
+
+#if DEBUG
+		Logger.LogDebug("[CustomHud] {Reason} - creating custom_hud_layout with layout '{Layout}'",
+			_entity == null ? "No HUD entity yet" : "HUD entity no longer valid (map change / round restart?)", Config.CustomHudLayout);
+#endif
+
+		// A plugin (re)load starts without a reference - remove any HUD entity a previous instance left
+		if (!_removedStaleEntities)
+		{
+			_removedStaleEntities = true;
+			foreach (var stale in Utilities.FindAllEntitiesByDesignerName<CCSCustomHudLayout>("custom_hud_layout"))
+			{
+				if (stale.IsValid)
+					stale.Remove();
+			}
+		}
+
+		var hud = Utilities.CreateEntityByName<CCSCustomHudLayout>("custom_hud_layout");
+		if (hud == null || !hud.IsValid)
+		{
+			_nextSpawnAttemptTick = Server.TickCount + 64 * 5; // Don't retry (and log) every tick
+			Logger.LogError("[CustomHud] Could not create custom_hud_layout - falling back to the center HTML HUD");
+			return false;
+		}
+
+		// Same as a Hammer-placed entity: `layout` keyvalue at spawn (plus the field, in case the
+		// keyvalue isn't applied). The resource itself is precached in OnServerPrecacheResources.
+		var keyValues = new CEntityKeyValues();
+		keyValues.SetString("layout", Config.CustomHudLayout);
+		hud.StrLayout = Config.CustomHudLayout;
+		hud.DispatchSpawn(keyValues);
+
+		_entity = hud;
+		Generation++;
+
+#if DEBUG
+		Logger.LogDebug("[CustomHud] Spawned custom_hud_layout #{Index} (valid={Valid}) | m_strLayout read back: '{Layout}' | generation {Generation}",
+			hud.Index, hud.IsValid, hud.StrLayout, Generation);
+
+		// What the entity looks like once it has had a frame to initialise
+		Server.NextFrame(() =>
+		{
+			if (_entity == null || !_entity.IsValid)
+			{
+				Logger.LogDebug("[CustomHud] Entity became invalid right after spawning");
+				return;
+			}
+
+			Logger.LogDebug("[CustomHud] Next frame: #{Index} valid | layout '{Layout}' | panel ids {PanelIds} | class names {ClassNames} | dialog vars {DialogVars} | player states {PlayerStates}",
+				_entity.Index, _entity.StrLayout, _entity.PanelIds.Count, _entity.ClassNames.Count,
+				_entity.DialogVariableNames.Count, _entity.PlayerLayoutStates.Count);
+		});
+#endif
+		return true;
+	}
+
+	/// <summary>
+	/// Makes every player resend their full HUD state. Works around CS2 dropping custom HUD texts
+	/// for existing players when another player joins.
+	/// </summary>
+	internal static void ResendAll()
+	{
+		Generation++;
+#if DEBUG
+		Logger.LogDebug("[CustomHud] Forcing a full resend for every player (generation {Generation})", Generation);
+#endif
+	}
+
+	/// <summary>
+	/// Replaces the HUD entity with a fresh one. Clients only build the layout for an entity that
+	/// spawns while they're fully in game - one that already existed while they were loading
+	/// (rejoin, map change) never shows. Also drops any per-player state left from an earlier
+	/// connection in the same slot. Every player resends their full HUD (Generation bump).
+	/// </summary>
+	internal static void Recreate()
+	{
+		if (!Config.CustomHudEnabled)
+			return;
+
+		var old = _entity;
+		_entity = null;
+		_nextSpawnAttemptTick = 0;
+
+#if DEBUG
+		Logger.LogDebug("[CustomHud] Re-creating the HUD entity (old #{Index})", old != null && old.IsValid ? old.Index : 0);
+#endif
+
+		// Spawn the new one before removing the old, so it gets its own index and there's no tick
+		// without an entity (which would fall back to the center HTML HUD for a frame)
+		EnsureSpawned();
+
+		if (old != null && old.IsValid)
+			old.Remove();
+	}
+
+	/// <summary>
+	/// Removes a map entity that would print its own center message over the HUD (see MapMessageEntities).
+	/// </summary>
+	internal static void RemoveMapMessageEntity(CEntityInstance? entity)
+	{
+		if (entity == null || !entity.IsValid)
+			return;
+#if DEBUG
+		Logger.LogDebug("[CustomHud] Removed map message entity {ClassName} '{TargetName}'",
+			entity.DesignerName, entity.Entity?.Name ?? "");
+#endif
+		entity.Remove();
+	}
+
+	internal static void SetText(CCSPlayerController player, string segmentId, string text) =>
+		_entity!.SetDialogVariableStringForPlayer(player, segmentId, segmentId, text);
+
+	internal static void SetClass(CCSPlayerController player, string panelId, string cssClass, bool enabled) =>
+		_entity!.SetHasClassForPlayer(player, panelId, cssClass, enabled);
+
+#if DEBUG
+	internal static void LogDebug(string message, params object?[] args) => Logger.LogDebug(message, args);
+
+	/// <summary>
+	/// Entity-side counts - confirms the calls actually land in the entity's networked vectors.
+	/// (Only counts: CounterStrikeSharp can't index networked vectors of anything but CHandle.)
+	/// </summary>
+	internal static string DescribeEntityState()
+	{
+		if (_entity == null || !_entity.IsValid)
+			return "no entity";
+
+		return $"#{_entity.Index} layout '{_entity.StrLayout}' | player states {_entity.PlayerLayoutStates.Count}, "
+			+ $"panel ids {_entity.PanelIds.Count}, class names {_entity.ClassNames.Count}, dialog var names {_entity.DialogVariableNames.Count}";
+	}
+#endif
+}
