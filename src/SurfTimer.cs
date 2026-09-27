@@ -179,6 +179,15 @@ public partial class SurfTimer : BasePlugin
 		RegisterListener<Listeners.OnTick>(OnTick);
 		// Block map scripts' chat and bot kicks (see MapCommandFilter.cs)
 		RegisterMapCommandFilter();
+		// Popup menu clicks (custom HUD buttons) - only our own layout, only players with a menu open
+		RegisterListener<Listeners.OnCustomHudClicked>((player, layout, buttonId) =>
+		{
+			if (player == null || !player.IsValid || !CustomHud.IsOwnLayout(layout))
+				return;
+
+			if (playerList.TryGetValue(player.UserId ?? 0, out var clicker))
+				clicker.HUD.OnMenuClick(buttonId);
+		});
 		// The custom HUD layout comes from a Workshop addon, not the map, so precache it. The manifest
 		// wants the compiled resource type (.vxml); the entity itself takes the source name (.xml).
 		RegisterListener<Listeners.OnServerPrecacheResources>(manifest =>

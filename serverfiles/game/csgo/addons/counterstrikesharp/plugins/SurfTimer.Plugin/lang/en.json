@@ -43,6 +43,8 @@
 	"replay_pool_full": "{red}All {green}{0}{red} replay slots are currently in use. Try again shortly.",
 	"replay_spawning": "{green}Spawning a replay bot, please wait...",
 	"replay_no_pb": "{red}No replay data was saved for this run.",
+	"replay_none": "{grey}There are no replays on this map yet.",
+	"spec_none": "{grey}Nobody to spectate right now.",
 	"spec_no_match": "{red}No player found matching '{yellow}{0}{red}'.",
 	"repeat_enabled": "Repeat mode {lime}enabled{default} - you'll be sent back to the start of each stage you finish.",
 	"repeat_disabled": "Repeat mode {red}disabled{default}.",

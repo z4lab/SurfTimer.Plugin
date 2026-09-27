@@ -15,121 +15,87 @@ public partial class SurfTimer
 	[CommandHelper(whoCanExecute: CommandUsage.CLIENT_ONLY)]
 	public void OpenReplayMenu(CCSPlayerController? player, CommandInfo command)
 	{
-		if (player == null)
+		if (player == null || !playerList.TryGetValue(player.UserId ?? 0, out var oPlayer))
 			return;
 
-		Player oPlayer = playerList[player.UserId ?? 0];
 		int style = oPlayer.Timer.Style;
+		var replays = CurrentMap.ReplayManager;
 
-		ChatMenu menu = new ChatMenu("Replays");
+		static string Time(int ticks) => PlayerHud.FormatTime(ticks, PlayerTimer.TimeFormatStyle.Full);
 
-		// Map WR
-		if (CurrentMap.ReplayManager.MapWR.MapTimeID != -1 && CurrentMap.ReplayManager.MapWR.Frames.Count > 0)
-		{
-			var template = CurrentMap.ReplayManager.MapWR;
-			menu.AddMenuOption($"Map WR - {template.RecordPlayerName} - {PlayerHud.FormatTime(template.RecordRunTime)}",
-				(p, o) => _ = HandleWrReplaySelection(p, template));
-		}
+		HudMenuItem Wr(string text, ReplayPlayer template) =>
+			new(text, p => _ = HandleWrReplaySelection(p, template), template.RecordPlayerName, () => Time(template.RecordRunTime));
 
-		// Stage WRs
-		if (CurrentMap.Stages > 0)
-		{
-			for (int stage = 1; stage <= CurrentMap.Stages; stage++)
-			{
-				var template = CurrentMap.ReplayManager.AllStageWR[stage][style];
-				if (template.MapTimeID == -1 || template.Frames.Count == 0)
-					continue;
+		HudMenuItem Pb(string text, PersonalBest pb, int type, int number) =>
+			new(text, p => _ = HandlePbReplaySelection(p, pb, type, number, style), "", () => Time(pb.RunTime));
 
-				menu.AddMenuOption($"Stage {stage} WR - {template.RecordPlayerName} - {PlayerHud.FormatTime(template.RecordRunTime)}",
-					(p, o) => _ = HandleWrReplaySelection(p, template));
-			}
-		}
+		static bool Playable(ReplayPlayer template) => template.MapTimeID != -1 && template.Frames.Count > 0;
 
-		// Bonus WRs
-		for (int bonus = 1; bonus <= CurrentMap.Bonuses; bonus++)
-		{
-			var template = CurrentMap.ReplayManager.AllBonusWR[bonus][style];
-			if (template.MapTimeID == -1 || template.Frames.Count == 0)
-				continue;
+		// Map: WR, the WR segments chained into one run, own PB
+		var map = new List<HudMenuItem>();
+		if (Playable(replays.MapWR))
+			map.Add(Wr("Map WR", replays.MapWR));
 
-			menu.AddMenuOption($"Bonus {bonus} WR - {template.RecordPlayerName} - {PlayerHud.FormatTime(template.RecordRunTime)}",
-				(p, o) => _ = HandleWrReplaySelection(p, template));
-		}
-
-		// Checkpoint WRs (non-staged maps only)
-		if (CurrentMap.Stages == 0 && CurrentMap.TotalCheckpoints > 0)
-		{
-			for (int cp = 1; cp <= CurrentMap.CheckpointSegments; cp++)
-			{
-				var template = CurrentMap.ReplayManager.AllCheckpointWR[cp][style];
-				if (template.MapTimeID == -1 || template.Frames.Count == 0)
-					continue;
-
-				menu.AddMenuOption($"Checkpoint {cp} WR - {template.RecordPlayerName} - {PlayerHud.FormatTime(template.RecordRunTime)}",
-					(p, o) => _ = HandleWrReplaySelection(p, template));
-			}
-		}
-
-		// All stage / checkpoint WRs chained into one run - the best time the WR segments add up to
-		int? bestSegmentsTime = CurrentMap.ReplayManager.BestSegmentsTime(style);
+		int? bestSegmentsTime = replays.BestSegmentsTime(style);
 		if (bestSegmentsTime != null)
 		{
-			menu.AddMenuOption($"{ReplayManager.BestSegmentsLabel} - {PlayerHud.FormatTime(bestSegmentsTime.Value)}", (p, o) =>
+			map.Add(new HudMenuItem(ReplayManager.BestSegmentsLabel, p =>
 			{
 				var template = CurrentMap.ReplayManager.BuildBestSegmentsReplay(style);
 				if (template != null)
 					ApplyReplayRequest(p, template, requestedByPlayerId: -1);
-			});
+			}, "", () => Time(bestSegmentsTime.Value)));
 		}
 
-		// Own PBs - only for segments actually completed
 		if (oPlayer.Stats.PB[style].ID != -1)
-		{
-			var pb = oPlayer.Stats.PB[style];
-			menu.AddMenuOption($"Your PB - Map - {PlayerHud.FormatTime(pb.RunTime)}",
-				(p, o) => _ = HandlePbReplaySelection(p, pb, 0, 0, style));
-		}
+			map.Add(Pb("Map PB", oPlayer.Stats.PB[style], 0, 0));
 
-		if (CurrentMap.Stages > 0)
-		{
-			for (int stage = 1; stage <= CurrentMap.Stages; stage++)
-			{
-				if (oPlayer.Stats.StagePB[stage][style].ID == -1)
-					continue;
+		// Stages (WRs), bonuses (WRs + own PBs), checkpoints (WRs), own stage/checkpoint PBs
+		var stages = new List<HudMenuItem>();
+		var bonuses = new List<HudMenuItem>();
+		var checkpoints = new List<HudMenuItem>();
+		var ownPbs = new List<HudMenuItem>();
 
-				var pb = oPlayer.Stats.StagePB[stage][style];
-				int stageNumber = stage; // The loop variable itself would be read when the option is picked
-				menu.AddMenuOption($"Your PB - Stage {stage} - {PlayerHud.FormatTime(pb.RunTime)}",
-					(p, o) => _ = HandlePbReplaySelection(p, pb, 2, stageNumber, style));
-			}
+		for (int stage = 1; stage <= CurrentMap.Stages; stage++)
+		{
+			if (Playable(replays.AllStageWR[stage][style]))
+				stages.Add(Wr($"Stage {stage} WR", replays.AllStageWR[stage][style]));
+			if (oPlayer.Stats.StagePB[stage][style].ID != -1)
+				ownPbs.Add(Pb($"Stage {stage} PB", oPlayer.Stats.StagePB[stage][style], 2, stage));
 		}
 
 		for (int bonus = 1; bonus <= CurrentMap.Bonuses; bonus++)
 		{
-			if (oPlayer.Stats.BonusPB[bonus][style].ID == -1)
-				continue;
-
-			var pb = oPlayer.Stats.BonusPB[bonus][style];
-			int bonusNumber = bonus;
-			menu.AddMenuOption($"Your PB - Bonus {bonus} - {PlayerHud.FormatTime(pb.RunTime)}",
-				(p, o) => _ = HandlePbReplaySelection(p, pb, 1, bonusNumber, style));
+			if (Playable(replays.AllBonusWR[bonus][style]))
+				bonuses.Add(Wr($"Bonus {bonus} WR", replays.AllBonusWR[bonus][style]));
+			if (oPlayer.Stats.BonusPB[bonus][style].ID != -1)
+				bonuses.Add(Pb($"Bonus {bonus} PB", oPlayer.Stats.BonusPB[bonus][style], 1, bonus));
 		}
 
-		if (CurrentMap.Stages == 0 && CurrentMap.TotalCheckpoints > 0)
+		for (int cp = 1; cp <= CurrentMap.CheckpointSegments; cp++)
 		{
-			for (int cp = 1; cp <= CurrentMap.CheckpointSegments; cp++)
-			{
-				if (oPlayer.Stats.CheckpointPB[cp][style].ID == -1)
-					continue;
-
-				var pb = oPlayer.Stats.CheckpointPB[cp][style];
-				int cpNumber = cp;
-				menu.AddMenuOption($"Your PB - Checkpoint {cp} - {PlayerHud.FormatTime(pb.RunTime)}",
-					(p, o) => _ = HandlePbReplaySelection(p, pb, 3, cpNumber, style));
-			}
+			if (Playable(replays.AllCheckpointWR[cp][style]))
+				checkpoints.Add(Wr($"Checkpoint {cp} WR", replays.AllCheckpointWR[cp][style]));
+			if (oPlayer.Stats.CheckpointPB[cp][style].ID != -1)
+				ownPbs.Add(Pb($"Checkpoint {cp} PB", oPlayer.Stats.CheckpointPB[cp][style], 3, cp));
 		}
 
-		menu.Open(player);
+		var menu = new HudMenu("Replays",
+		[
+			new HudMenuTab("Map", map),
+			new HudMenuTab("Stages", stages),
+			new HudMenuTab("Bonuses", bonuses),
+			new HudMenuTab("Checkpoints", checkpoints),
+			new HudMenuTab("Your PBs", ownPbs),
+		]);
+
+		if (menu.IsEmpty)
+		{
+			player.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["replay_none"]}");
+			return;
+		}
+
+		MenuPresenter.Show(oPlayer, menu);
 	}
 
 	/// <summary>

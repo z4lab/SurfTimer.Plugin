@@ -3,6 +3,7 @@
 	"replays_pre": 64,
 	"custom_hud_enabled": true,
 	"custom_hud_layout": "panorama/layout/custom_game/surftimer_hud.xml",
+	"popup_menus": true,
 	"block_map_chat": true,
 	"protect_replay_bots": true,
 	"replay_bot_direct_spawn": true

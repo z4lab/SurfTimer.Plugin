@@ -323,12 +323,17 @@ public partial class SurfTimer
 
 		if (command.ArgCount <= 1)
 		{
-			ChatMenu menu = new ChatMenu("Spectate (press M to rejoin a team, or type !r)");
-			foreach (var candidate in GetSpectateCandidates(player))
+			if (!playerList.TryGetValue(player.UserId ?? 0, out var oPlayer))
+				return;
+
+			var items = GetSpectateCandidates(player).Select(SpectateMenuItem).ToList();
+			if (items.Count == 0)
 			{
-				menu.AddMenuOption(candidate.PlayerName, (p, o) => SpectateTarget(p, candidate));
+				player.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["spec_none"]}");
+				return;
 			}
-			menu.Open(player);
+
+			MenuPresenter.Show(oPlayer, new HudMenu("Spectate · M or !r to rejoin", [new HudMenuTab("Players", items)]));
 			return;
 		}
 
@@ -343,6 +348,34 @@ public partial class SurfTimer
 		}
 
 		SpectateTarget(player, match);
+	}
+
+	/// <summary>
+	/// A !spec menu row: the name plus what they're doing right now, updated while the menu is open -
+	/// a player's running time and stage/bonus (or "idle"), a replay bot's replay and its time.
+	/// </summary>
+	private HudMenuItem SpectateMenuItem(CCSPlayerController target)
+	{
+		static string Time(int ticks) => PlayerHud.FormatTime(ticks, PlayerTimer.TimeFormatStyle.Full);
+
+		var replay = CurrentMap.ReplayManager.Pool.Find(s => s.Controller != null && s.Controller.Equals(target));
+		if (replay != null)
+		{
+			return new HudMenuItem(target.PlayerName, p => SpectateTarget(p, target),
+				PlayerHud.ReplayTypeLabel(replay), () => Time(replay.ReplayCurrentRunTime));
+		}
+
+		playerList.TryGetValue(target.UserId ?? 0, out var targetPlayer);
+		return new HudMenuItem(target.PlayerName, p => SpectateTarget(p, target), "", () =>
+		{
+			if (targetPlayer == null || !targetPlayer.Timer.IsRunning)
+				return "idle";
+
+			string where = targetPlayer.Timer.IsBonusMode ? $"B{targetPlayer.Timer.Bonus}"
+				: CurrentMap.Stages > 0 ? $"S{Math.Max((short)1, targetPlayer.Timer.Stage)}"
+				: "";
+			return $"{Time(targetPlayer.Timer.Ticks)}  {where}".TrimEnd();
+		});
 	}
 
 	/// <summary>

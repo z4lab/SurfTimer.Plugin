@@ -304,7 +304,7 @@ public class PlayerHud
 	/// <summary>
 	/// "Map WR Replay", "Stage 3 PB Replay", ... - empty for an unknown replay type.
 	/// </summary>
-	private static string ReplayTypeLabel(ReplayPlayer replay)
+	internal static string ReplayTypeLabel(ReplayPlayer replay)
 	{
 		string kind = replay.RequestedByPlayerId == -1 ? "WR" : "PB";
 		return replay.Type switch
@@ -324,7 +324,7 @@ public class PlayerHud
 
 	// ---- Custom HUD (custom_hud_layout) ----
 	// The layout's labels only take plain text (no HTML), so each slot is a grid of rows x segments:
-	// every segment has its own text variable and colour class (see hud_addon/ and CustomHud.cs).
+	// every segment has its own text variable and colour class (see the z4lab-custom-ui repo and CustomHud.cs).
 
 	/// <param name="Kind">lbl (small caps label), val (value) or unit - null for an unused segment</param>
 	/// <param name="Size">sm / md / lg / xl - null for an unused segment</param>
@@ -339,20 +339,29 @@ public class PlayerHud
 	private readonly Dictionary<(string Id, string Class), bool> _sentClass = new();
 	private readonly Dictionary<(string Id, string Group), string?> _sentExclusive = new();
 
+	/// <summary>
+	/// New HUD entity or forced resend (e.g. a player joined) - the client may have lost everything,
+	/// so forget what was sent.
+	/// </summary>
+	private void SyncCustomHudGeneration()
+	{
+		if (_customHudGeneration == CustomHud.Generation)
+			return;
+
+		_sentText.Clear();
+		_sentClass.Clear();
+		_sentExclusive.Clear();
+		_sentInputCapture = null;
+		_customHudGeneration = CustomHud.Generation;
+#if DEBUG
+		CustomHud.LogDebug("[CustomHud] Full HUD send for {Player} (slot {Slot}, generation {Generation})",
+			_player.Controller.PlayerName, _player.Controller.Slot, CustomHud.Generation);
+#endif
+	}
+
 	private void DisplayCustomHud(ICollection<Player> allPlayers)
 	{
-		// New HUD entity or forced resend (e.g. a player joined) - the client may have lost everything
-		if (_customHudGeneration != CustomHud.Generation)
-		{
-			_sentText.Clear();
-			_sentClass.Clear();
-			_sentExclusive.Clear();
-			_customHudGeneration = CustomHud.Generation;
-#if DEBUG
-			CustomHud.LogDebug("[CustomHud] Full HUD send for {Player} (slot {Slot}, generation {Generation})",
-				_player.Controller.PlayerName, _player.Controller.Slot, CustomHud.Generation);
-#endif
-		}
+		SyncCustomHudGeneration();
 
 		// Whose data to show: our own while alive, otherwise whoever we spectate (player or replay bot)
 		var (subject, replay) = ResolveSubject(allPlayers);
@@ -361,6 +370,7 @@ public class PlayerHud
 		SendSlot(CustomHud.Top, TopRows(subject, replay));
 		SendSlot(CustomHud.Left, subject != null ? SplitRows(subject) : []);
 		SendSlot(CustomHud.Right, SpectatorRows(allPlayers));
+		SendMenu(); // Refreshes live values (e.g. !spec times) - clicks re-render right away
 
 #if DEBUG
 		if (Server.TickCount >= _debugNextSummaryTick)
@@ -761,6 +771,164 @@ public class PlayerHud
 		var rows = new List<List<HudElement>> { new() { new("", $"Spectators · {spectators.Count}", SpectatorColor, Label: true) } };
 		rows.AddRange(spectators.Take(MaxSpectatorLines).Select(name => new List<HudElement> { new("", name, "", Size: HudSize.Small) }));
 		return rows;
+	}
+
+	// ---- Popup menu (st_menu) ----
+	// Opened through MenuPresenter. While it's open the player is in cursor mode (input capture) and
+	// clicks arrive in OnMenuClick. Rendered through the same cached senders as the HUD.
+
+	private HudMenu? _menu;
+	private int _menuTab;
+	private int _menuPage;
+	private bool? _sentInputCapture;
+
+	internal bool IsMenuOpen => _menu != null;
+
+	internal void OpenMenu(HudMenu menu)
+	{
+		_menu = menu;
+		_menuTab = 0;
+		_menuPage = 0;
+		SendMenu();
+	}
+
+	internal void CloseMenu()
+	{
+		if (_menu == null)
+			return;
+
+		_menu = null;
+		SendMenu();
+	}
+
+	/// <summary>
+	/// A button of our layout was clicked by this player. Only buttons that exist on the current
+	/// page / tab do anything.
+	/// </summary>
+	internal void OnMenuClick(string buttonId)
+	{
+		if (_menu == null)
+			return;
+
+		var items = _menu.Tabs[_menuTab].Items;
+		int pages = PageCount(items.Count);
+
+		if (buttonId == CustomHud.MenuCloseId)
+		{
+			CloseMenu();
+		}
+		else if (buttonId == CustomHud.MenuPrevId)
+		{
+			if (_menuPage > 0)
+			{
+				_menuPage--;
+				SendMenu();
+			}
+		}
+		else if (buttonId == CustomHud.MenuNextId)
+		{
+			if (_menuPage < pages - 1)
+			{
+				_menuPage++;
+				SendMenu();
+			}
+		}
+		else if (buttonId.StartsWith(CustomHud.MenuTabPrefix) && int.TryParse(buttonId[CustomHud.MenuTabPrefix.Length..], out int tab))
+		{
+			if (tab >= 0 && tab < _menu.Tabs.Count && tab != _menuTab)
+			{
+				_menuTab = tab;
+				_menuPage = 0;
+				SendMenu();
+			}
+		}
+		else if (buttonId.StartsWith(CustomHud.MenuItemPrefix) && int.TryParse(buttonId[CustomHud.MenuItemPrefix.Length..], out int row))
+		{
+			int index = _menuPage * CustomHud.MenuItemCount + row;
+			if (row < 0 || row >= CustomHud.MenuItemCount || index >= items.Count)
+				return;
+
+			var item = items[index];
+			var controller = _player.Controller;
+
+			// Movement back first, then the action (which may e.g. move the player to spectator)
+			CloseMenu();
+			Server.NextFrame(() =>
+			{
+				if (controller.IsValid)
+					item.OnSelect(controller);
+			});
+		}
+	}
+
+	private static int PageCount(int items) => Math.Max(1, (items + CustomHud.MenuItemCount - 1) / CustomHud.MenuItemCount);
+
+	/// <summary>
+	/// Sends the popup's state - only what changed, like the rest of the HUD.
+	/// </summary>
+	private void SendMenu()
+	{
+		if (!CustomHud.IsActive || !_player.Controller.IsValid)
+			return;
+
+		SyncCustomHudGeneration(); // Also called outside the HUD tick (open / clicks)
+
+		bool open = _menu != null;
+		SendClass(CustomHud.MenuId, "hidden", !open);
+		SendInputCapture(open);
+		if (!open)
+			return;
+
+		var menu = _menu!;
+		SendText(CustomHud.MenuTitleId, menu.Title);
+
+		// Tabs - no tab row for a single tab
+		bool showTabs = menu.Tabs.Count > 1;
+		SendClass(CustomHud.MenuTabsId, "hidden", !showTabs);
+		for (int t = 0; t < CustomHud.MenuTabCount; t++)
+		{
+			string tabId = CustomHud.MenuTabId(t);
+			bool exists = showTabs && t < menu.Tabs.Count;
+			SendClass(tabId, "hidden", !exists);
+			if (!exists)
+				continue;
+
+			SendText(CustomHud.MenuTabLabelId(t), menu.Tabs[t].Name);
+			SendClass(tabId, "on", t == _menuTab);
+		}
+
+		// Rows of the current page
+		var items = menu.Tabs[_menuTab].Items;
+		int pages = PageCount(items.Count);
+		_menuPage = Math.Clamp(_menuPage, 0, pages - 1);
+
+		for (int row = 0; row < CustomHud.MenuItemCount; row++)
+		{
+			int index = _menuPage * CustomHud.MenuItemCount + row;
+			bool exists = index < items.Count;
+			SendClass(CustomHud.MenuItemId(row), "hidden", !exists);
+			if (!exists)
+				continue;
+
+			var item = items[index];
+			SendText(CustomHud.MenuItemPartId(row, "num"), (row + 1).ToString());
+			SendText(CustomHud.MenuItemPartId(row, "text"), item.Text);
+			SendText(CustomHud.MenuItemPartId(row, "sub"), item.Sub);
+			SendText(CustomHud.MenuItemPartId(row, "right"), item.RightText());
+		}
+
+		SendText(CustomHud.MenuPageId, $"Page {_menuPage + 1} / {pages}");
+		SendClass(CustomHud.MenuPrevId, "off", _menuPage == 0);
+		SendClass(CustomHud.MenuNextId, "off", _menuPage >= pages - 1);
+	}
+
+	private void SendInputCapture(bool enabled)
+	{
+		if (_sentInputCapture == enabled)
+			return;
+
+		_sentInputCapture = enabled;
+		CustomHud.SetInputCapture(_player.Controller, enabled);
 	}
 
 	/// <summary>

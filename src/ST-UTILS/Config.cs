@@ -27,6 +27,13 @@ public static class Config
 	public static readonly string CustomHudLayout = TimerSettings.GetCustomHudLayout();
 
 	/// <summary>
+	/// Pickers (!replay, !spec) as the clickable centre popup of the custom HUD instead of chat menus.
+	/// Needs an addon version that has the popup (st_menu) - with an older one the player would be put in
+	/// cursor mode without a visible menu to close, so turn this off until the new addon is live.
+	/// </summary>
+	public static readonly bool PopupMenus = TimerSettings.GetBool("popup_menus", true);
+
+	/// <summary>
 	/// Blocks chat the map sends through the server console (`say` from map scripts, e.g. ads).
 	/// Note: also blocks `say` typed into the server console / RCON.
 	/// </summary>

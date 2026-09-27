@@ -251,6 +251,8 @@ public partial class SurfTimer
 
 				if (playerList.TryGetValue(userId, out var playerData))
 				{
+					// Release cursor mode, or whoever gets this slot next could start with it
+					playerData.HUD.CloseMenu();
 					_ = playerData.Profile.UpdatePlayerProfile(player.PlayerName);
 					playerList.TryRemove(userId, out _);
 				}
