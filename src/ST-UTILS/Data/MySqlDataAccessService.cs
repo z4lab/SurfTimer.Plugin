@@ -379,6 +379,7 @@ namespace SurfTimer.Data
 					Type = mapTime.Type,
 					Stage = mapTime.Stage,
 					RunTime = mapTime.RunTime,
+					Sync = mapTime.Sync,
 					StartVelX = mapTime.StartVelX,
 					StartVelY = mapTime.StartVelY,
 					StartVelZ = mapTime.StartVelZ,
@@ -453,6 +454,7 @@ namespace SurfTimer.Data
 				new
 				{
 					RunTime = mapTime.RunTime,
+					Sync = mapTime.Sync,
 					StartVelX = mapTime.StartVelX,
 					StartVelY = mapTime.StartVelY,
 					StartVelZ = mapTime.StartVelZ,

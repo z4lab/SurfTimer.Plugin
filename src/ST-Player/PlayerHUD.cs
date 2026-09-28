@@ -849,6 +849,10 @@ public class PlayerHud
 				return;
 
 			var item = items[index];
+			if (item.OnSelect == null)
+				return; // Info row
+
+			var onSelect = item.OnSelect;
 			var controller = _player.Controller;
 
 			// Movement back first, then the action (which may e.g. move the player to spectator)
@@ -856,7 +860,7 @@ public class PlayerHud
 			Server.NextFrame(() =>
 			{
 				if (controller.IsValid)
-					item.OnSelect(controller);
+					onSelect(controller);
 			});
 		}
 	}
@@ -911,6 +915,7 @@ public class PlayerHud
 				continue;
 
 			var item = items[index];
+			SendClass(CustomHud.MenuItemId(row), "info", item.OnSelect == null); // No hover, not clickable
 			SendText(CustomHud.MenuItemPartId(row, "num"), (row + 1).ToString());
 			SendText(CustomHud.MenuItemPartId(row, "text"), item.Text);
 			SendText(CustomHud.MenuItemPartId(row, "sub"), item.Sub);

@@ -59,6 +59,46 @@ public class Player
 	internal int SyncTotalTicks { get; private set; }
 	internal float SyncPercent => this.SyncTotalTicks > 0 ? 100f * this.SyncGoodTicks / this.SyncTotalTicks : 0f;
 	private float _lastYaw;
+
+	// Sync counters when the current stage / checkpoint segment started - a segment's sync is the difference
+	private int _segmentSyncGood;
+	private int _segmentSyncTotal;
+
+	/// <summary>
+	/// Strafe sync since the current stage / checkpoint segment started (MarkSegmentStart).
+	/// </summary>
+	internal float SegmentSyncPercent
+	{
+		get
+		{
+			int total = this.SyncTotalTicks - _segmentSyncTotal;
+			return total > 0 ? 100f * (this.SyncGoodTicks - _segmentSyncGood) / total : 0f;
+		}
+	}
+
+	internal void MarkSegmentStart()
+	{
+		_segmentSyncGood = this.SyncGoodTicks;
+		_segmentSyncTotal = this.SyncTotalTicks;
+	}
+
+	// Playtime not yet written to PlayerStats (StatsService.FlushAsync)
+	internal DateTime PlaytimeCountedUntil { get; set; } = DateTime.UtcNow;
+
+	// Runs started / finished on this map not yet written to PlayerAttempts, by (type, stage)
+	internal Dictionary<(short Type, short Stage), (int Started, int Finished)> PendingAttempts { get; } = new();
+
+	/// <summary>
+	/// Counts a started or finished run (type 0 map, 1 bonus, 2 stage) - written in batches.
+	/// </summary>
+	internal void CountAttempt(short type, short stage, bool finished)
+	{
+		if (this.Timer.IsPracticeMode)
+			return;
+
+		PendingAttempts.TryGetValue((type, stage), out var counts);
+		PendingAttempts[(type, stage)] = finished ? (counts.Started, counts.Finished + 1) : (counts.Started + 1, counts.Finished);
+	}
 	internal bool WasOnGroundLastTick { get; set; } = true;
 	internal int GroundTicks { get; set; } = 0;
 	internal int StartZoneJumpCount { get; set; } = 0;
@@ -165,6 +205,7 @@ public class Player
 	{
 		this.SyncGoodTicks = 0;
 		this.SyncTotalTicks = 0;
+		MarkSegmentStart();
 	}
 
 	/// <summary>

@@ -6,9 +6,9 @@
 -- (Dapper is configured with `DefaultTypeMap.MatchNamesWithUnderscores = true`, so
 -- PascalCase C# properties map to snake_case columns automatically).
 --
--- `PlayerStats`, `PlayerSettings` and `MapTimeInsights` are part of the design but are
--- not read/written by any query in Queries.cs yet - they're included for completeness
--- but are effectively reserved for future use.
+-- `PlayerSettings` and `MapTimeInsights` are part of the design but are not read/written by
+-- any query in Queries.cs yet - they're included for completeness but are effectively
+-- reserved for future use. Changes to existing databases are in migrations/.
 --
 -- Create the database yourself before running this file, e.g.:
 --   CREATE DATABASE surftimer CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS `Player` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------------------------
--- PlayerStats (reserved - not yet queried by the plugin)
+-- PlayerStats - total points (sum of PlayerMapPoints) and playtime per style
 -- --------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS `PlayerStats` (
     `player_id` INT UNSIGNED NOT NULL,
@@ -43,6 +43,52 @@ CREATE TABLE IF NOT EXISTS `PlayerStats` (
     PRIMARY KEY (`player_id`, `style`),
     CONSTRAINT `fk_playerstats_player`
         FOREIGN KEY (`player_id`) REFERENCES `Player` (`id`)
+        ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------------------------
+-- PlayerMapPoints - points per player, map and style (CS:GO SurfTimer formula, see
+-- PointsCalculator.cs), split into the buckets shown in !profile
+-- --------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `PlayerMapPoints` (
+    `player_id`         INT UNSIGNED NOT NULL,
+    `map_id`            INT UNSIGNED NOT NULL,
+    `style`             TINYINT UNSIGNED NOT NULL DEFAULT 0,
+    `points`            INT UNSIGNED NOT NULL DEFAULT 0,
+    `map_points`        INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Map completion (by tier)',
+    `wr_points`         INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Map WR',
+    `top10_points`      INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Map rank 2-10',
+    `group_points`      INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Map rank 11+ (G1-G5)',
+    `bonus_points`      INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Bonus rank 2+',
+    `bonus_wr_points`   INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Bonus WR',
+    `segment_wr_points` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Stage / checkpoint segment WR',
+    PRIMARY KEY (`player_id`, `map_id`, `style`),
+    KEY `ix_playermappoints_map` (`map_id`, `style`),
+    CONSTRAINT `fk_playermappoints_player`
+        FOREIGN KEY (`player_id`) REFERENCES `Player` (`id`)
+        ON DELETE CASCADE,
+    CONSTRAINT `fk_playermappoints_map`
+        FOREIGN KEY (`map_id`) REFERENCES `Maps` (`id`)
+        ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------------------------
+-- PlayerAttempts - runs started / finished per player, map, style and run type
+-- --------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `PlayerAttempts` (
+    `player_id` INT UNSIGNED NOT NULL,
+    `map_id`    INT UNSIGNED NOT NULL,
+    `style`     TINYINT UNSIGNED NOT NULL DEFAULT 0,
+    `type`      TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '0 map, 1 bonus, 2 stage',
+    `stage`     TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Bonus / stage number, 0 for map runs',
+    `started`   INT UNSIGNED NOT NULL DEFAULT 0,
+    `finished`  INT UNSIGNED NOT NULL DEFAULT 0,
+    PRIMARY KEY (`player_id`, `map_id`, `style`, `type`, `stage`),
+    CONSTRAINT `fk_playerattempts_player`
+        FOREIGN KEY (`player_id`) REFERENCES `Player` (`id`)
+        ON DELETE CASCADE,
+    CONSTRAINT `fk_playerattempts_map`
+        FOREIGN KEY (`map_id`) REFERENCES `Maps` (`id`)
         ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -90,6 +136,7 @@ CREATE TABLE IF NOT EXISTS `MapTimes` (
     `type`           TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '0 = map time, 1+ = bonus no. Must be 0 if stages > 0 - no stages in bonuses.',
     `stage`          TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'if type = 0: 0 = not staged, 1+ = stage no. Must be 0 if type > 0 - no stages in bonuses.',
     `run_time`       INT UNSIGNED NOT NULL,
+    `sync`           DECIMAL(5,2) NULL COMMENT 'Strafe sync in %, NULL for runs saved before it was tracked',
     `start_vel_x`    DECIMAL(8,3) NOT NULL DEFAULT 0,
     `start_vel_y`    DECIMAL(8,3) NOT NULL DEFAULT 0,
     `start_vel_z`    DECIMAL(8,3) NOT NULL DEFAULT 0,

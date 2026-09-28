@@ -34,6 +34,11 @@ public static class Config
 	public static readonly bool PopupMenus = TimerSettings.GetBool("popup_menus", true);
 
 	/// <summary>
+	/// Points per stage / checkpoint segment WR (CS:GO SurfTimer's ck_wrcp_points, 0 = none).
+	/// </summary>
+	public static readonly int PointsSegmentWr = TimerSettings.GetInt("points_segment_wr", 0);
+
+	/// <summary>
 	/// Blocks chat the map sends through the server console (`say` from map scripts, e.g. ads).
 	/// Note: also blocks `say` typed into the server console / RCON.
 	/// </summary>
@@ -110,6 +115,14 @@ public static class Config
 			return ConfigDocument.RootElement.TryGetProperty(key, out var value)
 				&& value.ValueKind is JsonValueKind.True or JsonValueKind.False
 				? value.GetBoolean()
+				: defaultValue;
+		}
+
+		public static int GetInt(string key, int defaultValue)
+		{
+			return ConfigDocument.RootElement.TryGetProperty(key, out var value) && value.ValueKind == JsonValueKind.Number
+				&& value.TryGetInt32(out int number)
+				? number
 				: defaultValue;
 		}
 

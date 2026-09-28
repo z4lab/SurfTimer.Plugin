@@ -25,7 +25,8 @@ internal static class MenuPresenter
 		foreach (var item in menu.Tabs.SelectMany(t => t.Items))
 		{
 			string line = string.Join(" - ", new[] { item.Text, item.Sub, item.RightText() }.Where(s => !string.IsNullOrEmpty(s)));
-			chatMenu.AddMenuOption(line, (p, _) => item.OnSelect(p));
+			// Info rows are shown but can't be picked
+			chatMenu.AddMenuOption(line, (p, _) => item.OnSelect?.Invoke(p), disabled: item.OnSelect == null);
 		}
 		chatMenu.Open(player.Controller);
 	}

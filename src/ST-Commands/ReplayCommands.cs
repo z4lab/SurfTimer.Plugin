@@ -112,7 +112,10 @@ public partial class SurfTimer
 	/// Handles picking a "Your PB" replay - PB replay frames aren't loaded up front, so this
 	/// fetches them on demand before requesting a pool slot.
 	/// </summary>
-	private async Task HandlePbReplaySelection(CCSPlayerController player, PersonalBest pb, int type, int stage, int style)
+	/// <param name="ownerName">Whose PB it is - the viewer's own when null (!profile shows other players' PBs)</param>
+	/// <param name="ownerId">Profile ID of that player - the viewer's when null</param>
+	private async Task HandlePbReplaySelection(CCSPlayerController player, PersonalBest pb, int type, int stage, int style,
+		string? ownerName = null, int? ownerId = null)
 	{
 		Player oPlayer = playerList[player.UserId ?? 0];
 
@@ -149,12 +152,12 @@ public partial class SurfTimer
 					MapID = CurrentMap.ID,
 					MapTimeID = pb.ID,
 					RecordRank = pb.Rank,
-					RecordPlayerName = oPlayer.Profile.Name ?? "N/A",
+					RecordPlayerName = ownerName ?? oPlayer.Profile.Name ?? "N/A",
 					RecordRunTime = pb.RunTime,
 					Frames = frames,
 				};
 
-				ApplyReplayRequest(player, template, requestedByPlayerId: oPlayer.Profile.ID);
+				ApplyReplayRequest(player, template, requestedByPlayerId: ownerId ?? oPlayer.Profile.ID);
 			}
 			catch (Exception ex)
 			{

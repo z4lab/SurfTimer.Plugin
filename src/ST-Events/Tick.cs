@@ -36,6 +36,10 @@ public partial class SurfTimer
 				}
 
 				player.HUD.Display(playerList.Values);
+
+				// Playtime / attempts in batches
+				if (Server.TickCount % StatsService.FlushIntervalTicks == 0)
+					StatsService.Flush(player, final: false);
 			}
 			catch (Exception ex)
 			{

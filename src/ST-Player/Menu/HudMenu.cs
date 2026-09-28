@@ -3,14 +3,19 @@ using CounterStrikeSharp.API.Core;
 namespace SurfTimer;
 
 /// <summary>
-/// One pickable row of a menu.
+/// One row of a menu - pickable, or an info row (no action, not clickable).
 /// </summary>
 /// <param name="Text">Main text, e.g. "Stage 3 WR" or a player name</param>
-/// <param name="OnSelect">Runs on the main thread after the popup has closed</param>
+/// <param name="OnSelect">Runs on the main thread after the popup has closed - null for an info row</param>
 /// <param name="Sub">Dim secondary text next to it, e.g. the record holder</param>
 /// <param name="Right">Right-aligned value - re-evaluated while the popup is open, so it can be live</param>
-internal sealed record HudMenuItem(string Text, Action<CCSPlayerController> OnSelect, string Sub = "", Func<string>? Right = null)
+internal sealed record HudMenuItem(string Text, Action<CCSPlayerController>? OnSelect, string Sub = "", Func<string>? Right = null)
 {
+	/// <summary>
+	/// A row that only shows something (label, optional detail, value).
+	/// </summary>
+	internal static HudMenuItem Info(string text, string value, string sub = "") => new(text, null, sub, () => value);
+
 	internal string RightText()
 	{
 		try

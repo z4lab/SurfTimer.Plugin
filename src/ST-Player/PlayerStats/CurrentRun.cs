@@ -38,9 +38,11 @@ public class CurrentRun : RunStatsEntity
 	/// <param name="run_ticks">Ticks for the run - used for Stage, Bonus and Checkpoint entries</param>
 	/// <param name="segmentStartVelX">Override for the segment's own start velocity (Stage/Checkpoint saves) - falls back to the overall run's start velocity when null (Map saves)</param>
 	/// <param name="segmentEndVelX">Override for the segment's own end velocity (Stage/Checkpoint saves) - falls back to the overall run's end velocity when null (Map saves)</param>
+	/// <param name="segmentSync">Stage / checkpoint segment sync - map and bonus runs use the run's sync</param>
 	internal async Task SaveMapTime(Player player, short bonus = 0, short stage = 0, short checkpoint = 0, int run_ticks = -1,
 		float? segmentStartVelX = null, float? segmentStartVelY = null, float? segmentStartVelZ = null,
 		float? segmentEndVelX = null, float? segmentEndVelY = null, float? segmentEndVelZ = null,
+		float? segmentSync = null,
 		[CallerMemberName] string methodName = "")
 	{
 		string replay_frames = "";
@@ -95,6 +97,8 @@ public class CurrentRun : RunStatsEntity
 			EndVelX = segmentEndVelX ?? this.EndVelX,
 			EndVelY = segmentEndVelY ?? this.EndVelY,
 			EndVelZ = segmentEndVelZ ?? this.EndVelZ,
+			// The timer is stopped by the time a map/bonus run is saved, so its sync is final
+			Sync = MathF.Round(segmentSync ?? player.SyncPercent, 2),
 			ReplayFrames = replay_frames,
 			Checkpoints = this.Checkpoints
 		};
@@ -149,6 +153,9 @@ public class CurrentRun : RunStatsEntity
 				break;
 		}
 
+		// A new time can shift everyone's rank on this map - recalculate the map's points
+		await PointsService.RecalculateMapAsync(SurfTimer.CurrentMap.ID, style);
+
 		stopwatch.Stop();
 		_logger.LogInformation("[{Class}] {Method} -> Finished SaveMapTime for '{Name}' (ID {ID}) in {Elapsed}ms",
 			nameof(CurrentRun), methodName, player.Profile.Name, mapTimeId, stopwatch.ElapsedMilliseconds
@@ -167,7 +174,7 @@ public class CurrentRun : RunStatsEntity
 	/// <param name="endVelX">This specific stage's own exit velocity (not the overall map run's)</param>
 	internal static async Task SaveStageTime(Player player, short stage = -1, int stage_run_time = -1, bool saveLastStage = false,
 		float startVelX = 0, float startVelY = 0, float startVelZ = 0,
-		float endVelX = 0, float endVelY = 0, float endVelZ = 0)
+		float endVelX = 0, float endVelY = 0, float endVelZ = 0, float? sync = null)
 	{
 #if DEBUG
 		var _logger = SurfTimer.ServiceProvider.GetRequiredService<ILogger<CurrentRun>>();
@@ -213,7 +220,7 @@ public class CurrentRun : RunStatsEntity
 			// Save stage run
 			await player.Stats.ThisRun.SaveMapTime(player, stage: stage, run_ticks: stage_run_time,
 				segmentStartVelX: startVelX, segmentStartVelY: startVelY, segmentStartVelZ: startVelZ,
-				segmentEndVelX: endVelX, segmentEndVelY: endVelY, segmentEndVelZ: endVelZ
+				segmentEndVelX: endVelX, segmentEndVelY: endVelY, segmentEndVelZ: endVelZ, segmentSync: sync
 			); // Save the Stage MapTime PB data
 		}
 		else if (stage_run_time > SurfTimer.CurrentMap.StageWR[stage][pStyle].RunTime && player.Timer.IsStageMode) // Player is behind the Stage WR for the map
@@ -238,7 +245,7 @@ public class CurrentRun : RunStatsEntity
 	/// <param name="endVelX">This specific checkpoint segment's own exit velocity (not the overall map run's)</param>
 	internal static async Task SaveCheckpointTime(Player player, short checkpoint = -1, int checkpoint_run_time = -1, bool saveLastCheckpoint = false,
 		float startVelX = 0, float startVelY = 0, float startVelZ = 0,
-		float endVelX = 0, float endVelY = 0, float endVelZ = 0)
+		float endVelX = 0, float endVelY = 0, float endVelZ = 0, float? sync = null)
 	{
 #if DEBUG
 		var _logger = SurfTimer.ServiceProvider.GetRequiredService<ILogger<CurrentRun>>();
@@ -284,7 +291,7 @@ public class CurrentRun : RunStatsEntity
 			// Save checkpoint segment run
 			await player.Stats.ThisRun.SaveMapTime(player, checkpoint: checkpoint, run_ticks: checkpoint_run_time,
 				segmentStartVelX: startVelX, segmentStartVelY: startVelY, segmentStartVelZ: startVelZ,
-				segmentEndVelX: endVelX, segmentEndVelY: endVelY, segmentEndVelZ: endVelZ
+				segmentEndVelX: endVelX, segmentEndVelY: endVelY, segmentEndVelZ: endVelZ, segmentSync: sync
 			); // Save the Checkpoint MapTime PB data
 		}
 	}

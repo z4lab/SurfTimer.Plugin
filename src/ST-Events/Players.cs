@@ -253,6 +253,7 @@ public partial class SurfTimer
 				{
 					// Release cursor mode, or whoever gets this slot next could start with it
 					playerData.HUD.CloseMenu();
+					StatsService.Flush(playerData, final: true);
 					_ = playerData.Profile.UpdatePlayerProfile(player.PlayerName);
 					playerList.TryRemove(userId, out _);
 				}

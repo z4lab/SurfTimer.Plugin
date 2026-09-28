@@ -85,6 +85,10 @@ public partial class SurfTimer : BasePlugin
 			);
 		}
 
+		// Playtime / attempts of this map - players come back as new Player objects
+		foreach (var player in playerList.Values)
+			StatsService.Flush(player, final: true);
+
 		// Clear/reset stuff here
 		CurrentMap = null!;
 		playerList.Clear();

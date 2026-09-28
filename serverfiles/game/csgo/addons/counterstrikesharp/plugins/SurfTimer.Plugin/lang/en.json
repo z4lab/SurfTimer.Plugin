@@ -45,6 +45,8 @@
 	"replay_no_pb": "{red}No replay data was saved for this run.",
 	"replay_none": "{grey}There are no replays on this map yet.",
 	"spec_none": "{grey}Nobody to spectate right now.",
+	"points_recalculated": "{green}Points recalculated for {0} maps.",
+	"profile_not_found": "{red}No player found matching '{0}'.",
 	"spec_no_match": "{red}No player found matching '{yellow}{0}{red}'.",
 	"repeat_enabled": "Repeat mode {lime}enabled{default} - you'll be sent back to the start of each stage you finish.",
 	"repeat_disabled": "Repeat mode {red}disabled{default}.",

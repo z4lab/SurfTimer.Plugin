@@ -51,6 +51,8 @@ public partial class SurfTimer
 
 		// The map end is also the last stage's finish - captured before the timer is stopped below
 		bool finishedStageForRepeat = player.IsRepeatMode && CurrentMap.Stages > 0;
+		// Sync of the last stage / checkpoint segment, saved with it (the saves run a second later)
+		float lastSegmentSync = player.SegmentSyncPercent;
 
 		player.HUD.Notify("Map End");
 
@@ -67,6 +69,7 @@ public partial class SurfTimer
 		if (player.Timer.IsRunning && !player.Timer.IsStageMode)
 		{
 			player.Timer.Stop();
+			player.CountAttempt(0, 0, finished: true);
 			bool saveMapTime = false;
 			string PracticeString = "";
 			if (player.Timer.IsPracticeMode)
@@ -134,7 +137,7 @@ public partial class SurfTimer
 
 						await CurrentRun.SaveStageTime(player, CurrentMap.Stages, stage_run_time, true,
 							startVelX: lastStageEntryVelX, startVelY: lastStageEntryVelY, startVelZ: lastStageEntryVelZ,
-							endVelX: velocity.X, endVelY: velocity.Y, endVelZ: velocity.Z);
+							endVelX: velocity.X, endVelY: velocity.Y, endVelZ: velocity.Z, sync: lastSegmentSync);
 					});
 				}
 				// Should we also save the last checkpoint segment (last cp -> map end)? (non-staged maps only)
@@ -165,7 +168,7 @@ public partial class SurfTimer
 
 						await CurrentRun.SaveCheckpointTime(player, lastSegment, checkpoint_run_time, true,
 							startVelX: lastCheckpointEntryVelX, startVelY: lastCheckpointEntryVelY, startVelZ: lastCheckpointEntryVelZ,
-							endVelX: velocity.X, endVelY: velocity.Y, endVelZ: velocity.Z);
+							endVelX: velocity.X, endVelY: velocity.Y, endVelZ: velocity.Z, sync: lastSegmentSync);
 					});
 				}
 
@@ -186,6 +189,7 @@ public partial class SurfTimer
 		else if (player.Timer.IsStageMode)
 		{
 			player.Timer.Stop();
+			player.CountAttempt(2, (short)CurrentMap.Stages, finished: true);
 
 			if (!player.Timer.IsPracticeMode)
 			{
@@ -197,11 +201,13 @@ public partial class SurfTimer
 					// This calculation is wrong unless we wait for a bit in order for the `END_ZONE_ENTER` to be available in the `Frames` object
 					int stage_run_time = player.ReplayRecorder.Frames.FindLastIndex(f => f.Situation == ReplayFrameSituation.END_ZONE_ENTER) - player.ReplayRecorder.Frames.FindLastIndex(f => f.Situation == ReplayFrameSituation.STAGE_ZONE_EXIT);
 
+					// Before the save: still on the main thread (chat can't be printed after an await),
+					// and compared against the previous PB rather than the one being saved
+					player.HUD.DisplayStageMessage(CurrentMap.Stages, stage_run_time, velocity);
+
 					await CurrentRun.SaveStageTime(player, CurrentMap.Stages, stage_run_time, true,
 						startVelX: lastStageEntryVelX, startVelY: lastStageEntryVelY, startVelZ: lastStageEntryVelZ,
-						endVelX: velocity.X, endVelY: velocity.Y, endVelZ: velocity.Z);
-
-					player.HUD.DisplayStageMessage(CurrentMap.Stages, stage_run_time, velocity);
+						endVelX: velocity.X, endVelY: velocity.Y, endVelZ: velocity.Z, sync: lastSegmentSync);
 				});
 			}
 		}
@@ -257,11 +263,16 @@ public partial class SurfTimer
 		// Captured before the stage-mode branch below resets the timer
 		bool finishedStageForRepeat = player.IsRepeatMode && stage > 1 && !failed_stage
 			&& player.Timer.IsRunning && !player.Timer.IsBonusMode;
+		// Sync of the stage just completed, saved with it
+		float segmentSync = player.SegmentSyncPercent;
 
 		// Reset/Stop the Stage timer
 		// Save a Stage run when `IsStageMode` is active - (`stage - 1` to get the previous stage data)
 		if (player.Timer.IsStageMode)
 		{
+			if (stage > 1 && !failed_stage && player.Timer.IsRunning)
+				player.CountAttempt(2, (short)(stage - 1), finished: true);
+
 			if (stage > 1 && !failed_stage && !player.Timer.IsPracticeMode)
 			{
 				int stage_run_time = player.Timer.Ticks;
@@ -271,7 +282,7 @@ public partial class SurfTimer
 				ScheduleRunSave(player, $"SaveStageTime (stage {stage - 1}, stage mode)", () =>
 					CurrentRun.SaveStageTime(player, (short)(stage - 1), stage_run_time,
 						startVelX: entryVelX, startVelY: entryVelY, startVelZ: entryVelZ,
-						endVelX: velocity.X, endVelY: velocity.Y, endVelZ: velocity.Z));
+						endVelX: velocity.X, endVelY: velocity.Y, endVelZ: velocity.Z, sync: segmentSync));
 
 				player.HUD.DisplayStageMessage((short)(stage - 1), stage_run_time, velocity);
 			}
@@ -305,7 +316,7 @@ public partial class SurfTimer
 				ScheduleRunSave(player, $"SaveStageTime (stage {stage - 1})", () =>
 					CurrentRun.SaveStageTime(player, (short)(stage - 1), stage_run_time,
 						startVelX: entryVelX, startVelY: entryVelY, startVelZ: entryVelZ,
-						endVelX: velocity.X, endVelY: velocity.Y, endVelZ: velocity.Z));
+						endVelX: velocity.X, endVelY: velocity.Y, endVelZ: velocity.Z, sync: segmentSync));
 			}
 
 			player.Timer.Checkpoint = (short)(stage - 1); // Stage = Checkpoint when in a run on a Staged map
@@ -397,10 +408,12 @@ public partial class SurfTimer
 				float entryVelY = player.Timer.CheckpointEntryVelY;
 				float entryVelZ = player.Timer.CheckpointEntryVelZ;
 
+				float segmentSync = player.SegmentSyncPercent; // Sync of this segment, saved with it
+
 				ScheduleRunSave(player, $"SaveCheckpointTime (checkpoint {checkpoint})", () =>
 					CurrentRun.SaveCheckpointTime(player, checkpoint, checkpoint_run_time,
 						startVelX: entryVelX, startVelY: entryVelY, startVelZ: entryVelZ,
-						endVelX: velocity.X, endVelY: velocity.Y, endVelZ: velocity.Z));
+						endVelX: velocity.X, endVelY: velocity.Y, endVelZ: velocity.Z, sync: segmentSync));
 			}
 
 			if (!player.Stats.ThisRun.Checkpoints.ContainsKey(checkpoint))
@@ -475,6 +488,7 @@ public partial class SurfTimer
 		int pStyle = player.Timer.Style;
 
 		player.Timer.Stop();
+		player.CountAttempt(1, bonus_idx, finished: true);
 		player.ReplayRecorder.CurrentSituation = ReplayFrameSituation.END_ZONE_ENTER;
 		player.ReplayRecorder.BonusSituations.Add(player.Timer.Ticks);
 
@@ -550,6 +564,7 @@ public partial class SurfTimer
 		{
 			player.Timer.Start();
 			player.ResetSync();
+			player.CountAttempt(0, 0, finished: false);
 			player.Stats.ThisRun.RunTime = player.Timer.Ticks;
 			player.ReplayRecorder.CurrentSituation = ReplayFrameSituation.START_ZONE_EXIT;
 			player.ReplayRecorder.MapSituations.Add(player.ReplayRecorder.Frames.Count);
@@ -589,6 +604,7 @@ public partial class SurfTimer
 		player.ReplayRecorder.CurrentSituation = ReplayFrameSituation.STAGE_ZONE_EXIT;
 		player.ReplayRecorder.StageExitSituations.Add(player.ReplayRecorder.Frames.Count);
 		player.Stats.ThisRun.RunTime = player.Timer.Ticks;
+		player.MarkSegmentStart(); // This stage's sync counts from here
 
 		// Entry speed for the stage just entered - shown regardless of how the stage was entered
 		// (normal run or !s practice)
@@ -602,6 +618,7 @@ public partial class SurfTimer
 		{
 			player.Timer.Start();
 			player.ResetSync();
+			player.CountAttempt(2, stage, finished: false);
 		}
 		else if (player.Timer.IsRunning && player.Stats.ThisRun.Checkpoints.TryGetValue(player.Timer.Checkpoint, out CheckpointEntity? currentCheckpoint))
 		{
@@ -653,7 +670,10 @@ public partial class SurfTimer
 			// The next checkpoint segment starts here (mirrors the stage start exit) - without this the
 			// segment times counted from the map start
 			if (player.Timer.IsRunning && !player.Timer.IsStageMode && !player.Timer.IsBonusMode)
+			{
 				player.Stats.ThisRun.RunTime = player.Timer.Ticks;
+				player.MarkSegmentStart(); // This segment's sync counts from here
+			}
 
 			// Update the Checkpoint object values
 			currentCheckpoint.EndVelX = velocity.X;
@@ -685,6 +705,7 @@ public partial class SurfTimer
 		{
 			player.Timer.Start();
 			player.ResetSync();
+			player.CountAttempt(1, zone.Number, finished: false);
 			// Set the CurrentRunData values
 			player.Stats.ThisRun.RunTime = player.Timer.Ticks;
 

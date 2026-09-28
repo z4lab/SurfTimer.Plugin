@@ -93,9 +93,13 @@ public partial class SurfTimer
 
 		CurrentMap.Tier = tier;
 
+		int mapId = CurrentMap.ID;
 		Task.Run(async () =>
 		{
-			await _dataService!.UpdateMapInfoAsync(mapInfo, CurrentMap.ID);
+			await _dataService!.UpdateMapInfoAsync(mapInfo, mapId);
+			// Points depend on the tier
+			foreach (int style in Config.Styles)
+				await PointsService.RecalculateMapAsync(mapId, style);
 		});
 
 		string msg = $"{Config.PluginPrefix} {ChatColors.Yellow}{CurrentMap.Name}{ChatColors.Default} - Set Tier to {Extensions.GetTierColor(CurrentMap.Tier)}{CurrentMap.Tier}{ChatColors.Default}.";
@@ -171,9 +175,13 @@ public partial class SurfTimer
 			LastPlayed = (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds()
 		};
 
+		int mapId = CurrentMap.ID;
 		Task.Run(async () =>
 		{
-			await _dataService!.UpdateMapInfoAsync(mapInfo, CurrentMap.ID);
+			await _dataService!.UpdateMapInfoAsync(mapInfo, mapId);
+			// Only ranked maps give points
+			foreach (int style in Config.Styles)
+				await PointsService.RecalculateMapAsync(mapId, style);
 		});
 
 		string msg = $"{Config.PluginPrefix} {ChatColors.Yellow}{CurrentMap.Name}{ChatColors.Default} - Set Ranked to {(CurrentMap.Ranked ? ChatColors.Green : ChatColors.Red)}{CurrentMap.Ranked}{ChatColors.Default}.";
@@ -215,6 +223,28 @@ public partial class SurfTimer
 			foreach (var zone in zones)
 				player.PrintToChat($"  #{zone.TriggerIndex} '{zone.Name}' -> teleport {zone.Teleport}{(zone.Angles is { } angles ? $" angles {angles}" : "")}");
 		}
+	}
+
+	[ConsoleCommand("css_recalcpoints", "Recalculate everyone's points on every map.")]
+	[RequiresPermissions("@css/root")]
+	[CommandHelper(whoCanExecute: CommandUsage.CLIENT_AND_SERVER)]
+	public void RecalculatePoints(CCSPlayerController? player, CommandInfo command)
+	{
+		command.ReplyToCommand($"{Config.PluginPrefix} Recalculating points for all maps...");
+
+		Task.Run(async () =>
+		{
+			int maps = await PointsService.RecalculateAllAsync();
+			// Back on the main thread for chat / console output
+			Server.NextFrame(() =>
+			{
+				string done = $"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["points_recalculated", maps]}";
+				if (player != null && player.IsValid)
+					player.PrintToChat(done);
+				else
+					Server.PrintToConsole(done);
+			});
+		});
 	}
 
 	[ConsoleCommand("css_map", "Change to a map from the workshop collection.")]
