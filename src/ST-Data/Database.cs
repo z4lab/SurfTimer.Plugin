@@ -18,6 +18,7 @@ internal sealed class Database : IAsyncDisposable
 
 	internal string TablePrefix { get; }
 	internal string DatabaseName { get; }
+	internal uint MaxPoolSize { get; }
 
 	static Database()
 	{
@@ -45,6 +46,7 @@ internal sealed class Database : IAsyncDisposable
 		_dataSource = new MySqlDataSourceBuilder(builder.ConnectionString).Build();
 		TablePrefix = settings.TablePrefix;
 		DatabaseName = settings.Database;
+		MaxPoolSize = settings.MaxPoolSize;
 	}
 
 	/// <summary>

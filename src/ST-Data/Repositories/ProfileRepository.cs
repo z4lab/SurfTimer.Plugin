@@ -104,7 +104,8 @@ internal static class ProfileRepository
 	// Rank = strictly faster times + 1 (ties share a rank) - a range scan on the leaderboard index
 	private const string RankOf = @"
 		(SELECT COUNT(*) FROM `{p}times` o
-			WHERE o.`course_id` = mine.`course_id` AND o.`style_id` = mine.`style_id` AND o.`run_time_ticks` < mine.`run_time_ticks`) + 1";
+			WHERE o.`course_id` = mine.`course_id` AND o.`style_id` = mine.`style_id` AND o.`hidden` = 0
+				AND o.`run_time_ticks` < mine.`run_time_ticks`) + 1";
 
 	// Completions / WRs / top 10s per course kind, ranked maps only
 	private const string TypeCountsSql = @"
@@ -115,7 +116,7 @@ internal static class ProfileRepository
 			FROM `{p}times` mine
 			JOIN `{p}courses` c ON c.`id` = mine.`course_id`
 			JOIN `{p}maps` m ON m.`id` = c.`map_id`
-			WHERE mine.`player_id` = @PlayerId AND mine.`style_id` = @Style AND m.`ranked` = 1
+			WHERE mine.`player_id` = @PlayerId AND mine.`style_id` = @Style AND mine.`hidden` = 0 AND m.`ranked` = 1
 		) AS r
 		GROUP BY r.`kind_id`";
 
@@ -161,7 +162,7 @@ internal static class ProfileRepository
 			JOIN `{p}courses` c ON c.`id` = mine.`course_id`
 			JOIN `{p}maps` m ON m.`id` = c.`map_id`
 			LEFT JOIN `{p}course_stats` cs ON cs.`course_id` = mine.`course_id` AND cs.`style_id` = mine.`style_id`
-			WHERE mine.`player_id` = @PlayerId AND mine.`style_id` = @Style {filter}
+			WHERE mine.`player_id` = @PlayerId AND mine.`style_id` = @Style AND mine.`hidden` = 0 {filter}
 		) AS r ";
 
 	private static readonly string RecordsSql = RunsSql.Replace("{filter}", "") + "WHERE r.`Rank` = 1 ORDER BY r.MapName, r.KindId, r.Stage";
@@ -172,7 +173,7 @@ internal static class ProfileRepository
 	private const string TiersSql = @"
 		SELECT COALESCE(c.`tier`, 0) AS Tier, COUNT(*) AS Total,
 			CAST(SUM(EXISTS(SELECT 1 FROM `{p}times` t
-				WHERE t.`player_id` = @PlayerId AND t.`course_id` = c.`id` AND t.`style_id` = @Style)) AS SIGNED) AS Completed
+				WHERE t.`player_id` = @PlayerId AND t.`course_id` = c.`id` AND t.`style_id` = @Style AND t.`hidden` = 0)) AS SIGNED) AS Completed
 		FROM `{p}courses` c JOIN `{p}maps` m ON m.`id` = c.`map_id`
 		WHERE m.`ranked` = 1 AND c.`kind_id` = 1
 		GROUP BY COALESCE(c.`tier`, 0)

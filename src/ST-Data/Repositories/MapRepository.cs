@@ -10,6 +10,7 @@ internal static class MapRepository
 		public int Id { get; set; }
 		public string Name { get; set; } = "";
 		public bool Ranked { get; set; }
+		public ulong? WorkshopId { get; set; }
 		public DateTime CreatedAt { get; set; }
 		public DateTime LastPlayedAt { get; set; }
 	}
@@ -20,6 +21,8 @@ internal static class MapRepository
 		public byte KindId { get; set; }
 		public short Number { get; set; }
 		public byte? Tier { get; set; }
+		public string? Name { get; set; }
+		public bool PointsEnabled { get; set; } = true;
 
 		internal CourseKind Kind => (CourseKind)KindId;
 	}
@@ -42,7 +45,7 @@ internal static class MapRepository
 				VALUES (@Name, FALSE, UTC_TIMESTAMP(3), UTC_TIMESTAMP(3))
 				ON DUPLICATE KEY UPDATE `last_played_at` = VALUES(`last_played_at`)", args);
 			return (await tx.QueryFirstOrDefaultAsync<MapRow>(
-				"SELECT `id`, `name`, `ranked`, `created_at`, `last_played_at` FROM `{p}maps` WHERE `name` = @Name", args))!;
+				"SELECT `id`, `name`, `ranked`, `workshop_id`, `created_at`, `last_played_at` FROM `{p}maps` WHERE `name` = @Name", args))!;
 		});
 
 	/// <summary>
@@ -60,7 +63,7 @@ internal static class MapRepository
 		}
 
 		return await SurfTimer.DB.QueryAsync<CourseRow>(
-			"SELECT `id`, `kind_id`, `number`, `tier` FROM `{p}courses` WHERE `map_id` = @MapId", new { MapId = mapId });
+			"SELECT `id`, `kind_id`, `number`, `tier`, `name`, `points_enabled` FROM `{p}courses` WHERE `map_id` = @MapId", new { MapId = mapId });
 	}
 
 	internal static Task SetCourseTierAsync(int courseId, byte? tier) =>
@@ -68,6 +71,23 @@ internal static class MapRepository
 
 	internal static Task SetRankedAsync(int mapId, bool ranked) =>
 		SurfTimer.DB.ExecuteAsync("UPDATE `{p}maps` SET `ranked` = @Ranked WHERE `id` = @Id", new { Id = mapId, Ranked = ranked });
+
+	internal static Task SetCourseNameAsync(int courseId, string? name) =>
+		SurfTimer.DB.ExecuteAsync("UPDATE `{p}courses` SET `name` = @Name WHERE `id` = @Id", new { Id = courseId, Name = name });
+
+	internal static Task SetCoursePointsEnabledAsync(int courseId, bool enabled) =>
+		SurfTimer.DB.ExecuteAsync("UPDATE `{p}courses` SET `points_enabled` = @Enabled WHERE `id` = @Id", new { Id = courseId, Enabled = enabled });
+
+	internal static Task SetWorkshopIdAsync(int mapId, ulong? workshopId) =>
+		SurfTimer.DB.ExecuteAsync("UPDATE `{p}maps` SET `workshop_id` = @WorkshopId WHERE `id` = @Id", new { Id = mapId, WorkshopId = workshopId });
+
+	/// <summary>
+	/// Maps by when they were last played, newest first (the admin panel's change-map list).
+	/// </summary>
+	internal static Task<List<MapRow>> GetRecentMapsAsync(int limit) =>
+		SurfTimer.DB.QueryAsync<MapRow>(@"
+			SELECT `id`, `name`, `ranked`, `workshop_id`, `created_at`, `last_played_at` FROM `{p}maps`
+			ORDER BY `last_played_at` DESC LIMIT @Limit", new { Limit = limit });
 
 	internal static Task<List<int>> GetAllIdsAsync() =>
 		SurfTimer.DB.QueryAsync<int>("SELECT `id` FROM `{p}maps`");

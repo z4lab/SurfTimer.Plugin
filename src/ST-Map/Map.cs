@@ -246,6 +246,19 @@ public class Map : MapEntity
 	internal Dictionary<string, string> Settings { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
 
 	internal const string SettingStagedLinear = "staged_linear";
+	internal const string SettingStartSpeedCap = "start_speed_cap";
+	internal const string SettingReplays = "replays_enabled";
+
+	/// <summary>Start zone bhop cap of this map (u/s, 0 = off) - null uses Config.StartSpeedCap</summary>
+	internal float? StartSpeedCap { get; private set; }
+
+	/// <summary>False when the map's replays_enabled setting turns replay recording off</summary>
+	internal bool RecordReplays { get; private set; } = true;
+
+	internal ulong? WorkshopId { get; set; }
+
+	/// <summary>All courses of the map (from the database, incl. ones whose zones were removed)</summary>
+	internal IEnumerable<MapRepository.CourseRow> Courses => _courses.Values;
 
 	/// <summary>
 	/// The course id of a run type (0 map, 1 bonus, 2 stage, 3 checkpoint segment) and number, 0 if unknown.
@@ -283,6 +296,7 @@ public class Map : MapEntity
 		this.Ranked = row.Ranked;
 		this.DateAdded = PlayerRepository.ToUnix(row.CreatedAt);
 		this.LastPlayed = PlayerRepository.ToUnix(row.LastPlayedAt);
+		this.WorkshopId = row.WorkshopId;
 
 		var courses = await MapRepository.EnsureCoursesAsync(this.ID, ZoneCourses());
 		_courses = courses.ToDictionary(c => (c.Kind, c.Number));
@@ -308,11 +322,23 @@ public class Map : MapEntity
 	}
 
 	/// <summary>
-	/// Map options stored in map_settings.
+	/// Map options stored in map_settings. Cvar overrides are applied on the next frame (natives are main
+	/// thread only - this also runs after the map load's awaits).
 	/// </summary>
 	internal void ApplySettings()
 	{
-		this.StagedLinear = Settings.TryGetValue(SettingStagedLinear, out var value) && value is "1" or "true";
+		this.StagedLinear = IsTrue(SettingStagedLinear, false);
+		this.RecordReplays = IsTrue(SettingReplays, true);
+		this.StartSpeedCap = Settings.TryGetValue(SettingStartSpeedCap, out var cap)
+			&& float.TryParse(cap, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float parsed)
+			? Math.Max(0, parsed)
+			: null;
+
+		var snapshot = new Dictionary<string, string>(Settings, StringComparer.OrdinalIgnoreCase);
+		Server.NextFrame(() => MapCvars.Apply(snapshot));
+
+		bool IsTrue(string key, bool fallback) =>
+			Settings.TryGetValue(key, out var value) ? value is "1" or "true" : fallback;
 	}
 
 	internal void SetCourseTier(CourseKind kind, short number, byte? tier)

@@ -28,7 +28,7 @@ public class CurrentRun : RunStatsEntity
 	/// <param name="type">0 map, 1 bonus, 2 stage, 3 checkpoint segment</param>
 	internal static void LogRun(Player player, short type, short number, int runTicks, float? sync)
 	{
-		if (player.Timer.IsPracticeMode || SurfTimer.CurrentMap == null)
+		if (player.Timer.IsPracticeMode || SurfTimer.CurrentMap == null || player.Profile.IsBanned)
 			return;
 
 		int courseId = SurfTimer.CurrentMap.CourseId(type, number);
@@ -92,6 +92,22 @@ public class CurrentRun : RunStatsEntity
 
 		short number = recType switch { 1 => bonus, 2 => stage, 3 => checkpoint, _ => 0 };
 		var map = SurfTimer.CurrentMap;
+
+		// Timer ban: nothing is stored (callers may already be off the main thread - chat via NextFrame)
+		if (player.Profile.IsBanned)
+		{
+			if (recType == 0 || recType == 1)
+			{
+				var controller = player.Controller;
+				Server.NextFrame(() =>
+				{
+					if (controller.IsValid)
+						controller.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["timer_banned_run"]}");
+				});
+			}
+			return;
+		}
+
 		int courseId = map.CourseId(recType, number);
 		if (courseId <= 0)
 		{
@@ -100,8 +116,10 @@ public class CurrentRun : RunStatsEntity
 			return;
 		}
 
-		// Everything from the live run is taken here, on the main thread, before the first await
-		var frames = player.ReplayRecorder.TrimReplay(
+		// Everything from the live run is taken here, on the main thread, before the first await.
+		// No replay when replays are off globally or for this map.
+		bool storeReplay = Config.ReplaysEnabled && map.RecordReplays;
+		var frames = !storeReplay ? new List<ReplayFrame>() : player.ReplayRecorder.TrimReplay(
 			player,
 			type: recType,
 			bonus: bonus,

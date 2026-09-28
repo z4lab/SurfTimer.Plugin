@@ -28,6 +28,9 @@ public class Player
 	// !hideself - player model hidden (on by default each join)
 	internal bool HideSelf { get; set; } = true;
 
+	// !admin - the open admin panel (tab, pages), kept while connected
+	internal AdminSession? Admin { get; set; }
+
 	// Anti-prehop/bhop state (map start zone + every stage start zone). Deliberately not on
 	// PlayerTimer - Timer.Reset() fires on every start-zone entry, which would wrongly clear this;
 	// this state must only clear when velocity actually drops below the cap.
@@ -101,7 +104,6 @@ public class Player
 	internal int GroundTicks { get; set; } = 0;
 	internal int StartZoneJumpCount { get; set; } = 0;
 	internal bool StartZoneSpeedCapActive { get; set; } = false;
-	private const float StartZoneSpeedCap = 260f;
 	// Staying on the ground this long (~0.25s at 64 tick) is walking/prestrafing, not a bhop
 	private const int StartZoneWalkResetTicks = 16;
 
@@ -237,7 +239,7 @@ public class Player
 	/// Start-zone (map start or any stage start) anti-prehop, on horizontal speed:
 	/// - the first jump is free, so ground prestrafe speed can be taken into it;
 	/// - a second jump that follows a landing within StartZoneWalkResetTicks (a bhop) caps airborne
-	///   speed at StartZoneSpeedCap while in the zone, until speed drops below the cap;
+	///   speed at the start speed cap (map setting / Config.StartSpeedCap) while in the zone, until speed drops below the cap;
 	/// - landing inside a start zone counts as the first hop, so speed carried in from the air
 	///   can't be bhopped out of the zone;
 	/// - staying on the ground for StartZoneWalkResetTicks (walking/prestrafing) resets it all.
@@ -280,16 +282,24 @@ public class Player
 
 		this.WasOnGroundLastTick = isOnGround;
 
+		// The map's start_speed_cap setting, else timer_settings.json's default - 0 = no cap
+		float cap = SurfTimer.CurrentMap?.StartSpeedCap ?? Config.StartSpeedCap;
+		if (cap <= 0)
+		{
+			this.StartZoneSpeedCapActive = false;
+			return;
+		}
+
 		VectorT vel = pawn.AbsVelocity.ToVector_t();
 		float horizontalSpeed = MathF.Sqrt(vel.X * vel.X + vel.Y * vel.Y);
 
-		if (this.IsInStartZone && this.StartZoneSpeedCapActive && !isOnGround && horizontalSpeed > StartZoneSpeedCap)
+		if (this.IsInStartZone && this.StartZoneSpeedCapActive && !isOnGround && horizontalSpeed > cap)
 		{
-			float scale = StartZoneSpeedCap / horizontalSpeed;
+			float scale = cap / horizontalSpeed;
 			Extensions.Teleport(pawn, null, null, new VectorT(vel.X * scale, vel.Y * scale, vel.Z));
 		}
 
-		if (horizontalSpeed < StartZoneSpeedCap)
+		if (horizontalSpeed < cap)
 		{
 			this.StartZoneJumpCount = 0;
 			this.StartZoneSpeedCapActive = false;

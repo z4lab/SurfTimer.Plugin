@@ -1,7 +1,7 @@
 namespace SurfTimer;
 
 /// <summary>
-/// players, player_names, player_sessions, player_settings.
+/// players, player_names, player_sessions, player_settings, player_bans.
 /// </summary>
 internal static class PlayerRepository
 {
@@ -127,4 +127,146 @@ internal static class PlayerRepository
 			VALUES (@PlayerId, @Key, @Value, UTC_TIMESTAMP(3))
 			ON DUPLICATE KEY UPDATE `value` = VALUES(`value`), `updated_at` = VALUES(`updated_at`)",
 			new { PlayerId = playerId, Key = key, Value = value });
+
+	internal static Task<int> ResetSettingsAsync(int playerId) =>
+		SurfTimer.DB.ExecuteAsync("DELETE FROM `{p}player_settings` WHERE `player_id` = @PlayerId", new { PlayerId = playerId });
+
+	// ---- Admin: search, history ----
+
+	/// <summary>
+	/// Players matching a (partial) current or former name, most recently seen first.
+	/// </summary>
+	internal static async Task<List<PlayerProfileEntity>> SearchAsync(string name, int limit)
+	{
+		string pattern = "%" + name.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_") + "%";
+		var rows = await SurfTimer.DB.QueryAsync<PlayerRow>(SelectPlayer + @"
+			WHERE p.`name` LIKE @Pattern
+				OR p.`id` IN (SELECT n.`player_id` FROM `{p}player_names` n WHERE n.`name` LIKE @Pattern)
+			ORDER BY p.`last_seen_at` DESC LIMIT @Limit", new { Pattern = pattern, Limit = limit });
+		return rows.Select(ToEntity).ToList();
+	}
+
+	internal static async Task<PlayerProfileEntity?> GetAsync(int playerId)
+	{
+		var row = await SurfTimer.DB.QueryFirstOrDefaultAsync<PlayerRow>(SelectPlayer + " WHERE p.`id` = @Id", new { Id = playerId });
+		return row == null ? null : ToEntity(row);
+	}
+
+	internal sealed class NameRow
+	{
+		public string Name { get; set; } = "";
+		public DateTime FirstUsedAt { get; set; }
+		public DateTime LastUsedAt { get; set; }
+	}
+
+	internal static Task<List<NameRow>> GetNamesAsync(int playerId) =>
+		SurfTimer.DB.QueryAsync<NameRow>(@"
+			SELECT `name`, `first_used_at`, `last_used_at` FROM `{p}player_names`
+			WHERE `player_id` = @PlayerId ORDER BY `last_used_at` DESC LIMIT 40", new { PlayerId = playerId });
+
+	internal sealed class SessionRow
+	{
+		public DateTime JoinedAt { get; set; }
+		public DateTime LastHeartbeatAt { get; set; }
+		public DateTime? LeftAt { get; set; }
+		public string? MapName { get; set; }
+	}
+
+	internal static Task<List<SessionRow>> GetRecentSessionsAsync(int playerId, int limit) =>
+		SurfTimer.DB.QueryAsync<SessionRow>(@"
+			SELECT s.`joined_at`, s.`last_heartbeat_at`, s.`left_at`, m.`name` AS MapName
+			FROM `{p}player_sessions` s LEFT JOIN `{p}maps` m ON m.`id` = s.`map_id`
+			WHERE s.`player_id` = @PlayerId ORDER BY s.`joined_at` DESC LIMIT @Limit",
+			new { PlayerId = playerId, Limit = limit });
+
+	internal sealed class SummaryRow
+	{
+		public long Points { get; set; }
+		public long Rank { get; set; }
+		public long PlayTime { get; set; }
+		public long Times { get; set; }
+		public long HiddenTimes { get; set; }
+	}
+
+	/// <summary>
+	/// Points / rank (style), playtime and time counts for the admin player page.
+	/// </summary>
+	internal static async Task<SummaryRow> GetSummaryAsync(int playerId, int style) =>
+		await SurfTimer.DB.QueryFirstOrDefaultAsync<SummaryRow>(@"
+			SELECT CAST(COALESCE(ps.`points`, 0) AS SIGNED) AS Points,
+				(SELECT COUNT(*) FROM `{p}player_stats` WHERE `style_id` = @Style AND `points` > COALESCE(ps.`points`, 0)) + 1 AS `Rank`,
+				(SELECT CAST(COALESCE(SUM(COALESCE(s.`duration_seconds`, TIMESTAMPDIFF(SECOND, s.`joined_at`, s.`last_heartbeat_at`))), 0) AS SIGNED)
+					FROM `{p}player_sessions` s WHERE s.`player_id` = @PlayerId) AS PlayTime,
+				(SELECT COUNT(*) FROM `{p}times` t WHERE t.`player_id` = @PlayerId) AS Times,
+				(SELECT COUNT(*) FROM `{p}times` t WHERE t.`player_id` = @PlayerId AND t.`hidden` = 1) AS HiddenTimes
+			FROM (SELECT 1) AS one
+			LEFT JOIN `{p}player_stats` ps ON ps.`player_id` = @PlayerId AND ps.`style_id` = @Style",
+			new { PlayerId = playerId, Style = style }) ?? new SummaryRow();
+
+	// ---- Timer bans ----
+
+	internal sealed class BanRow
+	{
+		public int Id { get; set; }
+		public int PlayerId { get; set; }
+		public string? AdminName { get; set; }
+		public string Reason { get; set; } = "";
+		public DateTime CreatedAt { get; set; }
+		public DateTime? ExpiresAt { get; set; }
+
+		internal bool IsPermanent => ExpiresAt == null;
+	}
+
+	private const string ActiveBan = "b.`lifted_at` IS NULL AND (b.`expires_at` IS NULL OR b.`expires_at` > UTC_TIMESTAMP(3))";
+
+	/// <summary>
+	/// The player's active timer ban (the one ending last), or null.
+	/// </summary>
+	internal static Task<BanRow?> GetActiveBanAsync(int playerId) =>
+		SurfTimer.DB.QueryFirstOrDefaultAsync<BanRow>(@"
+			SELECT b.`id`, b.`player_id`, a.`name` AS AdminName, b.`reason`, b.`created_at`, b.`expires_at`
+			FROM `{p}player_bans` b LEFT JOIN `{p}players` a ON a.`id` = b.`admin_player_id`
+			WHERE b.`player_id` = @PlayerId AND " + ActiveBan + @"
+			ORDER BY b.`expires_at` IS NULL DESC, b.`expires_at` DESC LIMIT 1", new { PlayerId = playerId });
+
+	/// <summary>
+	/// Adds a timer ban (expiresAt null = permanent). Hiding the times is up to the caller
+	/// (TimeRepository.SetHiddenForPlayerAsync) so it can recalculate points after.
+	/// </summary>
+	internal static Task BanAsync(int playerId, int? adminPlayerId, string reason, DateTime? expiresAtUtc) =>
+		SurfTimer.DB.ExecuteAsync(@"
+			INSERT INTO `{p}player_bans` (`player_id`, `admin_player_id`, `reason`, `created_at`, `expires_at`)
+			VALUES (@PlayerId, @AdminId, @Reason, UTC_TIMESTAMP(3), @ExpiresAt)",
+			new { PlayerId = playerId, AdminId = adminPlayerId, Reason = reason, ExpiresAt = expiresAtUtc });
+
+	/// <summary>
+	/// Lifts all active bans of the player.
+	/// </summary>
+	internal static Task<int> UnbanAsync(int playerId, int? adminPlayerId) =>
+		SurfTimer.DB.ExecuteAsync(@"
+			UPDATE `{p}player_bans` b SET b.`lifted_at` = UTC_TIMESTAMP(3), b.`lifted_by` = @AdminId
+			WHERE b.`player_id` = @PlayerId AND " + ActiveBan, new { PlayerId = playerId, AdminId = adminPlayerId });
+
+	/// <summary>
+	/// Marks bans that ran out as lifted and returns the players who are no longer banned at all -
+	/// their times get shown again by the caller.
+	/// </summary>
+	internal static Task<List<int>> LiftExpiredBansAsync() =>
+		SurfTimer.DB.InTransactionAsync(async tx =>
+		{
+			var expired = (await tx.QueryAsync<int>(@"
+				SELECT DISTINCT b.`player_id` FROM `{p}player_bans` b
+				WHERE b.`lifted_at` IS NULL AND b.`expires_at` IS NOT NULL AND b.`expires_at` <= UTC_TIMESTAMP(3)")).ToList();
+			if (expired.Count == 0)
+				return expired;
+
+			await tx.ExecuteAsync(@"
+				UPDATE `{p}player_bans` SET `lifted_at` = `expires_at`
+				WHERE `lifted_at` IS NULL AND `expires_at` IS NOT NULL AND `expires_at` <= UTC_TIMESTAMP(3)");
+
+			var stillBanned = (await tx.QueryAsync<int>(@"
+				SELECT DISTINCT b.`player_id` FROM `{p}player_bans` b WHERE b.`player_id` IN @Ids AND " + ActiveBan,
+				new { Ids = expired })).ToHashSet();
+			return expired.Where(id => !stillBanned.Contains(id)).ToList();
+		});
 }

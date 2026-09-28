@@ -67,7 +67,7 @@ public partial class SurfTimer
 			if (convar == null)
 				continue;
 
-			string current = ReadConVar(convar);
+			string current = ConVarHelper.Read(convar);
 			if (string.Equals(current, value, StringComparison.OrdinalIgnoreCase))
 				continue;
 
@@ -90,17 +90,6 @@ public partial class SurfTimer
 			}
 		}
 	}
-
-	// ConVars are typed - read them as the text you'd type in the console
-	private static string ReadConVar(ConVar convar) => convar.Type switch
-	{
-		ConVarType.Bool => convar.GetPrimitiveValue<bool>() ? "1" : "0",
-		ConVarType.Int16 or ConVarType.Int32 or ConVarType.UInt16 or ConVarType.UInt32 => convar.GetPrimitiveValue<int>().ToString(),
-		ConVarType.Int64 or ConVarType.UInt64 => convar.GetPrimitiveValue<long>().ToString(),
-		ConVarType.Float32 => convar.GetPrimitiveValue<float>().ToString(System.Globalization.CultureInfo.InvariantCulture),
-		ConVarType.Float64 => convar.GetPrimitiveValue<double>().ToString(System.Globalization.CultureInfo.InvariantCulture),
-		_ => convar.StringValue,
-	};
 
 	/// <summary>
 	/// Bots joining - with OnPlayerDisconnect's bot log this shows whether a bot was added and

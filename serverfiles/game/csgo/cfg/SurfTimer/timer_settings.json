@@ -7,5 +7,6 @@
 	"points_segment_wr": 0,
 	"block_map_chat": true,
 	"protect_replay_bots": true,
-	"replay_bot_direct_spawn": true
+	"replay_bot_direct_spawn": true,
+	"start_speed_cap": 260
 }

@@ -83,6 +83,10 @@ public partial class SurfTimer : BasePlugin
 		foreach (var player in playerList.Values)
 			StatsService.Flush(player, final: true);
 
+		// Per-map cvar overrides back to the server's values, open chat prompts dropped
+		MapCvars.RestoreAll();
+		ChatPrompt.ForgetAll();
+
 		// Clear/reset stuff here
 		CurrentMap = null!;
 		playerList.Clear();
@@ -104,6 +108,12 @@ public partial class SurfTimer : BasePlugin
 			player.TouchingTriggers.Clear();
 
 		Server.ExecuteCommand("execifexists SurfTimer/server_settings.cfg");
+		// The config may set the same cvars as the map's overrides - those win
+		AddTimer(0.5f, () =>
+		{
+			if (CurrentMap != null)
+				MapCvars.Apply(CurrentMap.Settings);
+		});
 		_logger.LogTrace(
 			"[{Prefix}] Executed configuration: server_settings.cfg",
 			Config.PluginName
@@ -155,6 +165,11 @@ public partial class SurfTimer : BasePlugin
 		RegisterListener<Listeners.OnTick>(OnTick);
 		// Block map scripts' chat and bot kicks (see MapCommandFilter.cs)
 		RegisterMapCommandFilter();
+		// Chat input for the admin panel (see ChatPrompt.cs)
+		ChatPrompt.Register(this);
+		// Timer bans that ran out: times shown again - now and every hour
+		LiftExpiredBans();
+		AddTimer(3600f, LiftExpiredBans, CounterStrikeSharp.API.Modules.Timers.TimerFlags.REPEAT);
 		// Popup menu clicks (custom HUD buttons) - only our own layout, only players with a menu open
 		RegisterListener<Listeners.OnCustomHudClicked>((player, layout, buttonId) =>
 		{

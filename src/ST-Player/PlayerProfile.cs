@@ -13,9 +13,15 @@ public class PlayerProfile : PlayerProfileEntity
 
 	internal const string SettingHideSelf = "hideself";
 
+	/// <summary>Active timer ban (loaded on connect, kept up to date by the admin panel)</summary>
+	internal PlayerRepository.BanRow? Ban { get; set; }
+
+	/// <summary>Timer-banned players can play, but their runs aren't saved</summary>
+	internal bool IsBanned => Ban != null && (Ban.ExpiresAt == null || Ban.ExpiresAt > DateTime.UtcNow);
+
 	/// <summary>
 	/// Creates / updates the player's row (name, country, last seen, name history), opens a session for
-	/// this map and loads their settings.
+	/// this map and loads their settings and timer ban.
 	/// </summary>
 	/// <param name="country">ISO country code - "XX" (unknown) keeps the stored one</param>
 	internal static async Task<PlayerProfile> CreateAsync(ulong steamId, string name, string country, int? mapId)
@@ -34,6 +40,7 @@ public class PlayerProfile : PlayerProfileEntity
 
 		profile.SessionId = await PlayerRepository.OpenSessionAsync(profile.ID, mapId);
 		profile.Settings = await PlayerRepository.GetSettingsAsync(profile.ID);
+		profile.Ban = await PlayerRepository.GetActiveBanAsync(profile.ID);
 		return profile;
 	}
 

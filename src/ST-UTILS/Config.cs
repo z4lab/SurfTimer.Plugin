@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Reflection;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using CounterStrikeSharp.API;
 
 namespace SurfTimer;
@@ -17,7 +18,7 @@ public static class Config
 	/// </summary>
 	public static readonly ImmutableList<int> Styles = [0]; // Add all supported style IDs
 
-	public static readonly bool ReplaysEnabled = TimerSettings.GetReplaysEnabled();
+	public static bool ReplaysEnabled { get; private set; } = TimerSettings.GetReplaysEnabled();
 	public static readonly int ReplaysPre = TimerSettings.GetReplaysPre();
 
 	/// <summary>
@@ -31,30 +32,72 @@ public static class Config
 	/// Needs an addon version that has the popup (st_menu) - with an older one the player would be put in
 	/// cursor mode without a visible menu to close, so turn this off until the new addon is live.
 	/// </summary>
-	public static readonly bool PopupMenus = TimerSettings.GetBool("popup_menus", true);
+	public static bool PopupMenus { get; private set; } = TimerSettings.GetBool("popup_menus", true);
 
 	/// <summary>
 	/// Points per stage / checkpoint segment WR (CS:GO SurfTimer's ck_wrcp_points, 0 = none).
 	/// </summary>
-	public static readonly int PointsSegmentWr = TimerSettings.GetInt("points_segment_wr", 0);
+	public static int PointsSegmentWr { get; private set; } = TimerSettings.GetInt("points_segment_wr", 0);
 
 	/// <summary>
 	/// Blocks chat the map sends through the server console (`say` from map scripts, e.g. ads).
 	/// Note: also blocks `say` typed into the server console / RCON.
 	/// </summary>
-	public static readonly bool BlockMapChat = TimerSettings.GetBool("block_map_chat", true);
+	public static bool BlockMapChat { get; private set; } = TimerSettings.GetBool("block_map_chat", true);
 
 	/// <summary>
 	/// Blocks bot kicks the plugin didn't ask for (`bot_kick`, `kick`/`kickid` on a bot) - maps that
 	/// kick every bot would otherwise remove replay bots.
 	/// </summary>
-	public static readonly bool ProtectReplayBots = TimerSettings.GetBool("protect_replay_bots", true);
+	public static bool ProtectReplayBots { get; private set; } = TimerSettings.GetBool("protect_replay_bots", true);
 
 	/// <summary>
 	/// Creates replay bots through the game's CreateBot function (works on maps without a nav mesh,
 	/// where bot_add/bot_quota do nothing). Falls back to bot_quota when off or the signature breaks.
 	/// </summary>
-	public static readonly bool ReplayBotDirectSpawn = TimerSettings.GetBool("replay_bot_direct_spawn", true);
+	public static bool ReplayBotDirectSpawn { get; private set; } = TimerSettings.GetBool("replay_bot_direct_spawn", true);
+
+	/// <summary>
+	/// Default airborne speed cap for bhops inside start zones (u/s, 0 = no cap) - maps can override it
+	/// with their start_speed_cap setting.
+	/// </summary>
+	public static int StartSpeedCap { get; private set; } = TimerSettings.GetInt("start_speed_cap", 260);
+
+	/// <summary>
+	/// Timer settings the !admin panel can change live - written back to timer_settings.json.
+	/// </summary>
+	internal static readonly IReadOnlyList<string> LiveBoolSettings =
+		["popup_menus", "block_map_chat", "protect_replay_bots", "replay_bot_direct_spawn", "replays_enabled"];
+
+	internal static bool GetLiveBool(string key) => key switch
+	{
+		"popup_menus" => PopupMenus,
+		"block_map_chat" => BlockMapChat,
+		"protect_replay_bots" => ProtectReplayBots,
+		"replay_bot_direct_spawn" => ReplayBotDirectSpawn,
+		"replays_enabled" => ReplaysEnabled,
+		_ => false,
+	};
+
+	/// <summary>
+	/// Changes a timer setting live and saves it to timer_settings.json (other keys and values are kept).
+	/// </summary>
+	internal static void SaveTimerSetting(string key, JsonNode value)
+	{
+		TimerSettings.Write(key, value);
+		ReloadLiveSettings();
+	}
+
+	private static void ReloadLiveSettings()
+	{
+		ReplaysEnabled = TimerSettings.GetReplaysEnabled();
+		PopupMenus = TimerSettings.GetBool("popup_menus", true);
+		PointsSegmentWr = TimerSettings.GetInt("points_segment_wr", 0);
+		BlockMapChat = TimerSettings.GetBool("block_map_chat", true);
+		ProtectReplayBots = TimerSettings.GetBool("protect_replay_bots", true);
+		ReplayBotDirectSpawn = TimerSettings.GetBool("replay_bot_direct_spawn", true);
+		StartSpeedCap = TimerSettings.GetInt("start_speed_cap", 260);
+	}
 
 	/// <summary>
 	/// Maximum number of distinct replays that can play concurrently via !replay.
@@ -83,6 +126,25 @@ public static class Config
 			}
 			return _configDocuments[configPath];
 		}
+
+		/// <summary>
+		/// Sets one key of a JSON config file (written to a temp file first, then swapped in) and drops
+		/// the cached document so the next read sees it.
+		/// </summary>
+		public static void WriteKey(string configPath, string key, JsonNode value)
+		{
+			var fullPath = Server.GameDirectory + configPath;
+			var root = JsonNode.Parse(File.ReadAllText(fullPath)) as JsonObject
+				?? throw new InvalidOperationException($"{configPath} is not a JSON object");
+			root[key] = value;
+
+			string temp = fullPath + ".tmp";
+			File.WriteAllText(temp, root.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+			File.Move(temp, fullPath, overwrite: true);
+
+			if (_configDocuments.Remove(configPath, out var old))
+				old.Dispose();
+		}
 	}
 
 	/// <summary>
@@ -98,6 +160,8 @@ public static class Config
 		{
 			return ConfigDocument.RootElement.GetProperty("replays_enabled").GetBoolean();
 		}
+
+		public static void Write(string key, JsonNode value) => ConfigLoader.WriteKey(TIMER_CONFIG_PATH, key, value);
 
 		public static int GetReplaysPre()
 		{

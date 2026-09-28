@@ -86,6 +86,8 @@ internal static class CustomHud
 	internal const string MenuId = "st_menu";
 	internal const string MenuTitleId = "st_menu_title";
 	internal const string MenuCloseId = "st_menu_close";
+	internal const string MenuBackId = "st_menu_back";
+	internal const string MenuStatusId = "st_menu_status";
 	internal const string MenuTabsId = "st_menu_tabs";
 	internal const string MenuPrevId = "st_menu_prev";
 	internal const string MenuNextId = "st_menu_next";

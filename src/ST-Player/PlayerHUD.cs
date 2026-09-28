@@ -783,12 +783,27 @@ public class PlayerHud
 
 	internal bool IsMenuOpen => _menu != null;
 
+	/// <summary>The open menu (null when closed)</summary>
+	internal HudMenu? Menu => _menu;
+
 	internal void OpenMenu(HudMenu menu)
 	{
 		_menu = menu;
-		_menuTab = 0;
+		_menuTab = Math.Clamp(menu.ActiveTab, 0, Math.Max(0, menu.Tabs.Count - 1));
 		_menuPage = 0;
 		SendMenu();
+	}
+
+	/// <summary>
+	/// Replaces the open menu's content (e.g. after an action) - stays on the page unless resetPage.
+	/// </summary>
+	internal void UpdateMenu(HudMenu menu, bool resetPage)
+	{
+		_menu = menu;
+		_menuTab = Math.Clamp(menu.ActiveTab, 0, Math.Max(0, menu.Tabs.Count - 1));
+		if (resetPage)
+			_menuPage = 0;
+		SendMenu(); // Clamps the page
 	}
 
 	internal void CloseMenu()
@@ -816,6 +831,10 @@ public class PlayerHud
 		{
 			CloseMenu();
 		}
+		else if (buttonId == CustomHud.MenuBackId)
+		{
+			_menu.OnBack?.Invoke(_player.Controller);
+		}
 		else if (buttonId == CustomHud.MenuPrevId)
 		{
 			if (_menuPage > 0)
@@ -839,6 +858,7 @@ public class PlayerHud
 				_menuTab = tab;
 				_menuPage = 0;
 				SendMenu();
+				_menu.OnTabChanged?.Invoke(_player.Controller, tab);
 			}
 		}
 		else if (buttonId.StartsWith(CustomHud.MenuItemPrefix) && int.TryParse(buttonId[CustomHud.MenuItemPrefix.Length..], out int row))
@@ -853,6 +873,13 @@ public class PlayerHud
 
 			var onSelect = item.OnSelect;
 			var controller = _player.Controller;
+
+			// The action updates the open menu itself (toggles, steppers, sub-pages)
+			if (item.KeepOpen)
+			{
+				onSelect(controller);
+				return;
+			}
 
 			// Movement back first, then the action (which may e.g. move the player to spectator)
 			CloseMenu();
@@ -884,6 +911,9 @@ public class PlayerHud
 
 		var menu = _menu!;
 		SendText(CustomHud.MenuTitleId, menu.Title);
+		SendClass(CustomHud.MenuBackId, "hidden", menu.OnBack == null);
+		SendClass(CustomHud.MenuStatusId, "hidden", menu.Status.Length == 0);
+		SendText(CustomHud.MenuStatusId, menu.Status);
 
 		// Tabs - no tab row for a single tab
 		bool showTabs = menu.Tabs.Count > 1;
@@ -915,6 +945,9 @@ public class PlayerHud
 
 			var item = items[index];
 			SendClass(CustomHud.MenuItemId(row), "info", item.OnSelect == null); // No hover, not clickable
+			SendClass(CustomHud.MenuItemId(row), "danger", item.Style == HudMenuItemStyle.Danger);
+			SendClass(CustomHud.MenuItemId(row), "on", item.Style == HudMenuItemStyle.On);
+			SendClass(CustomHud.MenuItemId(row), "off", item.Style == HudMenuItemStyle.Off);
 			SendText(CustomHud.MenuItemPartId(row, "num"), (row + 1).ToString());
 			SendText(CustomHud.MenuItemPartId(row, "text"), item.Text);
 			SendText(CustomHud.MenuItemPartId(row, "sub"), item.Sub);

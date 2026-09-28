@@ -12,6 +12,45 @@ public partial class SurfTimer
 	/// <summary>Who a profile is about - an online player's profile or a DB row for offline players.</summary>
 	private sealed record ProfileTarget(int Id, string Name, string Country, int JoinDate, int LastSeen, int Connections, bool Online);
 
+	/// <summary>
+	/// Opens the profile of a player by their id (the admin panel's player page).
+	/// </summary>
+	internal void OpenProfileById(CCSPlayerController viewerController, int playerId)
+	{
+		if (!playerList.TryGetValue(viewerController.UserId ?? 0, out var viewer))
+			return;
+
+		int style = viewer.Timer.Style;
+		int currentMapId = CurrentMap?.ID ?? 0;
+		var online = playerList.Values.FirstOrDefault(p => p.Profile.ID == playerId && p.Controller.IsValid);
+
+		Task.Run(async () =>
+		{
+			try
+			{
+				ProfileTarget? target = online != null
+					? new ProfileTarget(playerId, online.Profile.Name ?? "", online.Profile.Country ?? "", online.Profile.JoinDate,
+						online.Profile.LastSeen, online.Profile.Connections, true)
+					: await PlayerRepository.GetAsync(playerId) is { } row
+						? new ProfileTarget(row.ID, row.Name ?? "", row.Country ?? "", row.JoinDate, row.LastSeen, row.Connections, false)
+						: null;
+				if (target == null)
+					return;
+
+				var data = await ProfileRepository.LoadAsync(target.Id, style, currentMapId);
+				Server.NextFrame(() =>
+				{
+					if (viewerController.IsValid && playerList.TryGetValue(viewerController.UserId ?? 0, out var stillViewer))
+						MenuPresenter.Show(stillViewer, BuildProfileMenu(target, data, style));
+				});
+			}
+			catch (Exception ex)
+			{
+				_logger.LogError(ex, "[{ClassName}] Loading the profile of player {PlayerId} failed", nameof(SurfTimer), playerId);
+			}
+		});
+	}
+
 	[ConsoleCommand("css_profile", "Show your profile or another player's (online or offline)")]
 	[ConsoleCommand("css_p", "Show your profile or another player's (online or offline)")]
 	[CommandHelper(usage: "[name]", whoCanExecute: CommandUsage.CLIENT_ONLY)]

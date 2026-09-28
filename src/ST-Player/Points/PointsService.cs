@@ -7,7 +7,7 @@ namespace SurfTimer;
 /// Keeps player_course_points (points per player / course / style) and player_stats.points (their
 /// sum) up to date. A new PB can move everyone on that course a rank down, so the whole map is
 /// recalculated - not just the player who finished (the CS:GO SurfTimer only did the latter).
-/// Unranked maps give no points.
+/// Unranked maps, courses with points turned off and hidden times (timer bans) give no points.
 /// </summary>
 internal static class PointsService
 {
@@ -33,7 +33,7 @@ internal static class PointsService
 		FROM `{p}times` t
 		JOIN `{p}courses` c ON c.`id` = t.`course_id`
 		LEFT JOIN `{p}courses` mc ON mc.`map_id` = c.`map_id` AND mc.`kind_id` = 1 AND mc.`number` = 0
-		WHERE c.`map_id` = @MapId AND t.`style_id` = @Style";
+		WHERE c.`map_id` = @MapId AND t.`style_id` = @Style AND t.`hidden` = 0 AND c.`points_enabled` = 1";
 
 	// One recalculation at a time - a map run and its last stage are saved at the same moment
 	private static readonly SemaphoreSlim _lock = new(1, 1);

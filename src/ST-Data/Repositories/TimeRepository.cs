@@ -2,7 +2,8 @@ namespace SurfTimer;
 
 /// <summary>
 /// times (PBs), time_splits, run_history, course_stats and replays. Ranks are "count of strictly
-/// faster times + 1" - a range scan on the (course_id, style_id, run_time_ticks) index.
+/// faster visible times + 1" - a range scan on the (course_id, style_id, hidden, run_time_ticks) index.
+/// Hidden times (timer-banned players) are kept but left out of ranks, WRs and completions.
 /// </summary>
 internal static class TimeRepository
 {
@@ -45,6 +46,7 @@ internal static class TimeRepository
 		public string? PlayerName { get; set; }
 		public long Rank { get; set; }
 		public long TotalCount { get; set; }
+		public bool Hidden { get; set; }
 
 		internal CourseKind Kind => (CourseKind)KindId;
 
@@ -80,9 +82,10 @@ internal static class TimeRepository
 			t.`run_time_ticks` AS RunTime, t.`sync`,
 			t.`start_velocity_x` AS StartVelX, t.`start_velocity_y` AS StartVelY, t.`start_velocity_z` AS StartVelZ,
 			t.`end_velocity_x` AS EndVelX, t.`end_velocity_y` AS EndVelY, t.`end_velocity_z` AS EndVelZ,
-			t.`replay_id`, t.`updated_at`, p.`name` AS PlayerName,
+			t.`replay_id`, t.`updated_at`, t.`hidden`, p.`name` AS PlayerName,
 			(SELECT COUNT(*) FROM `{p}times` x
-				WHERE x.`course_id` = t.`course_id` AND x.`style_id` = t.`style_id` AND x.`run_time_ticks` < t.`run_time_ticks`) + 1 AS `Rank`,
+				WHERE x.`course_id` = t.`course_id` AND x.`style_id` = t.`style_id` AND x.`hidden` = 0
+					AND x.`run_time_ticks` < t.`run_time_ticks`) + 1 AS `Rank`,
 			COALESCE(cs.`completions`, 0) AS TotalCount
 		FROM `{p}times` t
 		JOIN `{p}courses` c ON c.`id` = t.`course_id`
@@ -116,14 +119,15 @@ internal static class TimeRepository
 			if (run.Replay != null)
 			{
 				await tx.ExecuteAsync(@"
-					INSERT INTO `{p}replays` (`format_version`, `tick_rate`, `frame_count`, `raw_size`, `data`, `created_at`)
-					VALUES (@FormatVersion, @TickRate, @FrameCount, @RawSize, @Data, UTC_TIMESTAMP(3))",
+					INSERT INTO `{p}replays` (`format_version`, `tick_rate`, `frame_count`, `raw_size`, `data_size`, `data`, `created_at`)
+					VALUES (@FormatVersion, @TickRate, @FrameCount, @RawSize, @DataSize, @Data, UTC_TIMESTAMP(3))",
 					new
 					{
 						FormatVersion = ReplayCodec.FormatVersion,
 						TickRate = ReplayCodec.TickRate,
 						run.Replay.FrameCount,
 						run.Replay.RawSize,
+						DataSize = run.Replay.Data.Length,
 						run.Replay.Data,
 					});
 				replayId = (int)await tx.ExecuteScalarAsync<ulong>("SELECT LAST_INSERT_ID()");
@@ -187,17 +191,8 @@ internal static class TimeRepository
 					}).ToList());
 			}
 
-			// Leaderboard cache: one more completion for a first time, and the course's fastest time
-			await tx.ExecuteAsync(@"
-				INSERT INTO `{p}course_stats` (`course_id`, `style_id`, `completions`, `wr_time_id`, `updated_at`)
-				VALUES (@CourseId, @StyleId, @NewCompletion, @TimeId, UTC_TIMESTAMP(3))
-				ON DUPLICATE KEY UPDATE `completions` = `completions` + VALUES(`completions`), `updated_at` = VALUES(`updated_at`)",
-				new { run.CourseId, run.StyleId, NewCompletion = existing == null ? 1 : 0, TimeId = timeId });
-			await tx.ExecuteAsync(@"
-				UPDATE `{p}course_stats` SET `wr_time_id` = (
-					SELECT t.`id` FROM `{p}times` t WHERE t.`course_id` = @CourseId AND t.`style_id` = @StyleId
-					ORDER BY t.`run_time_ticks`, t.`updated_at` LIMIT 1)
-				WHERE `course_id` = @CourseId AND `style_id` = @StyleId", new { run.CourseId, run.StyleId });
+			// Leaderboard cache: completions and WR of the course
+			await RefreshCourseStatsAsync(tx, [(run.CourseId, run.StyleId)]);
 
 			return new SaveResult(timeId, true);
 		});
@@ -267,6 +262,171 @@ internal static class TimeRepository
 			s.EnterVelocityX, s.EnterVelocityY, s.EnterVelocityZ, s.ExitVelocityX, s.ExitVelocityY, s.ExitVelocityZ,
 			s.ExitTicks, s.Attempts)
 		{ MapTimeID = s.TimeId });
+
+	/// <summary>
+	/// Recomputes the leaderboard cache (completions, WR) of courses from their visible times.
+	/// </summary>
+	private static async Task RefreshCourseStatsAsync(Database.Tx tx, IEnumerable<(int CourseId, short StyleId)> courses)
+	{
+		foreach (var (courseId, styleId) in courses.Distinct())
+		{
+			await tx.ExecuteAsync(@"
+				INSERT INTO `{p}course_stats` (`course_id`, `style_id`, `completions`, `wr_time_id`, `updated_at`)
+				SELECT @CourseId, @StyleId, COUNT(*),
+					(SELECT w.`id` FROM `{p}times` w
+						WHERE w.`course_id` = @CourseId AND w.`style_id` = @StyleId AND w.`hidden` = 0
+						ORDER BY w.`run_time_ticks`, w.`updated_at` LIMIT 1),
+					UTC_TIMESTAMP(3)
+				FROM `{p}times` t WHERE t.`course_id` = @CourseId AND t.`style_id` = @StyleId AND t.`hidden` = 0
+				ON DUPLICATE KEY UPDATE `completions` = VALUES(`completions`), `wr_time_id` = VALUES(`wr_time_id`),
+					`updated_at` = VALUES(`updated_at`)",
+				new { CourseId = courseId, StyleId = styleId });
+		}
+	}
+
+	// ---- Admin: leaderboards, deleting and hiding times ----
+
+	internal sealed class BoardRow
+	{
+		public int Id { get; set; }
+		public int PlayerId { get; set; }
+		public string PlayerName { get; set; } = "";
+		public int RunTime { get; set; }
+		public DateTime UpdatedAt { get; set; }
+		public int? ReplayId { get; set; }
+		public long Rank { get; set; }
+	}
+
+	/// <summary>
+	/// One page of a course's leaderboard (visible times), fastest first.
+	/// </summary>
+	internal static Task<List<BoardRow>> GetLeaderboardAsync(int courseId, int style, int offset, int limit) =>
+		SurfTimer.DB.QueryAsync<BoardRow>(@"
+			SELECT t.`id`, t.`player_id`, p.`name` AS PlayerName, t.`run_time_ticks` AS RunTime, t.`updated_at`, t.`replay_id`,
+				RANK() OVER (ORDER BY t.`run_time_ticks`) AS `Rank`
+			FROM `{p}times` t JOIN `{p}players` p ON p.`id` = t.`player_id`
+			WHERE t.`course_id` = @CourseId AND t.`style_id` = @Style AND t.`hidden` = 0
+			ORDER BY t.`run_time_ticks`, t.`updated_at`
+			LIMIT @Limit OFFSET @Offset",
+			new { CourseId = courseId, Style = style, Offset = offset, Limit = limit });
+
+	/// <summary>
+	/// What a delete / wipe covers - one time, a course, a map and / or a player's times. Wipes (all but a
+	/// single time) also delete the run history of what they cover.
+	/// </summary>
+	internal sealed record WipeScope(int? TimeId = null, int? CourseId = null, int? MapId = null, int? PlayerId = null)
+	{
+		internal bool IncludesHistory => TimeId == null;
+
+		internal string Where(string times, string courses)
+		{
+			var parts = new List<string>();
+			if (TimeId != null) parts.Add($"{times}.`id` = @TimeId");
+			if (CourseId != null) parts.Add($"{times}.`course_id` = @CourseId");
+			if (MapId != null) parts.Add($"{courses}.`map_id` = @MapId");
+			if (PlayerId != null) parts.Add($"{times}.`player_id` = @PlayerId");
+			return parts.Count == 0 ? "1 = 0" : string.Join(" AND ", parts); // Never "everything"
+		}
+	}
+
+	internal sealed class WipePreview
+	{
+		public long Times { get; set; }
+		public long Replays { get; set; }
+		public long ReplayBytes { get; set; }
+		public long History { get; set; }
+		public long Players { get; set; }
+	}
+
+	/// <summary>
+	/// Counts for the confirmation page of a delete / wipe.
+	/// </summary>
+	internal static async Task<WipePreview> PreviewWipeAsync(WipeScope scope)
+	{
+		var preview = await SurfTimer.DB.QueryFirstOrDefaultAsync<WipePreview>(@"
+			SELECT COUNT(*) AS Times, COUNT(r.`id`) AS Replays, CAST(COALESCE(SUM(r.`data_size`), 0) AS SIGNED) AS ReplayBytes,
+				COUNT(DISTINCT t.`player_id`) AS Players
+			FROM `{p}times` t JOIN `{p}courses` c ON c.`id` = t.`course_id`
+			LEFT JOIN `{p}replays` r ON r.`id` = t.`replay_id`
+			WHERE " + scope.Where("t", "c"), scope) ?? new WipePreview();
+
+		if (scope.IncludesHistory)
+		{
+			preview.History = await SurfTimer.DB.ExecuteScalarAsync<long>(@"
+				SELECT COUNT(*) FROM `{p}run_history` t JOIN `{p}courses` c ON c.`id` = t.`course_id`
+				WHERE " + scope.Where("t", "c"), scope);
+		}
+		return preview;
+	}
+
+	private sealed class AffectedRow
+	{
+		public int Id { get; set; }
+		public int CourseId { get; set; }
+		public short StyleId { get; set; }
+		public int MapId { get; set; }
+		public int PlayerId { get; set; }
+		public int? ReplayId { get; set; }
+	}
+
+	/// <summary>
+	/// Maps and players whose times changed - the caller recalculates points and reloads records / PBs.
+	/// </summary>
+	internal sealed record Affected(IReadOnlyList<int> MapIds, IReadOnlyList<int> PlayerIds, int Times);
+
+	/// <summary>
+	/// Deletes the times (splits cascade) and replays a scope covers, plus its run history for wipes,
+	/// and fixes the leaderboard cache. One transaction.
+	/// </summary>
+	internal static Task<Affected> WipeAsync(WipeScope scope) =>
+		SurfTimer.DB.InTransactionAsync(async tx =>
+		{
+			var rows = (await tx.QueryAsync<AffectedRow>(@"
+				SELECT t.`id`, t.`course_id`, t.`style_id`, c.`map_id`, t.`player_id`, t.`replay_id`
+				FROM `{p}times` t JOIN `{p}courses` c ON c.`id` = t.`course_id`
+				WHERE " + scope.Where("t", "c") + " FOR UPDATE", scope)).ToList();
+
+			if (rows.Count > 0)
+			{
+				await tx.ExecuteAsync("DELETE FROM `{p}times` WHERE `id` IN @Ids", new { Ids = rows.Select(r => r.Id).ToList() });
+				var replayIds = rows.Where(r => r.ReplayId != null).Select(r => r.ReplayId!.Value).ToList();
+				if (replayIds.Count > 0)
+					await tx.ExecuteAsync("DELETE FROM `{p}replays` WHERE `id` IN @Ids", new { Ids = replayIds });
+			}
+
+			if (scope.IncludesHistory)
+			{
+				await tx.ExecuteAsync(@"
+					DELETE t FROM `{p}run_history` t JOIN `{p}courses` c ON c.`id` = t.`course_id`
+					WHERE " + scope.Where("t", "c"), scope);
+			}
+
+			await RefreshCourseStatsAsync(tx, rows.Select(r => (r.CourseId, r.StyleId)));
+
+			return new Affected(rows.Select(r => r.MapId).Distinct().ToList(), rows.Select(r => r.PlayerId).Distinct().ToList(), rows.Count);
+		});
+
+	/// <summary>
+	/// Hides (timer ban) or shows again all times of a player, and fixes the leaderboard cache.
+	/// </summary>
+	internal static Task<Affected> SetHiddenForPlayerAsync(int playerId, bool hidden) =>
+		SurfTimer.DB.InTransactionAsync(async tx =>
+		{
+			var rows = (await tx.QueryAsync<AffectedRow>(@"
+				SELECT t.`id`, t.`course_id`, t.`style_id`, c.`map_id`, t.`player_id`, t.`replay_id`
+				FROM `{p}times` t JOIN `{p}courses` c ON c.`id` = t.`course_id`
+				WHERE t.`player_id` = @PlayerId AND t.`hidden` <> @Hidden FOR UPDATE",
+				new { PlayerId = playerId, Hidden = hidden })).ToList();
+
+			if (rows.Count > 0)
+			{
+				await tx.ExecuteAsync("UPDATE `{p}times` SET `hidden` = @Hidden WHERE `id` IN @Ids",
+					new { Hidden = hidden, Ids = rows.Select(r => r.Id).ToList() });
+				await RefreshCourseStatsAsync(tx, rows.Select(r => (r.CourseId, r.StyleId)));
+			}
+
+			return new Affected(rows.Select(r => r.MapId).Distinct().ToList(), [playerId], rows.Count);
+		});
 
 	/// <summary>
 	/// A stored replay (ReplayCodec data), or null.
