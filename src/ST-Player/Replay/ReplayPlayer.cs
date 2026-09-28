@@ -312,7 +312,8 @@ public class ReplayPlayer
 
 	internal void Start([CallerMemberName] string methodName = "")
 	{
-		if (!this.IsPlayable || !this.IsEnabled)
+		// Only pool slots with a bot play - content templates just hold the frames
+		if (!this.IsPlayable || !this.IsEnabled || this.Controller == null)
 			return;
 
 		Server.NextFrame(() =>
@@ -435,7 +436,8 @@ public class ReplayPlayer
 
 	internal void FormatBotName([CallerMemberName] string methodName = "")
 	{
-		if (!this.IsPlayable || !this.IsEnabled || this.MapID == -1)
+		// Content templates (MapWR etc.) have frames but no bot
+		if (!this.IsPlayable || !this.IsEnabled || this.MapID == -1 || this.Controller == null || !this.Controller.IsValid)
 			return;
 
 		string prefix;

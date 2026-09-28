@@ -174,18 +174,6 @@ public partial class SurfTimer
 							endVelX: velocity.X, endVelY: velocity.Y, endVelZ: velocity.Z, sync: lastSegmentSync);
 					});
 				}
-
-				// This section checks if the PB is better than WR
-				if (player.Timer.Ticks < CurrentMap.WR[pStyle].RunTime || CurrentMap.WR[pStyle].ID == -1)
-				{
-					AddTimer(2f, () =>
-					{
-						Console.WriteLine("CS2 Surf DEBUG >> OnTriggerStartTouch (Map end zone) -> WR/PB");
-						CurrentMap.ReplayManager.MapWR.Start(); // Start the replay again
-						CurrentMap.ReplayManager.MapWR.FormatBotName();
-					});
-				}
-
 			}
 		}
 		// MAP END ZONE - Stage RUN
