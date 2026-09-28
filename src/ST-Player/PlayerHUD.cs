@@ -1,6 +1,5 @@
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Modules.Utils;
-using SurfTimer.Shared.Entities;
 using System.Globalization;
 using System.Net;
 

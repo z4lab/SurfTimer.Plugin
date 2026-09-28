@@ -4,5 +4,7 @@
 	"user": "DATABASE_USERNAME",
 	"password": "DATABASE_PASSWORD",
 	"port": 3306,
-	"timeout": 0
+	"timeout": 10,
+	"table_prefix": "",
+	"max_pool_size": 20
 }

@@ -4,7 +4,6 @@ using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Core.Attributes.Registration;
 using CounterStrikeSharp.API.Modules.Commands;
 using Microsoft.Extensions.Logging;
-using SurfTimer.Data;
 
 namespace SurfTimer;
 
@@ -41,7 +40,7 @@ public partial class SurfTimer
 				var target = onlineTarget;
 				if (target == null)
 				{
-					var row = await ProfileRepository.FindPlayerByNameAsync(search);
+					var row = await PlayerRepository.FindByNameAsync(search);
 					if (row != null)
 						target = new ProfileTarget(row.ID, row.Name ?? search, row.Country ?? "", row.JoinDate, row.LastSeen, row.Connections, false);
 				}
@@ -152,7 +151,7 @@ public partial class SurfTimer
 
 		Action<CCSPlayerController>? onSelect = null;
 		if (CurrentMap != null && run.MapId == CurrentMap.ID)
-			onSelect = ReplayActionFor(target, run.Id, run.Type, run.Stage, style, isRecord: run.Rank == 1);
+			onSelect = ReplayActionFor(target, run, run.Type, run.Stage, style);
 
 		return new HudMenuItem(run.MapName, onSelect, sub, () => right);
 	}
@@ -178,7 +177,7 @@ public partial class SurfTimer
 			}
 
 			string right = FormatRunTime(run.RunTime, run.Sync);
-			rows.Add(new HudMenuItem(kind, ReplayActionFor(target, run.Id, type, stage, style, isRecord: run.Rank == 1),
+			rows.Add(new HudMenuItem(kind, ReplayActionFor(target, run, type, stage, style),
 				$"#{run.Rank} of {run.Total}", () => right));
 		}
 
@@ -196,16 +195,16 @@ public partial class SurfTimer
 	/// <summary>
 	/// Plays a run of the current map: the loaded WR replay for a record, otherwise that PB's replay.
 	/// </summary>
-	private Action<CCSPlayerController> ReplayActionFor(ProfileTarget target, int mapTimeId, short type, short stage, int style, bool isRecord)
+	private Action<CCSPlayerController> ReplayActionFor(ProfileTarget target, ProfileData.RunRow run, short type, short stage, int style)
 	{
-		if (isRecord)
+		if (run.Rank == 1)
 		{
 			var template = WrTemplateFor(type, stage, style);
-			if (template != null && template.MapTimeID == mapTimeId && template.Frames.Count > 0)
+			if (template != null && template.MapTimeID == run.Id && template.Frames.Count > 0)
 				return p => _ = HandleWrReplaySelection(p, template);
 		}
 
-		return p => _ = HandlePbReplaySelection(p, new PersonalBest { ID = mapTimeId, Type = type }, type, stage, style,
+		return p => _ = HandlePbReplaySelection(p, new PbReplayRef(run.Id, run.ReplayId, run.RunTime, (int)run.Rank), type, stage, style,
 			ownerName: target.Name, ownerId: target.Id);
 	}
 

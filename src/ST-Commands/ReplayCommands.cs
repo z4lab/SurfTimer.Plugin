@@ -27,7 +27,7 @@ public partial class SurfTimer
 			new(text, p => _ = HandleWrReplaySelection(p, template), template.RecordPlayerName, () => Time(template.RecordRunTime));
 
 		HudMenuItem Pb(string text, PersonalBest pb, int type, int number) =>
-			new(text, p => _ = HandlePbReplaySelection(p, pb, type, number, style), "", () => Time(pb.RunTime));
+			new(text, p => _ = HandlePbReplaySelection(p, PbReplayRef.Of(pb), type, number, style), "", () => Time(pb.RunTime));
 
 		static bool Playable(ReplayPlayer template) => template.MapTimeID != -1 && template.Frames.Count > 0;
 
@@ -109,24 +109,27 @@ public partial class SurfTimer
 	}
 
 	/// <summary>
-	/// Handles picking a "Your PB" replay - PB replay frames aren't loaded up front, so this
-	/// fetches them on demand before requesting a pool slot.
+	/// Handles picking a PB replay - PB replays aren't loaded up front, so this fetches and decodes
+	/// the replay by its id before requesting a pool slot.
 	/// </summary>
 	/// <param name="ownerName">Whose PB it is - the viewer's own when null (!profile shows other players' PBs)</param>
 	/// <param name="ownerId">Profile ID of that player - the viewer's when null</param>
-	private async Task HandlePbReplaySelection(CCSPlayerController player, PersonalBest pb, int type, int stage, int style,
+	private async Task HandlePbReplaySelection(CCSPlayerController player, PbReplayRef pb, int type, int stage, int style,
 		string? ownerName = null, int? ownerId = null)
 	{
-		Player oPlayer = playerList[player.UserId ?? 0];
-
+		List<ReplayFrame> frames = [];
 		try
 		{
-			await pb.LoadPlayerSpecificMapTimeData(oPlayer);
+			if (pb.ReplayId is int replayId)
+			{
+				var data = await TimeRepository.GetReplayDataAsync(replayId);
+				if (data != null)
+					frames = await Task.Run(() => ReplayCodec.Decode(data));
+			}
 		}
 		catch (Exception ex)
 		{
-			_logger.LogError(ex, "[{ClassName}] Loading PB replay {ID} failed", nameof(SurfTimer), pb.ID);
-			return;
+			_logger.LogError(ex, "[{ClassName}] Loading PB replay {ReplayId} (time {TimeId}) failed", nameof(SurfTimer), pb.ReplayId, pb.TimeId);
 		}
 
 		// Back on the main thread - chat and the replay pool may only be touched there
@@ -134,10 +137,9 @@ public partial class SurfTimer
 		{
 			try
 			{
-				if (!player.IsValid)
+				if (!player.IsValid || !playerList.TryGetValue(player.UserId ?? 0, out var oPlayer))
 					return;
 
-				List<ReplayFrame> frames = pb.ReplayFrames != null ? ReplayFrame.Deserialize(pb.ReplayFrames) : [];
 				if (frames.Count == 0)
 				{
 					player.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["replay_no_pb"]}");
@@ -150,7 +152,8 @@ public partial class SurfTimer
 					Stage = stage,
 					Style = style,
 					MapID = CurrentMap.ID,
-					MapTimeID = pb.ID,
+					MapTimeID = pb.TimeId,
+					ReplayId = pb.ReplayId,
 					RecordRank = pb.Rank,
 					RecordPlayerName = ownerName ?? oPlayer.Profile.Name ?? "N/A",
 					RecordRunTime = pb.RunTime,
@@ -161,9 +164,15 @@ public partial class SurfTimer
 			}
 			catch (Exception ex)
 			{
-				_logger.LogError(ex, "[{ClassName}] Starting PB replay {ID} failed", nameof(SurfTimer), pb.ID);
+				_logger.LogError(ex, "[{ClassName}] Starting PB replay {ReplayId} (time {TimeId}) failed", nameof(SurfTimer), pb.ReplayId, pb.TimeId);
 			}
 		});
+	}
+
+	/// <summary>The PB a replay is picked for - its time, replay and what the bot shows</summary>
+	private sealed record PbReplayRef(int TimeId, int? ReplayId, int RunTime, int Rank)
+	{
+		internal static PbReplayRef Of(PersonalBest pb) => new(pb.ID, pb.ReplayId, pb.RunTime, pb.Rank);
 	}
 
 	/// <summary>

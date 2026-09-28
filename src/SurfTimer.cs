@@ -22,11 +22,7 @@ using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Core.Attributes;
 using CounterStrikeSharp.API.Core.Attributes.Registration;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using SurfTimer.Data;
-using SurfTimer.Shared.Data;
-using SurfTimer.Shared.Data.MySql;
 
 namespace SurfTimer;
 
@@ -36,14 +32,12 @@ public partial class SurfTimer : BasePlugin
 {
 	private readonly ILogger<SurfTimer> _logger;
 	public static IServiceProvider ServiceProvider { get; private set; } = null!;
-	private readonly IDataAccessService? _dataService;
 
 	// Inject ILogger and store IServiceProvider globally
 	public SurfTimer(ILogger<SurfTimer> logger, IServiceProvider serviceProvider)
 	{
 		_logger = logger;
 		ServiceProvider = serviceProvider;
-		_dataService = ServiceProvider.GetRequiredService<IDataAccessService>();
 	}
 
 	// Metadata
@@ -54,7 +48,7 @@ public partial class SurfTimer : BasePlugin
 
 	// Globals
 	private readonly ConcurrentDictionary<int, Player> playerList = new();
-	internal static IDatabaseService DB { get; private set; } = null!;
+	internal static Database DB { get; private set; } = null!;
 	public static Map CurrentMap { get; private set; } = null!;
 
 	/* ========== MAP START HOOKS ========== */
@@ -122,47 +116,25 @@ public partial class SurfTimer : BasePlugin
 	{
 		LocalizationService.Init(Localizer);
 
-		// === Dapper bootstrap (snake_case mapping + type handlers) + DB init ===
-		DapperBootstrapper.Init();
-		var connString = Config.MySql.GetConnectionString();
-		var factory = new MySqlConnectionStringFactory(connString);
-		DB = new DapperDatabaseService(factory);
-
-		bool accessService = false;
-
+		// === Database: connect, create / upgrade the schema, clean up after a crash ===
 		try
 		{
-			accessService = Task.Run(() => _dataService!.PingAccessService())
-				.GetAwaiter()
-				.GetResult();
+			DB = new Database(Config.MySql.GetSettings());
+			Task.Run(async () =>
+			{
+				await MigrationRunner.RunAsync(DB, _logger);
+				int closed = await PlayerRepository.CloseStaleSessionsAsync();
+				if (closed > 0)
+					_logger.LogInformation("[{Prefix}] Closed {Count} player session(s) left open by a crash", Config.PluginName, closed);
+			}).GetAwaiter().GetResult();
+
+			_logger.LogInformation("[{Prefix}] Database ready (table prefix '{TablePrefix}').", Config.PluginName, DB.TablePrefix);
 		}
 		catch (Exception ex)
 		{
-			_logger.LogError(
-				ex,
-				"[{Prefix}] PingAccessService threw an exception.",
-				Config.PluginName
-			);
-		}
-
-		if (accessService)
-		{
-			_logger.LogInformation(
-				"[{Prefix}] DB connection established.",
-				Config.PluginName
-			);
-		}
-		else
-		{
-			_logger.LogCritical(
-				"[{Prefix}] Error connecting to the DB.",
-				Config.PluginName
-			);
-
-			Exception exception = new(
-				$"[{Config.PluginName}] Error connecting to the DB"
-			);
-			throw exception;
+			_logger.LogCritical(ex, "[{Prefix}] Database setup failed - check cfg/SurfTimer/database.json and that the database exists.",
+				Config.PluginName);
+			throw new Exception($"[{Config.PluginName}] Database setup failed: {ex.Message}", ex);
 		}
 
 		_logger.LogInformation(

@@ -82,22 +82,20 @@ public class Player
 		_segmentSyncTotal = this.SyncTotalTicks;
 	}
 
-	// Playtime not yet written to PlayerStats (StatsService.FlushAsync)
-	internal DateTime PlaytimeCountedUntil { get; set; } = DateTime.UtcNow;
-
-	// Runs started / finished on this map not yet written to PlayerAttempts, by (type, stage)
+	// Runs started on this map not yet written to player_course_attempts, by (type, stage)
 	internal Dictionary<(short Type, short Stage), (int Started, int Finished)> PendingAttempts { get; } = new();
 
 	/// <summary>
-	/// Counts a started or finished run (type 0 map, 1 bonus, 2 stage) - written in batches.
+	/// Counts a started run (type 0 map, 1 bonus, 2 stage) - written in batches (StatsService).
+	/// Finished runs aren't counted here: every finish is stored in run_history.
 	/// </summary>
 	internal void CountAttempt(short type, short stage, bool finished)
 	{
-		if (this.Timer.IsPracticeMode)
+		if (finished || this.Timer.IsPracticeMode)
 			return;
 
 		PendingAttempts.TryGetValue((type, stage), out var counts);
-		PendingAttempts[(type, stage)] = finished ? (counts.Started, counts.Finished + 1) : (counts.Started + 1, counts.Finished);
+		PendingAttempts[(type, stage)] = (counts.Started + 1, counts.Finished);
 	}
 	internal bool WasOnGroundLastTick { get; set; } = true;
 	internal int GroundTicks { get; set; } = 0;

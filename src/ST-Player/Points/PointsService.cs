@@ -1,31 +1,39 @@
-using Dapper;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using SurfTimer.Shared.Sql;
 
 namespace SurfTimer;
 
 /// <summary>
-/// Keeps PlayerMapPoints (points per player/map/style) and PlayerStats.points (their sum) up to date.
-/// A new PB can move everyone on that map a rank down, so the whole map is recalculated - not just
-/// the player who finished (the CS:GO SurfTimer only did the latter). Unranked maps give no points.
+/// Keeps player_course_points (points per player / course / style) and player_stats.points (their
+/// sum) up to date. A new PB can move everyone on that course a rank down, so the whole map is
+/// recalculated - not just the player who finished (the CS:GO SurfTimer only did the latter).
+/// Unranked maps give no points.
 /// </summary>
 internal static class PointsService
 {
-	private sealed class MapInfoRow
-	{
-		public int Tier { get; set; }
-		public bool Ranked { get; set; }
-	}
+	internal const byte BucketNone = 0;
+	internal const byte BucketWr = 1;
+	internal const byte BucketTop10 = 2;
+	internal const byte BucketGroup = 3;
 
 	private sealed class RankRow
 	{
 		public int PlayerId { get; set; }
-		public short Type { get; set; }
-		public short Stage { get; set; }
+		public int CourseId { get; set; }
+		public byte KindId { get; set; }
+		public int Tier { get; set; }
 		public long Rank { get; set; }
 		public long Total { get; set; }
 	}
+
+	private const string MapRanks = @"
+		SELECT t.`player_id`, t.`course_id`, c.`kind_id`, COALESCE(c.`tier`, mc.`tier`, 0) AS Tier,
+			RANK() OVER (PARTITION BY t.`course_id` ORDER BY t.`run_time_ticks`) AS `Rank`,
+			COUNT(*) OVER (PARTITION BY t.`course_id`) AS Total
+		FROM `{p}times` t
+		JOIN `{p}courses` c ON c.`id` = t.`course_id`
+		LEFT JOIN `{p}courses` mc ON mc.`map_id` = c.`map_id` AND mc.`kind_id` = 1 AND mc.`number` = 0
+		WHERE c.`map_id` = @MapId AND t.`style_id` = @Style";
 
 	// One recalculation at a time - a map run and its last stage are saved at the same moment
 	private static readonly SemaphoreSlim _lock = new(1, 1);
@@ -43,78 +51,66 @@ internal static class PointsService
 		await _lock.WaitAsync();
 		try
 		{
-			var map = await SurfTimer.DB.QueryFirstOrDefaultAsync<MapInfoRow>(Queries.DB_QUERY_POINTS_GET_MAP, new { MapId = mapId });
-			var ranks = (await SurfTimer.DB.QueryAsync<RankRow>(Queries.DB_QUERY_POINTS_GET_MAP_RANKS, new { MapId = mapId, Style = style })).ToList();
-			var previousPlayers = await SurfTimer.DB.QueryAsync<int>(Queries.DB_QUERY_POINTS_GET_MAP_PLAYERS, new { MapId = mapId, Style = style });
+			var args = new { MapId = mapId, Style = style };
+			bool ranked = await SurfTimer.DB.ExecuteScalarAsync<bool>("SELECT `ranked` FROM `{p}maps` WHERE `id` = @MapId", args);
+			var ranks = ranked ? await SurfTimer.DB.QueryAsync<RankRow>(MapRanks, args) : new List<RankRow>();
+			var previousPlayers = await SurfTimer.DB.QueryAsync<int>(@"
+				SELECT DISTINCT pcp.`player_id` FROM `{p}player_course_points` pcp
+				JOIN `{p}courses` c ON c.`id` = pcp.`course_id`
+				WHERE c.`map_id` = @MapId AND pcp.`style_id` = @Style", args);
 
-			var points = new Dictionary<int, PointsCalculator.MapPoints>();
-			if (map != null && map.Ranked)
+			var rows = new List<object>();
+			foreach (var row in ranks)
 			{
-				foreach (var row in ranks)
+				var (completion, rankPoints, bucket) = PointsFor((CourseKind)row.KindId, row.Tier, (int)row.Rank, (int)row.Total);
+				if (completion == 0 && rankPoints == 0)
+					continue;
+
+				rows.Add(new
 				{
-					points.TryGetValue(row.PlayerId, out var p);
-					int rank = (int)row.Rank;
-
-					switch (row.Type)
-					{
-						case 0: // Map
-							var (wr, top10, group) = PointsCalculator.RankPoints(map.Tier, rank, (int)row.Total);
-							p = p with
-							{
-								Map = p.Map + PointsCalculator.CompletionPoints(map.Tier),
-								Wr = p.Wr + wr,
-								Top10 = p.Top10 + top10,
-								Group = p.Group + group,
-							};
-							break;
-						case 1: // Bonus
-							p = rank == 1
-								? p with { BonusWr = p.BonusWr + PointsCalculator.BonusPoints(1) }
-								: p with { Bonus = p.Bonus + PointsCalculator.BonusPoints(rank) };
-							break;
-						case 2: // Stage
-						case 3: // Checkpoint segment
-							if (rank == 1)
-								p = p with { SegmentWr = p.SegmentWr + Config.PointsSegmentWr };
-							break;
-					}
-
-					points[row.PlayerId] = p;
-				}
+					row.PlayerId,
+					row.CourseId,
+					Style = style,
+					Completion = completion,
+					RankPoints = rankPoints,
+					Bucket = bucket,
+				});
 			}
-
-			var rows = points.Where(e => e.Value.Total > 0).Select(e => new
-			{
-				PlayerId = e.Key,
-				MapId = mapId,
-				Style = style,
-				Points = e.Value.Total,
-				MapPoints = e.Value.Map,
-				WrPoints = e.Value.Wr,
-				Top10Points = e.Value.Top10,
-				GroupPoints = e.Value.Group,
-				BonusPoints = e.Value.Bonus,
-				BonusWrPoints = e.Value.BonusWr,
-				SegmentWrPoints = e.Value.SegmentWr,
-			}).ToList();
 
 			// Everyone whose total can change: players with times here, and anyone who had points here before
 			var affected = ranks.Select(r => r.PlayerId).Concat(previousPlayers).Distinct().ToList();
 
-			await SurfTimer.DB.TransactionAsync(async (conn, tx) =>
+			await SurfTimer.DB.InTransactionAsync(async tx =>
 			{
-				await conn.ExecuteAsync(Queries.DB_QUERY_POINTS_DELETE_MAP, new { MapId = mapId, Style = style }, tx);
+				await tx.ExecuteAsync(@"
+					DELETE pcp FROM `{p}player_course_points` pcp
+					JOIN `{p}courses` c ON c.`id` = pcp.`course_id`
+					WHERE c.`map_id` = @MapId AND pcp.`style_id` = @Style", args);
+
 				if (rows.Count > 0)
-					await conn.ExecuteAsync(Queries.DB_QUERY_POINTS_INSERT_MAP_PLAYER, rows, tx);
+				{
+					await tx.ExecuteAsync(@"
+						INSERT INTO `{p}player_course_points`
+							(`player_id`, `course_id`, `style_id`, `completion_points`, `rank_points`, `rank_bucket`)
+						VALUES (@PlayerId, @CourseId, @Style, @Completion, @RankPoints, @Bucket)", rows);
+				}
+
 				if (affected.Count > 0)
 				{
-					await conn.ExecuteAsync(Queries.DB_QUERY_POINTS_RESET_TOTALS, new { Style = style, PlayerIds = affected }, tx);
-					await conn.ExecuteAsync(Queries.DB_QUERY_POINTS_UPDATE_TOTALS, new { Style = style, PlayerIds = affected }, tx);
+					var totals = new { Style = style, PlayerIds = affected };
+					await tx.ExecuteAsync("UPDATE `{p}player_stats` SET `points` = 0, `updated_at` = UTC_TIMESTAMP(3) WHERE `style_id` = @Style AND `player_id` IN @PlayerIds", totals);
+					await tx.ExecuteAsync(@"
+						INSERT INTO `{p}player_stats` (`player_id`, `style_id`, `points`, `updated_at`)
+						SELECT `player_id`, `style_id`, SUM(`completion_points` + `rank_points`), UTC_TIMESTAMP(3)
+						FROM `{p}player_course_points`
+						WHERE `style_id` = @Style AND `player_id` IN @PlayerIds
+						GROUP BY `player_id`, `style_id`
+						ON DUPLICATE KEY UPDATE `points` = VALUES(`points`), `updated_at` = VALUES(`updated_at`)", totals);
 				}
 			});
 
 #if DEBUG
-			Logger.LogDebug("[PointsService] Map {MapId} style {Style}: {Players} players with points, {Affected} totals updated",
+			Logger.LogDebug("[PointsService] Map {MapId} style {Style}: {Rows} point rows, {Affected} totals updated",
 				mapId, style, rows.Count, affected.Count);
 #endif
 		}
@@ -129,11 +125,32 @@ internal static class PointsService
 	}
 
 	/// <summary>
+	/// Points of one time: map completion (by tier) plus rank points - WR / top 10 / group on maps,
+	/// the bonus table on bonuses, and the configured WR points on stage / checkpoint segments.
+	/// </summary>
+	private static (int Completion, int Rank, byte Bucket) PointsFor(CourseKind kind, int tier, int rank, int total)
+	{
+		switch (kind)
+		{
+			case CourseKind.Map:
+				var (wr, top10, group) = PointsCalculator.RankPoints(tier, rank, total);
+				byte bucket = wr > 0 ? BucketWr : top10 > 0 ? BucketTop10 : group > 0 ? BucketGroup : BucketNone;
+				return (PointsCalculator.CompletionPoints(tier), wr + top10 + group, bucket);
+
+			case CourseKind.Bonus:
+				return (0, PointsCalculator.BonusPoints(rank), rank == 1 ? BucketWr : BucketNone);
+
+			default: // Stage / checkpoint segment
+				return rank == 1 && Config.PointsSegmentWr > 0 ? (0, Config.PointsSegmentWr, BucketWr) : (0, 0, BucketNone);
+		}
+	}
+
+	/// <summary>
 	/// Recalculates every map for every style (!recalcpoints) - returns how many maps were done.
 	/// </summary>
 	internal static async Task<int> RecalculateAllAsync()
 	{
-		var mapIds = (await SurfTimer.DB.QueryAsync<int>(Queries.DB_QUERY_POINTS_GET_ALL_MAP_IDS)).ToList();
+		var mapIds = await MapRepository.GetAllIdsAsync();
 		foreach (int mapId in mapIds)
 		{
 			foreach (int style in Config.Styles)

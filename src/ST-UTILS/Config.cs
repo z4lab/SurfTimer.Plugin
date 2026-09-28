@@ -141,22 +141,31 @@ public static class Config
 			ConfigLoader.GetConfigDocument(DB_CONFIG_PATH);
 
 		/// <summary>
-		/// Retrieves the connection details for connecting to the MySQL Database
+		/// Connection settings for the MariaDB / MySQL database.
 		/// </summary>
-		/// <returns>A connection string</returns>
-		public static string GetConnectionString()
+		internal static DatabaseSettings GetSettings()
 		{
-			string host = ConfigDocument.RootElement.GetProperty("host").GetString()!;
-			string database = ConfigDocument.RootElement.GetProperty("database").GetString()!;
-			string user = ConfigDocument.RootElement.GetProperty("user").GetString()!;
-			string password = ConfigDocument.RootElement.GetProperty("password").GetString()!;
-			int port = ConfigDocument.RootElement.GetProperty("port").GetInt32()!;
-			int timeout = ConfigDocument.RootElement.GetProperty("timeout").GetInt32()!;
+			var root = ConfigDocument.RootElement;
+			string String(string key, string fallback = "") =>
+				root.TryGetProperty(key, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString()! : fallback;
+			uint Number(string key, uint fallback) =>
+				root.TryGetProperty(key, out var value) && value.ValueKind == JsonValueKind.Number && value.TryGetUInt32(out uint number) ? number : fallback;
 
-			string connString =
-				$"Server={host};User={user};Password={password};Database={database};Port={port};Connect Timeout={timeout};Allow User Variables=true";
+			string prefix = String("table_prefix");
+			// Goes into every table name - only letters, digits and underscores
+			if (!System.Text.RegularExpressions.Regex.IsMatch(prefix, "^[A-Za-z0-9_]*$"))
+				throw new InvalidOperationException($"database.json: table_prefix '{prefix}' may only contain letters, digits and '_'");
 
-			return connString;
+			uint timeout = Number("timeout", 10);
+			return new DatabaseSettings(
+				Host: String("host"),
+				Port: Number("port", 3306),
+				Database: String("database"),
+				User: String("user"),
+				Password: String("password"),
+				ConnectTimeoutSeconds: timeout == 0 ? 10 : timeout,
+				TablePrefix: prefix,
+				MaxPoolSize: Number("max_pool_size", 20));
 		}
 	}
 }

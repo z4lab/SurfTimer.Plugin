@@ -23,7 +23,11 @@
 		<PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
 		<!-- Add Dapper, to ensure Dapper.dll is included in the output -->
 		<PackageReference Include="Dapper" Version="2.1.79" />
-		<ProjectReference Include="..\..\SurfTimer.Shared\SurfTimer.Shared.csproj" />
+	</ItemGroup>
+
+	<!-- Database migrations, applied by MigrationRunner on plugin load -->
+	<ItemGroup>
+		<EmbeddedResource Include="ST-Data\Migrations\*.sql" LogicalName="Migrations.%(Filename)%(Extension)" />
 	</ItemGroup>
 
 	<!-- After Build, keep only the necessary files -->
@@ -32,7 +36,6 @@
 			<Keep
 				Include="$(OutDir)SurfTimer.Plugin.dll;
 					  $(OutDir)SurfTimer.Plugin.pdb;
-					  $(OutDir)SurfTimer.Shared.dll;
 					  $(OutDir)Dapper.dll;
 					  $(OutDir)MaxMind.Db.dll;
 					  $(OutDir)MaxMind.GeoIP2.dll;

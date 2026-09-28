@@ -1,9 +1,5 @@
-using System;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Modules.Utils;
-using SurfTimer.Shared.Types;
 
 namespace SurfTimer;
 
@@ -31,7 +27,9 @@ public enum ReplayFrameSituation
 	// ENTER_STAGE,
 }
 
-[Serializable]
+/// <summary>
+/// One recorded tick of a run. Stored with ReplayCodec.
+/// </summary>
 public class ReplayFrame
 {
 	public float[] pos { get; set; } = { 0, 0, 0 };
@@ -39,14 +37,13 @@ public class ReplayFrame
 	public ReplayFrameSituation Situation { get; set; } = ReplayFrameSituation.NONE;
 	public uint Flags { get; set; }
 	/// <summary>
-	/// Buttons held this tick (PlayerButtons). null in replays recorded before buttons were stored.
+	/// Buttons held this tick (PlayerButtons).
 	/// </summary>
-	[JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
 	public ulong? Buttons { get; set; }
 
 	// Strafe sync prefix sums up to and including this frame (see PrepareSync) - not stored
-	[JsonIgnore] internal int SyncGood { get; set; }
-	[JsonIgnore] internal int SyncTotal { get; set; }
+	internal int SyncGood { get; set; }
+	internal int SyncTotal { get; set; }
 
 	public VectorT GetPos()
 	{
@@ -55,19 +52,6 @@ public class ReplayFrame
 	public QAngleT GetAng()
 	{
 		return new QAngleT(this.ang[0], this.ang[1], this.ang[2]);
-	}
-
-	/// <summary>
-	/// Decompresses and deserializes a stored replay_frames blob into a frame list.
-	/// Shared by Map.SetReplayData (WR content templates) and PB replay loading.
-	/// </summary>
-	public static List<ReplayFrame> Deserialize(ReplayFramesString data)
-	{
-		JsonSerializerOptions options = new JsonSerializerOptions { WriteIndented = false, Converters = { new VectorTConverter(), new QAngleTConverter() } };
-		string json = Compressor.Decompress(data.ToString());
-		var frames = JsonSerializer.Deserialize<List<ReplayFrame>>(json, options)!;
-		PrepareSync(frames);
-		return frames;
 	}
 
 	/// <summary>

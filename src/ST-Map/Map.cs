@@ -3,10 +3,6 @@ using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Utils;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using SurfTimer.Data;
-using SurfTimer.Shared.DTO;
-using SurfTimer.Shared.Entities;
-using SurfTimer.Shared.Types;
 using System.Data;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
@@ -71,14 +67,12 @@ public class Map : MapEntity
 	public ReplayManager ReplayManager { get; set; } = null!;
 
 	private readonly ILogger<Map> _logger;
-	private readonly IDataAccessService _dataService;
 
 	// Constructor
 	internal Map(string name)
 	{
 		// Resolve the logger instance from the DI container
 		_logger = SurfTimer.ServiceProvider.GetRequiredService<ILogger<Map>>();
-		_dataService = SurfTimer.ServiceProvider.GetRequiredService<IDataAccessService>();
 
 		// Set map name
 		this.Name = name;
@@ -243,107 +237,65 @@ public class Map : MapEntity
 		return list.MinBy(z => (z.Teleport - position).Length());
 	}
 
+	// ---- Database ----
+
+	// The map's courses by (kind, number) - map course = (Map, 0)
+	private Dictionary<(CourseKind Kind, short Number), MapRepository.CourseRow> _courses = new();
+
+	/// <summary>map_settings of this map</summary>
+	internal Dictionary<string, string> Settings { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
+
+	internal const string SettingStagedLinear = "staged_linear";
+
 	/// <summary>
-	/// Inserts a new map entry in the database.
+	/// The course id of a run type (0 map, 1 bonus, 2 stage, 3 checkpoint segment) and number, 0 if unknown.
 	/// </summary>
-	internal async Task InsertMapInfo([CallerMemberName] string methodName = "")
+	internal int CourseId(int type, short number)
 	{
-		var mapInfo = new MapDto
-		{
-			Name = this.Name!,
-			Author = "Unknown", // Or set appropriately
-			Tier = this.Tier,
-			Stages = this.Stages,
-			Bonuses = this.Bonuses,
-			Ranked = false
-		};
+		var kind = CourseKinds.FromRunType(type);
+		return _courses.TryGetValue((kind, kind == CourseKind.Map ? (short)0 : number), out var course) ? course.Id : 0;
+	}
 
-		try
-		{
-			this.ID = await _dataService.InsertMapInfoAsync(mapInfo);
+	internal MapRepository.CourseRow? Course(CourseKind kind, short number) =>
+		_courses.TryGetValue((kind, kind == CourseKind.Map ? (short)0 : number), out var course) ? course : null;
 
-			_logger.LogInformation("[{ClassName}] {MethodName} -> Map '{Map}' inserted successfully with ID {ID}.",
-				nameof(Map), methodName, this.Name, this.ID
-			);
-		}
-		catch (Exception ex)
-		{
-			_logger.LogCritical(ex, "[{ClassName}] {MethodName} -> Failed to insert map '{Map}'. Exception: {ExceptionMessage}",
-				nameof(Map), methodName, this.Name, ex.Message
-			);
-			throw new InvalidOperationException($"Failed to insert map '{Name}'. See inner exception for details.", ex);
-		}
+	/// <summary>
+	/// Every course the map's zones define.
+	/// </summary>
+	private IEnumerable<(CourseKind, short)> ZoneCourses()
+	{
+		yield return (CourseKind.Map, 0);
+		for (short stage = 1; stage <= this.Stages; stage++)
+			yield return (CourseKind.Stage, stage);
+		for (short bonus = 1; bonus <= this.Bonuses; bonus++)
+			yield return (CourseKind.Bonus, bonus);
+		for (short cp = 1; cp <= this.CheckpointSegments; cp++)
+			yield return (CourseKind.Checkpoint, cp);
 	}
 
 	/// <summary>
-	/// Updates last played, stages, bonuses for the map in the database.
+	/// Loads the map's row (created on first load), courses, authors and settings, then its records.
 	/// </summary>
-	internal async Task UpdateMapInfo([CallerMemberName] string methodName = "")
+	internal async Task LoadMapInfo([CallerMemberName] string methodName = "")
 	{
-		var mapInfo = new MapDto
-		{
-			Name = this.Name!,
-			Author = this.Author!,
-			Tier = this.Tier,
-			Stages = this.Stages,
-			Bonuses = this.Bonuses,
-			Ranked = this.Ranked,
-			LastPlayed = (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds()
-		};
+		var row = await MapRepository.GetOrCreateAsync(this.Name!);
+		this.ID = row.Id;
+		this.Ranked = row.Ranked;
+		this.DateAdded = PlayerRepository.ToUnix(row.CreatedAt);
+		this.LastPlayed = PlayerRepository.ToUnix(row.LastPlayedAt);
 
-		try
-		{
-			await _dataService.UpdateMapInfoAsync(mapInfo, this.ID);
+		var courses = await MapRepository.EnsureCoursesAsync(this.ID, ZoneCourses());
+		_courses = courses.ToDictionary(c => (c.Kind, c.Number));
+		this.Tier = (short)(Course(CourseKind.Map, 0)?.Tier ?? 0);
 
-#if DEBUG
-			_logger.LogDebug("[{ClassName}] {MethodName} -> Updated map '{Map}' (ID: {ID}).",
-				nameof(Map), methodName, this.Name, this.ID
-			);
-#endif
-		}
-		catch (Exception ex)
-		{
-			_logger.LogCritical(ex, "[{ClassName}] {MethodName} -> Failed to update map '{Map}'. Exception Message: {ExceptionMessage}",
-				nameof(Map), methodName, this.Name, ex.Message
-			);
-			throw new InvalidOperationException($"Failed to update map '{Name}'. See inner exception for details.", ex);
-		}
-	}
+		var authors = await MapRepository.GetAuthorsAsync(this.ID);
+		this.Author = authors.Count > 0 ? string.Join(", ", authors) : null;
 
-	/// <summary>
-	/// Load/update/create Map table entry.
-	/// Loads the record runs for the map as well.
-	/// </summary>
-	/// <param name="updateData">Should we run UPDATE query for the map</param>
-	internal async Task LoadMapInfo(bool updateData = true, [CallerMemberName] string methodName = "")
-	{
-		bool newMap = false;
+		this.Settings = await MapRepository.GetSettingsAsync(this.ID);
+		ApplySettings();
 
-		var mapInfo = await _dataService.GetMapInfoAsync(this.Name!);
-
-		if (mapInfo != null)
-		{
-			ID = mapInfo.ID;
-			Author = mapInfo.Author;
-			Tier = mapInfo.Tier;
-			Ranked = mapInfo.Ranked;
-			StagedLinear = mapInfo.StagedLinear;
-			DateAdded = mapInfo.DateAdded;
-			LastPlayed = mapInfo.LastPlayed;
-		}
-		else
-		{
-			newMap = true;
-		}
-
-		if (newMap)
-		{
-			await InsertMapInfo();
-			return;
-		}
-
-		if (updateData)
-			await UpdateMapInfo();
+		_logger.LogInformation("[{ClassName}] {MethodName} -> Map '{Map}' (ID {ID}) with {Courses} courses, tier {Tier}, ranked {Ranked}",
+			nameof(Map), methodName, this.Name, this.ID, _courses.Count, this.Tier, this.Ranked);
 
 		var stopwatch = Stopwatch.StartNew();
 		await LoadMapRecordRuns();
@@ -356,268 +308,184 @@ public class Map : MapEntity
 	}
 
 	/// <summary>
-	/// Extracts Map, Bonus, Stage record runs and the total completions for each style. 
-	/// (NOT TESTED WITH MORE THAN 1 STYLE)
-	/// For the Map WR it also gets the Checkpoints data.
+	/// Map options stored in map_settings.
+	/// </summary>
+	internal void ApplySettings()
+	{
+		this.StagedLinear = Settings.TryGetValue(SettingStagedLinear, out var value) && value is "1" or "true";
+	}
+
+	internal void SetCourseTier(CourseKind kind, short number, byte? tier)
+	{
+		var course = Course(kind, number);
+		if (course == null)
+			return;
+
+		course.Tier = tier;
+		if (kind == CourseKind.Map)
+			this.Tier = (short)(tier ?? 0);
+	}
+
+	/// <summary>
+	/// Loads every course's WR and completions (from course_stats - no replay data) and, for WRs whose
+	/// replay changed since the last load, their replay. Called on map load and after every saved time.
 	/// </summary>
 	internal async Task LoadMapRecordRuns([CallerMemberName] string methodName = "")
 	{
-		//this.ConnectedMapTimes.Clear(); // This is for Custom Replays (PB replays?) - T
+		var records = await TimeRepository.GetMapRecordsAsync(this.ID);
+		var wrIds = records.Where(r => r.WrTimeId != null).Select(r => r.WrTimeId!.Value).Distinct().ToList();
+		var wrTimes = (await TimeRepository.GetTimesAsync(wrIds)).ToDictionary(t => t.Id);
 
-		var runs = await _dataService.GetMapRecordRunsAsync(this.ID);
+		_logger.LogInformation("[{ClassName}] {MethodName} -> {Records} course records, {Wrs} WRs",
+			nameof(Map), methodName, records.Count, wrTimes.Count);
 
-		_logger.LogInformation("[{ClassName}] {MethodName} -> Received {Length} runs from `GetMapRecordRunsAsync`",
-			nameof(Map), methodName, runs.Count
-		);
-
-		foreach (var run in runs)
+		foreach (var record in records)
 		{
-			switch (run.Type)
+			short type = CourseKinds.ToRunType(record.Kind);
+			short number = record.Kind == CourseKind.Map ? (short)0 : record.Number;
+			int style = record.StyleId;
+
+			SetCompletions(type, number, style, (int)record.Completions);
+
+			var wr = WrFor(type, number, style);
+			if (wr == null)
+				continue; // A course the map's zones don't have anymore, or an unknown style
+
+			if (record.WrTimeId is not int wrId || !wrTimes.TryGetValue(wrId, out var time))
 			{
-				case 0: // Map WR data and total completions
-					WR[run.Style].ID = run.ID;
-					WR[run.Style].RunTime = run.RunTime;
-					WR[run.Style].StartVelX = run.StartVelX;
-					WR[run.Style].StartVelY = run.StartVelY;
-					WR[run.Style].StartVelZ = run.StartVelZ;
-					WR[run.Style].EndVelX = run.EndVelX;
-					WR[run.Style].EndVelY = run.EndVelY;
-					WR[run.Style].EndVelZ = run.EndVelZ;
-					WR[run.Style].RunDate = run.RunDate;
-					WR[run.Style].Name = run.Name;
-					/// ConnectedMapTimes.Add(run.ID);
-					MapCompletions[run.Style] = run.TotalCount;
-
-					SetReplayData(run.Type, run.Style, run.Stage, run.ReplayFrames!);
-					break;
-
-				case 1: // Bonus WR data and total completions
-					BonusWR[run.Stage][run.Style].ID = run.ID;
-					BonusWR[run.Stage][run.Style].RunTime = run.RunTime;
-					BonusWR[run.Stage][run.Style].StartVelX = run.StartVelX;
-					BonusWR[run.Stage][run.Style].StartVelY = run.StartVelY;
-					BonusWR[run.Stage][run.Style].StartVelZ = run.StartVelZ;
-					BonusWR[run.Stage][run.Style].EndVelX = run.EndVelX;
-					BonusWR[run.Stage][run.Style].EndVelY = run.EndVelY;
-					BonusWR[run.Stage][run.Style].EndVelZ = run.EndVelZ;
-					BonusWR[run.Stage][run.Style].RunDate = run.RunDate;
-					BonusWR[run.Stage][run.Style].Name = run.Name;
-					BonusCompletions[run.Stage][run.Style] = run.TotalCount;
-
-					SetReplayData(run.Type, run.Style, run.Stage, run.ReplayFrames!);
-					break;
-
-				case 2: // Stage WR data and total completions
-					StageWR[run.Stage][run.Style].ID = run.ID;
-					StageWR[run.Stage][run.Style].RunTime = run.RunTime;
-					StageWR[run.Stage][run.Style].StartVelX = run.StartVelX;
-					StageWR[run.Stage][run.Style].StartVelY = run.StartVelY;
-					StageWR[run.Stage][run.Style].StartVelZ = run.StartVelZ;
-					StageWR[run.Stage][run.Style].EndVelX = run.EndVelX;
-					StageWR[run.Stage][run.Style].EndVelY = run.EndVelY;
-					StageWR[run.Stage][run.Style].EndVelZ = run.EndVelZ;
-					StageWR[run.Stage][run.Style].RunDate = run.RunDate;
-					StageWR[run.Stage][run.Style].Name = run.Name;
-					StageCompletions[run.Stage][run.Style] = run.TotalCount;
-
-					SetReplayData(run.Type, run.Style, run.Stage, run.ReplayFrames!);
-					break;
-
-				case 3: // Checkpoint segment WR data and total completions (non-staged maps only)
-					// Skip records for segments the map no longer has (zones changed)
-					if (run.Stage < 1 || run.Stage >= CheckpointWR.Length || CheckpointWR[run.Stage] == null)
-						break;
-					CheckpointWR[run.Stage][run.Style].ID = run.ID;
-					CheckpointWR[run.Stage][run.Style].RunTime = run.RunTime;
-					CheckpointWR[run.Stage][run.Style].StartVelX = run.StartVelX;
-					CheckpointWR[run.Stage][run.Style].StartVelY = run.StartVelY;
-					CheckpointWR[run.Stage][run.Style].StartVelZ = run.StartVelZ;
-					CheckpointWR[run.Stage][run.Style].EndVelX = run.EndVelX;
-					CheckpointWR[run.Stage][run.Style].EndVelY = run.EndVelY;
-					CheckpointWR[run.Stage][run.Style].EndVelZ = run.EndVelZ;
-					CheckpointWR[run.Stage][run.Style].RunDate = run.RunDate;
-					CheckpointWR[run.Stage][run.Style].Name = run.Name;
-					CheckpointCompletions[run.Stage][run.Style] = run.TotalCount;
-
-					SetReplayData(run.Type, run.Style, run.Stage, run.ReplayFrames!);
-					break;
+				wr.Clear();
+				continue;
 			}
-		}
 
-		foreach (int style in Config.Styles)
-		{
-			if (MapCompletions[style] > 0 && WR[style].ID != -1)
+			time.Fill(wr);
+			if (record.Kind == CourseKind.Map)
+				await wr.LoadCheckpoints();
+
+			// Replays are only downloaded when the WR's replay changed
+			var template = ReplayTemplateFor(type, number, style);
+			if (template != null && template.ReplayId != time.ReplayId)
 			{
-#if DEBUG
-				_logger.LogDebug("[{ClassName}] {MethodName} -> LoadMapRecordRuns : Map -> Loaded {MapCompletions} runs (MapID {MapID} | Style {Style}). WR by {PlayerName} - {Time}",
-					nameof(Map), methodName, this.MapCompletions[style], this.ID, style, this.WR[style].Name, PlayerHud.FormatTime(this.WR[style].RunTime)
-				);
-#endif
-
-				var stopwatch = Stopwatch.StartNew();
-				await this.WR[style].LoadCheckpoints(); // Load the checkpoints for the WR and Style combo
-				stopwatch.Stop();
-
-				_logger.LogInformation("[{ClassName}] {MethodName} -> Finished WR.[{Style}].LoadCheckpoints() in {ElapsedMilliseconds}ms",
-					nameof(Map), methodName, style, stopwatch.ElapsedMilliseconds
-				);
+				var data = time.ReplayId is int replayId ? await TimeRepository.GetReplayDataAsync(replayId) : null;
+				var frames = data != null ? ReplayCodec.Decode(data) : new List<ReplayFrame>();
+				SetReplayData(type, style, number, frames, time.ReplayId);
 			}
 		}
 	}
 
 	/// <summary>
-	/// Populates the content-template replay data (MapWR / AllStageWR / AllBonusWR / AllCheckpointWR)
-	/// for a record run retrieved from MapTimes data. These are pure content templates - loading data
-	/// here does not start or spawn any bot; replays only ever start via ReplayManager.RequestReplay.
+	/// The WR object of a run type, number and style - null when the map / style doesn't have it.
 	/// </summary>
-	/// <param name="type">Type - 0 = Map, 1 = Bonus, 2 = Stage, 3 = Checkpoint segment</param>
-	/// <param name="style">Style to add</param>
-	/// <param name="stage">Stage to add</param>
-	/// <param name="replayFramesBase64">Base64 encoded string for the replay_frames</param>
-	internal void SetReplayData(int type, int style, int stage, ReplayFramesString replayFramesBase64, [CallerMemberName] string methodName = "")
+	internal PersonalBest? WrFor(short type, short number, int style)
 	{
-		List<ReplayFrame> frames = ReplayFrame.Deserialize(replayFramesBase64);
-
-		switch (type)
+		Dictionary<int, PersonalBest>? byStyle = type switch
 		{
-			case 0: // Map Replays
-				_logger.LogTrace("[{ClassName}] {MethodName} -> SetReplayData -> [MapWR] Setting run {RunID} {RunTime} (Ticks = {RunTicks}; Frames = {TotalFrames})",
-					nameof(Map), methodName, this.WR[style].ID, PlayerHud.FormatTime(this.WR[style].RunTime), this.WR[style].RunTime, frames.Count
-				);
-				if (this.ReplayManager.MapWR.IsPlaying)
-					this.ReplayManager.MapWR.Stop();
+			0 => WR,
+			1 => number > 0 && number < BonusWR.Length ? BonusWR[number] : null,
+			2 => number > 0 && number < StageWR.Length ? StageWR[number] : null,
+			3 => number > 0 && number < CheckpointWR.Length ? CheckpointWR[number] : null,
+			_ => null,
+		};
+		return byStyle != null && byStyle.TryGetValue(style, out var wr) ? wr : null;
+	}
 
-				this.ReplayManager.MapWR.RecordPlayerName = this.WR[style].Name!;
-				this.ReplayManager.MapWR.RecordRunTime = this.WR[style].RunTime;
-				this.ReplayManager.MapWR.Frames = frames;
-				this.ReplayManager.MapWR.MapTimeID = this.WR[style].ID;
-				this.ReplayManager.MapWR.MapID = this.ID;
-				this.ReplayManager.MapWR.Type = 0;
-				for (int i = 0; i < frames.Count; i++) // Load the situations for the replay
-				{
-					ReplayFrame f = frames[i];
-					switch (f.Situation)
-					{
-						case ReplayFrameSituation.START_ZONE_ENTER or ReplayFrameSituation.START_ZONE_EXIT:
-							this.ReplayManager.MapWR.MapSituations.Add(i);
-							/// Console.WriteLine($"START_ZONE_ENTER: {i} | Situation {f.Situation}");
-							break;
-						case ReplayFrameSituation.STAGE_ZONE_ENTER or ReplayFrameSituation.STAGE_ZONE_EXIT:
-							this.ReplayManager.MapWR.StageEnterSituations.Add(i);
-							/// Console.WriteLine($"STAGE_ZONE_ENTER: {i} | Situation {f.Situation}");
-							break;
-						case ReplayFrameSituation.CHECKPOINT_ZONE_ENTER or ReplayFrameSituation.CHECKPOINT_ZONE_EXIT:
-							this.ReplayManager.MapWR.CheckpointEnterSituations.Add(i);
-							/// Console.WriteLine($"CHECKPOINT_ZONE_ENTER: {i} | Situation {f.Situation}");
-							break;
-						case ReplayFrameSituation.END_ZONE_ENTER or ReplayFrameSituation.END_ZONE_EXIT:
-							/// Console.WriteLine($"END_ZONE_ENTER: {i} | Situation {f.Situation}");
-							break;
-					}
-				}
-				break;
-			case 1: // Bonus Replays
-					// Skip if the same bonus run already exists
-				if (this.ReplayManager.AllBonusWR[stage][style].RecordRunTime == this.BonusWR[stage][style].RunTime)
+	private void SetCompletions(short type, short number, int style, int completions)
+	{
+		Dictionary<int, int>? byStyle = type switch
+		{
+			0 => MapCompletions,
+			1 => number > 0 && number < BonusCompletions.Length ? BonusCompletions[number] : null,
+			2 => number > 0 && number < StageCompletions.Length ? StageCompletions[number] : null,
+			3 => number > 0 && number < CheckpointCompletions.Length ? CheckpointCompletions[number] : null,
+			_ => null,
+		};
+		if (byStyle != null && byStyle.ContainsKey(style))
+			byStyle[style] = completions;
+	}
+
+	private ReplayPlayer? ReplayTemplateFor(short type, short number, int style)
+	{
+		if (type == 0)
+			return style == 0 ? this.ReplayManager.MapWR : null; // One map WR template (normal style)
+
+		Dictionary<int, ReplayPlayer>[] byNumber = type switch
+		{
+			1 => this.ReplayManager.AllBonusWR,
+			2 => this.ReplayManager.AllStageWR,
+			_ => this.ReplayManager.AllCheckpointWR,
+		};
+		return number > 0 && number < byNumber.Length && byNumber[number] != null && byNumber[number].TryGetValue(style, out var template)
+			? template
+			: null;
+	}
+
+	/// <summary>
+	/// Puts a WR's replay into its content template (MapWR / AllBonusWR / AllStageWR / AllCheckpointWR).
+	/// Templates are only content - nothing is spawned here; replays start via ReplayManager.RequestReplay.
+	/// </summary>
+	/// <param name="type">0 = Map, 1 = Bonus, 2 = Stage, 3 = Checkpoint segment</param>
+	/// <param name="frames">Decoded replay (empty when the WR has none)</param>
+	/// <param name="replayId">replays.id the frames came from</param>
+	internal void SetReplayData(short type, int style, short number, List<ReplayFrame> frames, int? replayId, [CallerMemberName] string methodName = "")
+	{
+		var template = ReplayTemplateFor(type, number, style);
+		if (template == null)
+			return;
+
+		var wr = WrFor(type, number, style);
+		if (template.IsPlaying)
+			template.Stop();
+
+		template.MapID = this.ID;
+		template.Type = type;
+		template.Stage = type == 0 ? 0 : number;
+		template.MapTimeID = wr?.ID ?? -1;
+		template.RecordRunTime = wr?.RunTime ?? -1;
+		template.RecordPlayerName = wr?.Name ?? "N/A";
+		template.RecordRank = 1;
+		template.Frames = frames;
+		template.ReplayId = replayId;
+		template.IsPlayable = frames.Count > 0; // Set here, else it's only set when a bot is assigned
+
+		// Zone situations of the replay - new lists, pool slots may still share the old ones
+		var map = new List<int>();
+		var bonus = new List<int>();
+		var stageEnter = new List<int>();
+		var stageExit = new List<int>();
+		var checkpointEnter = new List<int>();
+		var checkpointExit = new List<int>();
+		for (int i = 0; i < frames.Count; i++)
+		{
+			switch (frames[i].Situation)
+			{
+				case ReplayFrameSituation.START_ZONE_ENTER or ReplayFrameSituation.START_ZONE_EXIT
+					or ReplayFrameSituation.END_ZONE_ENTER or ReplayFrameSituation.END_ZONE_EXIT:
+					(type == 1 ? bonus : map).Add(i);
 					break;
-#if DEBUG
-				_logger.LogDebug("[{ClassName}] {MethodName} -> SetReplayData -> [BonusWR] Adding run {ID} {Time} (Ticks = {Ticks}; Frames = {Frames}) to `ReplayManager.AllBonusWR`",
-					nameof(Map), methodName, this.BonusWR[stage][style].ID, PlayerHud.FormatTime(this.BonusWR[stage][style].RunTime), this.BonusWR[stage][style].RunTime, frames.Count
-				);
-#endif
-
-				// Add all stages found to a dictionary with their data
-				this.ReplayManager.AllBonusWR[stage][style].MapID = this.ID;
-				this.ReplayManager.AllBonusWR[stage][style].Frames = frames;
-				this.ReplayManager.AllBonusWR[stage][style].RecordRunTime = this.BonusWR[stage][style].RunTime;
-				this.ReplayManager.AllBonusWR[stage][style].RecordPlayerName = this.BonusWR[stage][style].Name!;
-				this.ReplayManager.AllBonusWR[stage][style].MapTimeID = this.BonusWR[stage][style].ID;
-				this.ReplayManager.AllBonusWR[stage][style].Stage = stage;
-				this.ReplayManager.AllBonusWR[stage][style].Type = 1;
-				this.ReplayManager.AllBonusWR[stage][style].RecordRank = 1;
-				this.ReplayManager.AllBonusWR[stage][style].IsPlayable = true; // We set this to `true` else we overwrite it and need to call SetController method again
-				for (int i = 0; i < frames.Count; i++)
-				{
-					ReplayFrame f = frames[i];
-					switch (f.Situation)
-					{
-						case ReplayFrameSituation.START_ZONE_ENTER or ReplayFrameSituation.END_ZONE_EXIT:
-							this.ReplayManager.AllBonusWR[stage][style].BonusSituations.Add(i);
-							break;
-					}
-				}
-				break;
-			case 2: // Stage Replays
-					// Skip if the same stage run already exists
-				if (this.ReplayManager.AllStageWR[stage][style].RecordRunTime == this.StageWR[stage][style].RunTime)
+				case ReplayFrameSituation.STAGE_ZONE_ENTER:
+					stageEnter.Add(i);
 					break;
-#if DEBUG
-				_logger.LogDebug("[{ClassName}] {MethodName} -> SetReplayData -> [StageWR] Adding run {ID} {Time} (Ticks = {Ticks}; Frames = {Frames}) to `ReplayManager.AllStageWR`",
-					nameof(Map), methodName, this.StageWR[stage][style].ID, PlayerHud.FormatTime(this.StageWR[stage][style].RunTime), this.StageWR[stage][style].RunTime, frames.Count
-				);
-#endif
-
-				// Add all stages found to a dictionary with their data
-				this.ReplayManager.AllStageWR[stage][style].MapID = this.ID;
-				this.ReplayManager.AllStageWR[stage][style].Frames = frames;
-				this.ReplayManager.AllStageWR[stage][style].RecordRunTime = this.StageWR[stage][style].RunTime;
-				this.ReplayManager.AllStageWR[stage][style].RecordPlayerName = this.StageWR[stage][style].Name!;
-				this.ReplayManager.AllStageWR[stage][style].MapTimeID = this.StageWR[stage][style].ID;
-				this.ReplayManager.AllStageWR[stage][style].Stage = stage;
-				this.ReplayManager.AllStageWR[stage][style].Type = 2;
-				this.ReplayManager.AllStageWR[stage][style].RecordRank = 1;
-				this.ReplayManager.AllStageWR[stage][style].IsPlayable = true; // We set this to `true` else we overwrite it and need to call SetController method again
-				for (int i = 0; i < frames.Count; i++)
-				{
-					ReplayFrame f = frames[i];
-					switch (f.Situation)
-					{
-						case ReplayFrameSituation.STAGE_ZONE_ENTER:
-							this.ReplayManager.AllStageWR[stage][style].StageEnterSituations.Add(i);
-							break;
-						case ReplayFrameSituation.STAGE_ZONE_EXIT:
-							this.ReplayManager.AllStageWR[stage][style].StageExitSituations.Add(i);
-							break;
-					}
-				}
-				break;
-			case 3: // Checkpoint segment Replays (non-staged maps only)
-				if (stage < 1 || stage >= this.ReplayManager.AllCheckpointWR.Length || this.ReplayManager.AllCheckpointWR[stage] == null)
-					break; // Segment the map no longer has (zones changed)
-				// Skip if the same checkpoint run already exists
-				if (this.ReplayManager.AllCheckpointWR[stage][style].RecordRunTime == this.CheckpointWR[stage][style].RunTime)
+				case ReplayFrameSituation.STAGE_ZONE_EXIT:
+					stageExit.Add(i);
 					break;
-#if DEBUG
-				_logger.LogDebug("[{ClassName}] {MethodName} -> SetReplayData -> [CheckpointWR] Adding run {ID} {Time} (Ticks = {Ticks}; Frames = {Frames}) to `ReplayManager.AllCheckpointWR`",
-					nameof(Map), methodName, this.CheckpointWR[stage][style].ID, PlayerHud.FormatTime(this.CheckpointWR[stage][style].RunTime), this.CheckpointWR[stage][style].RunTime, frames.Count
-				);
-#endif
-
-				// Add all checkpoints found to a dictionary with their data
-				this.ReplayManager.AllCheckpointWR[stage][style].MapID = this.ID;
-				this.ReplayManager.AllCheckpointWR[stage][style].Frames = frames;
-				this.ReplayManager.AllCheckpointWR[stage][style].RecordRunTime = this.CheckpointWR[stage][style].RunTime;
-				this.ReplayManager.AllCheckpointWR[stage][style].RecordPlayerName = this.CheckpointWR[stage][style].Name!;
-				this.ReplayManager.AllCheckpointWR[stage][style].MapTimeID = this.CheckpointWR[stage][style].ID;
-				this.ReplayManager.AllCheckpointWR[stage][style].Stage = stage;
-				this.ReplayManager.AllCheckpointWR[stage][style].Type = 3;
-				this.ReplayManager.AllCheckpointWR[stage][style].RecordRank = 1;
-				this.ReplayManager.AllCheckpointWR[stage][style].IsPlayable = true; // We set this to `true` else we overwrite it and need to call SetController method again
-				for (int i = 0; i < frames.Count; i++)
-				{
-					ReplayFrame f = frames[i];
-					switch (f.Situation)
-					{
-						case ReplayFrameSituation.CHECKPOINT_ZONE_ENTER:
-							this.ReplayManager.AllCheckpointWR[stage][style].CheckpointEnterSituations.Add(i);
-							break;
-						case ReplayFrameSituation.CHECKPOINT_ZONE_EXIT:
-							this.ReplayManager.AllCheckpointWR[stage][style].CheckpointExitSituations.Add(i);
-							break;
-					}
-				}
-				break;
+				case ReplayFrameSituation.CHECKPOINT_ZONE_ENTER:
+					checkpointEnter.Add(i);
+					break;
+				case ReplayFrameSituation.CHECKPOINT_ZONE_EXIT:
+					checkpointExit.Add(i);
+					break;
+			}
 		}
+		template.MapSituations = map;
+		template.BonusSituations = bonus;
+		template.StageEnterSituations = stageEnter;
+		template.StageExitSituations = stageExit;
+		template.CheckpointEnterSituations = checkpointEnter;
+		template.CheckpointExitSituations = checkpointExit;
+
+#if DEBUG
+		_logger.LogDebug("[{ClassName}] {MethodName} -> WR replay of type {Type} {Number} (style {Style}): time {TimeId}, replay {ReplayId}, {Frames} frames",
+			nameof(Map), methodName, type, number, style, template.MapTimeID, replayId, frames.Count);
+#endif
 	}
 
 	public void KickReplayBot(int index)

@@ -5,7 +5,6 @@ using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using Serilog;
 using Serilog.Events;
-using SurfTimer.Data;
 
 namespace SurfTimer;
 
@@ -49,8 +48,6 @@ public class Injection : IPluginServiceCollection<SurfTimer>
 		serviceCollection.AddScoped<PlayerStats>(); // Multiple instances for different players
 		serviceCollection.AddScoped<PlayerProfile>(); // Multiple instances for different players
 		serviceCollection.AddSingleton<Map>(); // Single instance for 1 Map object
-
-		serviceCollection.AddScoped<IDataAccessService>(provider => new MySqlDataAccessService());
 	}
 }
 

@@ -22,6 +22,8 @@ public class ReplayPlayer
 
 	public int MapID { get; set; } = -1;
 	public int MapTimeID { get; set; } = -1;
+	/// <summary>replays.id of the loaded frames - WR templates reload their replay only when it changes</summary>
+	public int? ReplayId { get; set; }
 	public int Type { get; set; } = -1;
 	public int Stage { get; set; } = -1;
 	public int Style { get; set; } = 0;
@@ -136,6 +138,7 @@ public class ReplayPlayer
 		this.Style = source.Style;
 		this.MapID = source.MapID;
 		this.MapTimeID = source.MapTimeID;
+		this.ReplayId = source.ReplayId;
 		this.RecordRank = source.RecordRank;
 		this.RecordPlayerName = source.RecordPlayerName;
 		this.RecordRunTime = source.RecordRunTime;

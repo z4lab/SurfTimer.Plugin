@@ -195,6 +195,7 @@ public partial class SurfTimer
 			return;
 
 		oPlayer.HideSelf = !oPlayer.HideSelf;
+		oPlayer.Profile.SetSetting(PlayerProfile.SettingHideSelf, oPlayer.HideSelf ? "1" : "0"); // Kept over reconnects
 		oPlayer.ApplySelfVisibility();
 		player.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull[oPlayer.HideSelf ? "hideself_on" : "hideself_off"]}");
 	}
@@ -814,8 +815,7 @@ public partial class SurfTimer
 		Console.WriteLine($"Map WR Type: {CurrentMap.WR[0].Type}");
 		Console.WriteLine($"Map WR Rank: {CurrentMap.WR[0].Rank}");
 		Console.WriteLine($"Map WR Checkpoints.Count: {CurrentMap.WR[0].Checkpoints?.Count}");
-		Console.WriteLine($"Map WR ReplayFramesBase64.Length: {CurrentMap.WR[0].ReplayFrames?.ToString().Length}");
-		Console.WriteLine($"Map WR ReplayFrames.Length: {CurrentMap.WR[0].ReplayFrames?.ToString().Length}");
+		Console.WriteLine($"Map WR ReplayId: {CurrentMap.WR[0].ReplayId}");
 
 		Console.WriteLine("====== MAP StageWR INFO ======");
 		Console.WriteLine($"Map Stage Completions ({CurrentMap.Stages} + 1): {CurrentMap.StageCompletions.Length}");
@@ -823,8 +823,7 @@ public partial class SurfTimer
 		Console.WriteLine($"Map StageWR Name: {CurrentMap.StageWR[1][0].Name}");
 		Console.WriteLine($"Map StageWR Type: {CurrentMap.StageWR[1][0].Type}");
 		Console.WriteLine($"Map StageWR Rank: {CurrentMap.StageWR[1][0].Rank}");
-		Console.WriteLine($"Map StageWR ReplayFramesBase64.Length: {CurrentMap.StageWR[1][0].ReplayFrames?.ToString().Length}");
-		Console.WriteLine($"Map StageWR ReplayFrames.Length: {CurrentMap.StageWR[1][0].ReplayFrames?.ToString().Length}");
+		Console.WriteLine($"Map StageWR ReplayId: {CurrentMap.StageWR[1][0].ReplayId}");
 
 		Console.WriteLine($"Map Bonus Completions ({CurrentMap.Bonuses} + 1): {CurrentMap.BonusCompletions.Length}");
 

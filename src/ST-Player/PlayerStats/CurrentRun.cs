@@ -1,9 +1,6 @@
 using CounterStrikeSharp.API;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using SurfTimer.Data;
-using SurfTimer.Shared.DTO;
-using SurfTimer.Shared.Entities;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 
@@ -15,16 +12,44 @@ namespace SurfTimer;
 public class CurrentRun : RunStatsEntity
 {
 	private readonly ILogger<CurrentRun> _logger;
-	private readonly IDataAccessService _dataService;
 
 	public Dictionary<int, CheckpointEntity> Checkpoints { get; set; }
 
 	internal CurrentRun()
 	{
 		_logger = SurfTimer.ServiceProvider.GetRequiredService<ILogger<CurrentRun>>();
-		_dataService = SurfTimer.ServiceProvider.GetRequiredService<IDataAccessService>();
 
 		Checkpoints = new Dictionary<int, CheckpointEntity>();
+	}
+
+	/// <summary>
+	/// Stores a finished run that isn't a PB in the run history (in the background).
+	/// </summary>
+	/// <param name="type">0 map, 1 bonus, 2 stage, 3 checkpoint segment</param>
+	internal static void LogRun(Player player, short type, short number, int runTicks, float? sync)
+	{
+		if (player.Timer.IsPracticeMode || SurfTimer.CurrentMap == null)
+			return;
+
+		int courseId = SurfTimer.CurrentMap.CourseId(type, number);
+		int playerId = player.Profile.ID;
+		short style = player.Timer.Style;
+		if (courseId <= 0 || playerId <= 0)
+			return;
+
+		float? rounded = sync.HasValue ? MathF.Round(sync.Value, 2) : null;
+		_ = Task.Run(async () =>
+		{
+			try
+			{
+				await TimeRepository.LogRunAsync(playerId, courseId, style, runTicks, rounded);
+			}
+			catch (Exception ex)
+			{
+				SurfTimer.ServiceProvider.GetRequiredService<ILogger<CurrentRun>>()
+					.LogError(ex, "[CurrentRun] Logging a run of player {PlayerId} failed", playerId);
+			}
+		});
 	}
 
 	/// <summary>
@@ -45,9 +70,7 @@ public class CurrentRun : RunStatsEntity
 		float? segmentSync = null,
 		[CallerMemberName] string methodName = "")
 	{
-		string replay_frames = "";
 		int style = player.Timer.Style;
-		int mapTimeId = 0;
 		short recType;
 
 		if (checkpoint != 0)
@@ -67,98 +90,74 @@ public class CurrentRun : RunStatsEntity
 			recType = 0; // Map run
 		}
 
-		/// Test Time Saving: if (methodName != "TestSetPb")
-		replay_frames = player.ReplayRecorder.TrimReplay(
+		short number = recType switch { 1 => bonus, 2 => stage, 3 => checkpoint, _ => 0 };
+		var map = SurfTimer.CurrentMap;
+		int courseId = map.CourseId(recType, number);
+		if (courseId <= 0)
+		{
+			_logger.LogError("[{ClassName}] {MethodName} -> No course for run type {Type} {Number} on {Map} - run not saved",
+				nameof(CurrentRun), methodName, recType, number, map.Name);
+			return;
+		}
+
+		// Everything from the live run is taken here, on the main thread, before the first await
+		var frames = player.ReplayRecorder.TrimReplay(
 			player,
 			type: recType,
 			bonus: bonus,
 			stage: stage,
-			lastStage: stage == SurfTimer.CurrentMap.Stages,
+			lastStage: stage == map.Stages,
 			checkpoint: checkpoint,
-			lastCheckpoint: checkpoint == SurfTimer.CurrentMap.CheckpointSegments // Last segment ends at the map end
+			lastCheckpoint: checkpoint == map.CheckpointSegments // Last segment ends at the map end
 		);
 
-		_logger.LogTrace("[{ClassName}] {MethodName} -> Sending total of {Frames} serialized and compressed replay frames.",
-			nameof(CurrentRun), methodName, replay_frames.Length
-		);
+		var splits = recType == 0
+			? this.Checkpoints.Values.Select(c => new CheckpointEntity(c.CP, c.RunTime, c.StartVelX, c.StartVelY, c.StartVelZ,
+				c.EndVelX, c.EndVelY, c.EndVelZ, c.EndTouch, c.Attempts)).ToList()
+			: null;
+
+		var save = new TimeRepository.PbSave(
+			PlayerId: player.Profile.ID,
+			CourseId: courseId,
+			StyleId: (short)style,
+			RunTimeTicks: run_ticks == -1 ? this.RunTime : run_ticks,
+			// The timer is stopped by the time a map/bonus run is saved, so its sync is final
+			Sync: MathF.Round(segmentSync ?? player.SyncPercent, 2),
+			StartVelX: segmentStartVelX ?? this.StartVelX,
+			StartVelY: segmentStartVelY ?? this.StartVelY,
+			StartVelZ: segmentStartVelZ ?? this.StartVelZ,
+			EndVelX: segmentEndVelX ?? this.EndVelX,
+			EndVelY: segmentEndVelY ?? this.EndVelY,
+			EndVelZ: segmentEndVelZ ?? this.EndVelZ,
+			Splits: splits,
+			Replay: null);
 
 		var stopwatch = Stopwatch.StartNew();
-		var mapTime = new MapTimeRunDataDto
-		{
-			PlayerID = player.Profile.ID,
-			MapID = SurfTimer.CurrentMap.ID,
-			Style = player.Timer.Style,
-			Type = recType,
-			Stage = stage != 0 ? stage : (bonus != 0 ? bonus : checkpoint),
-			RunTime = run_ticks == -1 ? this.RunTime : run_ticks,
-			StartVelX = segmentStartVelX ?? this.StartVelX,
-			StartVelY = segmentStartVelY ?? this.StartVelY,
-			StartVelZ = segmentStartVelZ ?? this.StartVelZ,
-			EndVelX = segmentEndVelX ?? this.EndVelX,
-			EndVelY = segmentEndVelY ?? this.EndVelY,
-			EndVelZ = segmentEndVelZ ?? this.EndVelZ,
-			// The timer is stopped by the time a map/bonus run is saved, so its sync is final
-			Sync = MathF.Round(segmentSync ?? player.SyncPercent, 2),
-			ReplayFrames = replay_frames,
-			Checkpoints = this.Checkpoints
-		};
 
-		switch (recType)
+		// Encoding the replay is the expensive part - off the main thread
+		var replay = frames.Count > 0 ? await Task.Run(() => ReplayCodec.Encode(frames)) : null;
+		var result = await TimeRepository.SavePbAsync(save with { Replay = replay });
+
+		_logger.LogTrace("[{ClassName}] {MethodName} -> Saved time {TimeId} (course {CourseId}, improved {Improved}, replay {Frames} frames / {Bytes} bytes)",
+			nameof(CurrentRun), methodName, result.TimeId, courseId, result.Improved, replay?.FrameCount ?? 0, replay?.Data.Length ?? 0);
+
+		// Records (and WR replays that changed), the player's PB with its new rank, everyone's points
+		await map.LoadMapRecordRuns();
+
+		var pb = player.Stats.PbFor(recType, number, style);
+		if (pb != null)
 		{
-			case 0:
-				mapTimeId = player.Stats.PB[style].ID;
-				break;
-			case 1:
-				mapTimeId = player.Stats.BonusPB[bonus][style].ID;
-				break;
-			case 2:
-				mapTimeId = player.Stats.StagePB[stage][style].ID;
-				break;
-			case 3:
-				mapTimeId = player.Stats.CheckpointPB[checkpoint][style].ID;
-				break;
+			pb.ID = result.TimeId;
+			await pb.ReloadAsync();
+			if (recType == 0)
+				await pb.LoadCheckpoints();
 		}
 
-		if (mapTimeId <= 0)
-			mapTimeId = await _dataService.InsertMapTimeAsync(mapTime);
-		else
-			_ = await _dataService.UpdateMapTimeAsync(mapTime, mapTimeId);
-
-
-		// Reload the times for the map
-		await SurfTimer.CurrentMap.LoadMapRecordRuns();
-
-		_logger.LogTrace("[{ClassName}] {MethodName} -> Loading data for run {ID} with type {Type}.",
-			nameof(CurrentRun), methodName, mapTimeId, recType
-		);
-
-		// Reload the player PB time (could possibly be skipped as we have mapTimeId after inserting)
-		switch (recType)
-		{
-			case 0:
-				player.Stats.PB[player.Timer.Style].ID = mapTimeId;
-				await player.Stats.PB[player.Timer.Style].LoadPlayerSpecificMapTimeData(player);
-				break;
-			case 1:
-				player.Stats.BonusPB[bonus][player.Timer.Style].ID = mapTimeId;
-				await player.Stats.BonusPB[bonus][player.Timer.Style].LoadPlayerSpecificMapTimeData(player);
-				break;
-			case 2:
-				player.Stats.StagePB[stage][player.Timer.Style].ID = mapTimeId;
-				await player.Stats.StagePB[stage][player.Timer.Style].LoadPlayerSpecificMapTimeData(player);
-				break;
-			case 3:
-				player.Stats.CheckpointPB[checkpoint][player.Timer.Style].ID = mapTimeId;
-				await player.Stats.CheckpointPB[checkpoint][player.Timer.Style].LoadPlayerSpecificMapTimeData(player);
-				break;
-		}
-
-		// A new time can shift everyone's rank on this map - recalculate the map's points
-		await PointsService.RecalculateMapAsync(SurfTimer.CurrentMap.ID, style);
+		await PointsService.RecalculateMapAsync(map.ID, style);
 
 		stopwatch.Stop();
-		_logger.LogInformation("[{Class}] {Method} -> Finished SaveMapTime for '{Name}' (ID {ID}) in {Elapsed}ms",
-			nameof(CurrentRun), methodName, player.Profile.Name, mapTimeId, stopwatch.ElapsedMilliseconds
+		_logger.LogInformation("[{Class}] {Method} -> Finished SaveMapTime for '{Name}' (time {ID}) in {Elapsed}ms",
+			nameof(CurrentRun), methodName, player.Profile.Name, result.TimeId, stopwatch.ElapsedMilliseconds
 		);
 	}
 
@@ -223,12 +222,17 @@ public class CurrentRun : RunStatsEntity
 				segmentEndVelX: endVelX, segmentEndVelY: endVelY, segmentEndVelZ: endVelZ, segmentSync: sync
 			); // Save the Stage MapTime PB data
 		}
-		else if (stage_run_time > SurfTimer.CurrentMap.StageWR[stage][pStyle].RunTime && player.Timer.IsStageMode) // Player is behind the Stage WR for the map
+		else
 		{
-			int timeImprove = stage_run_time - SurfTimer.CurrentMap.StageWR[stage][pStyle].RunTime;
-			player.Controller.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["stagewr_missed",
-				stage, PlayerHud.FormatTime(stage_run_time), PlayerHud.FormatTime(timeImprove), PlayerHud.FormatTime(SurfTimer.CurrentMap.StageWR[stage][pStyle].RunTime)]}"
-			);
+			LogRun(player, 2, stage, stage_run_time, sync); // Not a PB - history only
+
+			if (stage_run_time > SurfTimer.CurrentMap.StageWR[stage][pStyle].RunTime && player.Timer.IsStageMode) // Player is behind the Stage WR for the map
+			{
+				int timeImprove = stage_run_time - SurfTimer.CurrentMap.StageWR[stage][pStyle].RunTime;
+				player.Controller.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["stagewr_missed",
+					stage, PlayerHud.FormatTime(stage_run_time), PlayerHud.FormatTime(timeImprove), PlayerHud.FormatTime(SurfTimer.CurrentMap.StageWR[stage][pStyle].RunTime)]}"
+				);
+			}
 		}
 	}
 
@@ -293,6 +297,10 @@ public class CurrentRun : RunStatsEntity
 				segmentStartVelX: startVelX, segmentStartVelY: startVelY, segmentStartVelZ: startVelZ,
 				segmentEndVelX: endVelX, segmentEndVelY: endVelY, segmentEndVelZ: endVelZ, segmentSync: sync
 			); // Save the Checkpoint MapTime PB data
+		}
+		else
+		{
+			LogRun(player, 3, checkpoint, checkpoint_run_time, sync); // Not a PB - history only
 		}
 	}
 

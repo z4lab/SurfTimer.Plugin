@@ -1,6 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using SurfTimer.Data;
 using System.Runtime.CompilerServices;
 
 namespace SurfTimer;
@@ -29,14 +28,12 @@ public class PlayerStats
 	public CurrentRun ThisRun { get; set; } = new CurrentRun();
 
 	private readonly ILogger<PlayerStats> _logger;
-	private readonly IDataAccessService _dataService;
 
 
 	internal PlayerStats([CallerMemberName] string methodName = "")
 	{
 		// Resolve the logger instance from the DI container
 		_logger = SurfTimer.ServiceProvider.GetRequiredService<ILogger<PlayerStats>>();
-		_dataService = SurfTimer.ServiceProvider.GetRequiredService<IDataAccessService>();
 
 		// Initialize PB variables
 		this.StagePB = new Dictionary<int, PersonalBest>[SurfTimer.CurrentMap.Stages + 1];
@@ -82,104 +79,42 @@ public class PlayerStats
 	}
 
 	/// <summary>
-	/// Loads the player's map time data from the database along with their ranks. For all types and styles (may not work correctly for Stages/Bonuses)
-	/// `Checkpoints` are loaded separately from another method in the `PresonalBest` class as it uses the unique `ID` for the run. (This method calls it if needed)
-	/// This populates all the `style` and `type` stats the player has for the map
+	/// The PB object for a run type (0 map, 1 bonus, 2 stage, 3 checkpoint segment), number and style -
+	/// null for a course / style this map doesn't have.
 	/// </summary>
-	internal async Task LoadPlayerMapTimesData(Player player, int playerId = 0, int mapId = 0, [CallerMemberName] string methodName = "")
+	internal PersonalBest? PbFor(short type, short number, int style)
 	{
-		var playerMapTimes = await _dataService.GetPlayerMapTimesAsync(player.Profile.ID, SurfTimer.CurrentMap.ID);
-
-		if (!playerMapTimes.Any())
+		Dictionary<int, PersonalBest>? byStyle = type switch
 		{
-			_logger.LogTrace("[{ClassName}] {MethodName} -> No MapTimes data found for Player {PlayerName} (ID {PlayerID}).",
-				nameof(PlayerStats), methodName, player.Profile.Name, player.Profile.ID);
-			return;
-		}
+			0 => PB,
+			1 => number > 0 && number < BonusPB.Length ? BonusPB[number] : null,
+			2 => number > 0 && number < StagePB.Length ? StagePB[number] : null,
+			3 => number > 0 && number < CheckpointPB.Length ? CheckpointPB[number] : null,
+			_ => null,
+		};
+		return byStyle != null && byStyle.TryGetValue(style, out var pb) ? pb : null;
+	}
 
-		foreach (var mapTime in playerMapTimes)
+	/// <summary>
+	/// Loads the player's PBs on the current map with their ranks (and the map PB's splits).
+	/// </summary>
+	internal async Task LoadPlayerMapTimesData(Player player, [CallerMemberName] string methodName = "")
+	{
+		var times = await TimeRepository.GetPlayerMapTimesAsync(player.Profile.ID, SurfTimer.CurrentMap.ID);
+
+		foreach (var time in times)
 		{
-			int style = mapTime.Style;
-			switch (mapTime.Type)
-			{
-				case 1: // Bonus time
-#if DEBUG
-					_logger.LogDebug("[{ClassName}] {MethodName} -> LoadPlayerMapTimesData >> BonusPB with ID {ID}", nameof(PlayerStats), methodName, mapTime.ID);
-#endif
-					BonusPB[mapTime.Stage][style].ID = mapTime.ID;
-					BonusPB[mapTime.Stage][style].RunTime = mapTime.RunTime;
-					BonusPB[mapTime.Stage][style].Type = mapTime.Type;
-					BonusPB[mapTime.Stage][style].Rank = mapTime.Rank;
-					BonusPB[mapTime.Stage][style].StartVelX = mapTime.StartVelX;
-					BonusPB[mapTime.Stage][style].StartVelY = mapTime.StartVelY;
-					BonusPB[mapTime.Stage][style].StartVelZ = mapTime.StartVelZ;
-					BonusPB[mapTime.Stage][style].EndVelX = mapTime.EndVelX;
-					BonusPB[mapTime.Stage][style].EndVelY = mapTime.EndVelY;
-					BonusPB[mapTime.Stage][style].EndVelZ = mapTime.EndVelZ;
-					BonusPB[mapTime.Stage][style].RunDate = mapTime.RunDate;
-					break;
+			var pb = PbFor(CourseKinds.ToRunType(time.Kind), time.Kind == CourseKind.Map ? (short)0 : time.Number, time.Style);
+			if (pb == null)
+				continue; // A course the map's zones don't have anymore
 
-				case 2: // Stage time
-#if DEBUG
-					_logger.LogDebug("[{ClassName}] {MethodName} -> LoadPlayerMapTimesData >> StagePB with ID {ID}", nameof(PlayerStats), methodName, mapTime.ID);
-#endif
-					StagePB[mapTime.Stage][style].ID = mapTime.ID;
-					StagePB[mapTime.Stage][style].RunTime = mapTime.RunTime;
-					StagePB[mapTime.Stage][style].Type = mapTime.Type;
-					StagePB[mapTime.Stage][style].Rank = mapTime.Rank;
-					StagePB[mapTime.Stage][style].StartVelX = mapTime.StartVelX;
-					StagePB[mapTime.Stage][style].StartVelY = mapTime.StartVelY;
-					StagePB[mapTime.Stage][style].StartVelZ = mapTime.StartVelZ;
-					StagePB[mapTime.Stage][style].EndVelX = mapTime.EndVelX;
-					StagePB[mapTime.Stage][style].EndVelY = mapTime.EndVelY;
-					StagePB[mapTime.Stage][style].EndVelZ = mapTime.EndVelZ;
-					StagePB[mapTime.Stage][style].RunDate = mapTime.RunDate;
-					break;
-
-				case 3: // Checkpoint segment time
-#if DEBUG
-					_logger.LogDebug("[{ClassName}] {MethodName} -> LoadPlayerMapTimesData >> CheckpointPB with ID {ID}", nameof(PlayerStats), methodName, mapTime.ID);
-#endif
-					// Skip PBs for segments the map no longer has (zones changed)
-					if (mapTime.Stage < 1 || mapTime.Stage >= CheckpointPB.Length || CheckpointPB[mapTime.Stage] == null)
-						break;
-					CheckpointPB[mapTime.Stage][style].ID = mapTime.ID;
-					CheckpointPB[mapTime.Stage][style].RunTime = mapTime.RunTime;
-					CheckpointPB[mapTime.Stage][style].Type = mapTime.Type;
-					CheckpointPB[mapTime.Stage][style].Rank = mapTime.Rank;
-					CheckpointPB[mapTime.Stage][style].StartVelX = mapTime.StartVelX;
-					CheckpointPB[mapTime.Stage][style].StartVelY = mapTime.StartVelY;
-					CheckpointPB[mapTime.Stage][style].StartVelZ = mapTime.StartVelZ;
-					CheckpointPB[mapTime.Stage][style].EndVelX = mapTime.EndVelX;
-					CheckpointPB[mapTime.Stage][style].EndVelY = mapTime.EndVelY;
-					CheckpointPB[mapTime.Stage][style].EndVelZ = mapTime.EndVelZ;
-					CheckpointPB[mapTime.Stage][style].RunDate = mapTime.RunDate;
-					break;
-
-				default: // Map time
-#if DEBUG
-					_logger.LogDebug("[{ClassName}] {MethodName} -> LoadPlayerMapTimesData >> MapPB with ID {ID}", nameof(PlayerStats), methodName, mapTime.ID);
-#endif
-					PB[style].ID = mapTime.ID;
-					PB[style].RunTime = mapTime.RunTime;
-					PB[style].Type = mapTime.Type;
-					PB[style].Rank = mapTime.Rank;
-					PB[style].StartVelX = mapTime.StartVelX;
-					PB[style].StartVelY = mapTime.StartVelY;
-					PB[style].StartVelZ = mapTime.StartVelZ;
-					PB[style].EndVelX = mapTime.EndVelX;
-					PB[style].EndVelY = mapTime.EndVelY;
-					PB[style].EndVelZ = mapTime.EndVelZ;
-					PB[style].RunDate = mapTime.RunDate;
-					//SurfTimer.CurrentMap.ConnectedMapTimes.Add(mapTime.ID); // Needed for PB replays? 
-
-					await PB[style].LoadCheckpoints();
-					break;
-			}
+			time.Fill(pb);
+			if (time.Kind == CourseKind.Map)
+				await pb.LoadCheckpoints();
 
 #if DEBUG
-			_logger.LogDebug("[{ClassName}] {MethodName} -> Loaded PB[{Style}] run {RunID} (Rank {Rank}) for '{PlayerName}' (ID {PlayerID}).",
-				nameof(PlayerStats), methodName, style, mapTime.ID, mapTime.Rank, player.Profile.Name, player.Profile.ID);
+			_logger.LogDebug("[{ClassName}] {MethodName} -> Loaded {Kind} {Number} PB {RunID} (rank {Rank}) for '{PlayerName}'",
+				nameof(PlayerStats), methodName, time.Kind, time.Number, time.Id, time.Rank, player.Profile.Name);
 #endif
 		}
 	}

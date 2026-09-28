@@ -157,10 +157,16 @@ public partial class SurfTimer
 			throw ex;
 		}
 
-		var profile = PlayerProfile.CreateAsync(player.SteamID, name, country).GetAwaiter().GetResult();
+		int? mapId = CurrentMap != null && CurrentMap.ID > 0 ? CurrentMap.ID : null;
+		ulong steamId = player.SteamID;
+		var profile = Task.Run(() => PlayerProfile.CreateAsync(steamId, name, country, mapId)).GetAwaiter().GetResult();
 		var movement = new CCSPlayer_MovementServices(player.PlayerPawn.Value!.MovementServices!.Handle);
 
-		var p = new Player(player, movement, profile);
+		var p = new Player(player, movement, profile)
+		{
+			// Persisted !hideself choice (hidden by default)
+			HideSelf = profile.GetBoolSetting(PlayerProfile.SettingHideSelf, true),
+		};
 
 		// No lock - we use thread-safe method AddOrUpdate
 		playerList.AddOrUpdate(player.UserId ?? 0, p, (_, _) => p);
@@ -210,12 +216,13 @@ public partial class SurfTimer
 		}
 
 		// No map during a map change (players are disconnected after the old map is cleaned up)
-		for (int i = (CurrentMap?.ReplayManager.Pool.Count ?? 0) - 1; i >= 0; i--)
+		var pool = CurrentMap?.ReplayManager.Pool;
+		for (int i = (pool?.Count ?? 0) - 1; i >= 0; i--)
 		{
-			if (CurrentMap.ReplayManager.Pool[i].Controller != null && CurrentMap.ReplayManager.Pool[i].Controller!.Equals(player))
+			if (pool![i].Controller != null && pool[i].Controller!.Equals(player))
 			{
-				CurrentMap.ReplayManager.Pool[i].Reset();
-				CurrentMap.ReplayManager.Pool.RemoveAt(i);
+				pool[i].Reset();
+				pool.RemoveAt(i);
 			}
 		}
 
@@ -253,8 +260,7 @@ public partial class SurfTimer
 				{
 					// Release cursor mode, or whoever gets this slot next could start with it
 					playerData.HUD.CloseMenu();
-					StatsService.Flush(playerData, final: true);
-					_ = playerData.Profile.UpdatePlayerProfile(player.PlayerName);
+					StatsService.Flush(playerData, final: true); // Also closes the session
 					playerList.TryRemove(userId, out _);
 				}
 			}

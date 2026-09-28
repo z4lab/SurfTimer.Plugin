@@ -2,7 +2,6 @@ using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Utils;
 using Microsoft.Extensions.Logging;
-using SurfTimer.Shared.Entities;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 
@@ -115,6 +114,10 @@ public partial class SurfTimer
 			if (saveMapTime && !player.Timer.IsPracticeMode)
 			{
 				ScheduleRunSave(player, "SaveMapTime", () => player.Stats.ThisRun.SaveMapTime(player));
+			}
+			else
+			{
+				CurrentRun.LogRun(player, 0, 0, player.Timer.Ticks, player.SyncPercent); // Not a PB - history only
 			}
 
 			// Add entry in DB for the run
@@ -544,6 +547,10 @@ public partial class SurfTimer
 			if (saveBonusTime)
 			{
 				ScheduleRunSave(player, $"SaveMapTime (bonus {bonus_idx})", () => player.Stats.ThisRun.SaveMapTime(player, bonus: bonus_idx));
+			}
+			else
+			{
+				CurrentRun.LogRun(player, 1, bonus_idx, player.Timer.Ticks, player.SyncPercent); // Not a PB - history only
 			}
 		}
 	}

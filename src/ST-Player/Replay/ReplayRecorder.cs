@@ -1,7 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Runtime.CompilerServices;
-using System.Text.Json;
 
 namespace SurfTimer;
 
@@ -121,7 +120,7 @@ public class ReplayRecorder
 		this.CurrentSituation = ReplayFrameSituation.NONE;
 	}
 
-	internal string TrimReplay(Player player, short type = 0, short bonus = 0, short stage = 0, bool lastStage = false, short checkpoint = 0, bool lastCheckpoint = false, [CallerMemberName] string methodName = "")
+	internal List<ReplayFrame> TrimReplay(Player player, short type = 0, short bonus = 0, short stage = 0, bool lastStage = false, short checkpoint = 0, bool lastCheckpoint = false, [CallerMemberName] string methodName = "")
 	{
 		List<ReplayFrame>? trimmed_frames = new List<ReplayFrame>();
 
@@ -163,8 +162,8 @@ public class ReplayRecorder
 		_logger.LogTrace("[{ClassName}] {MethodName} -> Sending total of {Frames} replay frames.",
 			nameof(CurrentRun), methodName, trimmed_frames?.Count
 		);
-		var trimmed = JsonSerializer.Serialize(trimmed_frames);
-		return Compressor.Compress(trimmed);
+		// Encoded (ReplayCodec) by the caller, off the main thread
+		return trimmed_frames ?? new List<ReplayFrame>();
 	}
 
 	internal List<ReplayFrame>? TrimMapRun(Player player, [CallerMemberName] string methodName = "")
