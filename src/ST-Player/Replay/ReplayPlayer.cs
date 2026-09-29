@@ -30,6 +30,9 @@ public class ReplayPlayer
 
 	public int RecordRank { get; set; } = -1; // This is used to determine whether replay is for wr or for pb
 	public string RecordPlayerName { get; set; } = "N/A";
+	internal int RecordPlayerId { get; set; } // players.id of whoever set the replayed run - 0 when unknown / several (best segments)
+	internal string? TrailColor { get; set; } // Trail color from the holder's rank group (Trails.cs), for TrailColorPlayerId
+	internal int TrailColorPlayerId { get; set; }
 	public int RecordRunTime { get; set; } = -1;
 	public int ReplayCurrentRunTime { get; set; } = 0;
 	public bool IsReplayOutsideZone { get; set; } = false;
@@ -147,6 +150,7 @@ public class ReplayPlayer
 		this.ReplayId = source.ReplayId;
 		this.RecordRank = source.RecordRank;
 		this.RecordPlayerName = source.RecordPlayerName;
+		this.RecordPlayerId = source.RecordPlayerId;
 		this.RecordRunTime = source.RecordRunTime;
 		this.Frames = source.Frames;
 		this.StageEnterSituations = source.StageEnterSituations;

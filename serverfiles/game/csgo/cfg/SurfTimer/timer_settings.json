@@ -13,5 +13,6 @@
 	"replay_pool_cap": 5,
 	"replay_permanent_map_bot": false,
 	"idle_threshold_seconds": 60,
-	"clan_tags_enabled": true
+	"clan_tags_enabled": true,
+	"country_clan_tag": true
 }

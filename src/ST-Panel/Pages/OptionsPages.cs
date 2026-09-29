@@ -56,7 +56,71 @@ public partial class SurfTimer
 				options.HideBots = on;
 				ctx.Session.Status = on ? "Replay bots are hidden" : "Replay bots are visible";
 			}),
+			ctx.Nav("Trails", "", "which trails you see, your trail color", OptionsTrailsPage),
 		];
+	});
+
+	// ---- Trails ----
+
+	private PanelPage OptionsTrailsPage() => new("Trails", ctx =>
+	{
+		var player = ctx.Player;
+		var options = player.Options;
+		string? color = TrailColorFor(player);
+
+		var rows = new List<HudMenuItem>
+		{
+			color != null
+				? PanelContext.Info("Your trail", TrailColors.Describe(color), "top 100 / VIP / admin")
+				: PanelContext.Info("Your trail", "none", "trails: top 100 and VIP / admin"),
+		};
+
+		if (color != null)
+		{
+			rows.Add(ctx.Toggle("My trail", options.TrailMine, "off = nobody sees it", on =>
+			{
+				options.TrailMine = on;
+				ctx.Session.Status = on ? "Your trail is drawn" : "Your trail is off";
+			}));
+		}
+
+		rows.Add(ctx.Toggle("Other players' trails", options.TrailsOthers, "", on => options.TrailsOthers = on));
+		rows.Add(ctx.Toggle("My own trail", options.TrailsOwn, "see your trail yourself", on => options.TrailsOwn = on));
+		rows.Add(ctx.Toggle("Spectated trail", options.TrailsSpectate, "trail of the player / bot you spectate", on => options.TrailsSpectate = on));
+		rows.Add(ctx.Toggle("Replay bot trails", options.TrailsBots, "", on => options.TrailsBots = on));
+
+		if (color != null && CanPickTrailColor(player))
+			rows.Add(ctx.Nav("My trail color", options.TrailColor.Length > 0 ? TrailColors.Describe(options.TrailColor) : "group color", "top 3 / VIP / admin", OptionsTrailColorPage));
+		return rows;
+	});
+
+	private PanelPage OptionsTrailColorPage() => new("Trail color", ctx =>
+	{
+		var options = ctx.Player.Options;
+
+		void Pick(string value, string label)
+		{
+			options.TrailColor = value;
+			ctx.Session.Status = value.Length == 0 ? "Your trail uses your group color" : $"Trail color: {label}";
+		}
+
+		var rows = new List<HudMenuItem>
+		{
+			ctx.Act("Group color", options.TrailColor.Length == 0 ? "current" : "", "your rank / role color", () => Pick("", "")),
+			ctx.Act("Rainbow", options.TrailColor == TrailColors.Rainbow ? "current" : "", "cycles through all colors", () => Pick(TrailColors.Rainbow, "Rainbow")),
+			ctx.Ask("Hex color", TrailColors.IsHex(options.TrailColor) && TrailColors.Describe(options.TrailColor).StartsWith('#') ? options.TrailColor : "", "e.g. #FF8800",
+				"Type a color in chat as #RRGGBB, e.g. #FF8800", text =>
+				{
+					if (!TrailColors.IsHex(text))
+						return "A color like #FF8800 (# and 6 hex digits)";
+					Pick(text.ToUpperInvariant(), text.ToUpperInvariant());
+					return null;
+				}),
+		};
+
+		rows.AddRange(TrailColors.Palette.Select(c => ctx.Act(c.Name, options.TrailColor.Equals(c.Hex, StringComparison.OrdinalIgnoreCase) ? "current" : "", c.Hex,
+			() => Pick(c.Hex, c.Name))));
+		return rows;
 	});
 
 	// ---- HUD ----

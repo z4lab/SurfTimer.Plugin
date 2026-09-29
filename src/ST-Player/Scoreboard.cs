@@ -6,12 +6,12 @@ namespace SurfTimer;
 /// <summary>
 /// Scoreboard score = -server rank, so the scoreboard (sorted by score, highest first) lists players by
 /// rank: #1 has -1 and is on top. Players without points and replay bots go to the bottom.
-/// Clan tags can be turned off server-wide (!admin - Server - Timer settings).
+/// Clan tags: the player's country and / or own tag, both switchable (!admin - Server - Timer settings).
 /// </summary>
 public partial class SurfTimer
 {
-	private const int UnrankedScore = -99999;
-	private const int ReplayBotScore = -100000;
+	private const int UnrankedScore = -99998;
+	private const int ReplayBotScore = -99999;
 
 	/// <summary>
 	/// Sets everyone's score (once per second from OnTick) - the game changes it on kills / round
@@ -33,9 +33,13 @@ public partial class SurfTimer
 		}
 	}
 
+	// m_szClan holds 32 bytes including the terminator
+	private const int MaxClanTagLength = 31;
+
 	/// <summary>
-	/// Clan tags off (clan_tags_enabled): a player's tag is taken off and remembered - also a new one set
-	/// meanwhile - and put back once tags are enabled again. Once per second from OnTick.
+	/// The scoreboard clan tag from the two settings: the country (country_clan_tag) followed by the
+	/// player's own tag (clan_tags_enabled) - shown as [DE][z4lab], [DE], [z4lab] or nothing. The player's own tag
+	/// is remembered, so it comes back when clan tags are turned on again. Once per second from OnTick.
 	/// </summary>
 	private void UpdateClanTags()
 	{
@@ -45,20 +49,24 @@ public partial class SurfTimer
 			if (!controller.IsValid || controller.IsBot)
 				continue;
 
-			string clan = controller.Clan ?? "";
-			if (!Config.ClanTagsEnabled)
-			{
-				if (clan.Length == 0)
-					continue;
-				player.HiddenClanTag = clan;
-				SetClan(controller, "");
-			}
-			else if (player.HiddenClanTag != null)
-			{
-				if (clan.Length == 0)
-					SetClan(controller, player.HiddenClanTag);
-				player.HiddenClanTag = null;
-			}
+			// Anything but what we wrote last came from the player (connect / changed their clan)
+			string current = controller.Clan ?? "";
+			if (current != player.AppliedClanTag)
+				player.UserClanTag = current;
+
+			// The game shows the clan tag in brackets itself - "DE" shows as [DE], "DE][z4lab" as [DE][z4lab]
+			string? country = player.Profile.Country;
+			string countryTag = Config.CountryClanTag && country is { Length: 2 } && country != "XX" && country != "LL"
+				? country.ToUpperInvariant()
+				: "";
+			string userTag = Config.ClanTagsEnabled ? player.UserClanTag : "";
+			string wanted = string.Join("] [", new[] { countryTag, userTag }.Where(t => t.Length > 0));
+			if (wanted.Length > MaxClanTagLength)
+				wanted = wanted[..MaxClanTagLength];
+
+			if (current != wanted)
+				SetClan(controller, wanted);
+			player.AppliedClanTag = wanted;
 		}
 	}
 

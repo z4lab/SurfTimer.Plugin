@@ -27,6 +27,12 @@ internal sealed class PlayerOptions
 	internal const string KeyHudSplits = "hud_splits";
 	internal const string KeyHudSpectators = "hud_spectators";
 	internal const string KeyHudFields = "hud_fields";
+	internal const string KeyTrailMine = "trail_mine";
+	internal const string KeyTrailsOthers = "trails_others";
+	internal const string KeyTrailsOwn = "trails_own";
+	internal const string KeyTrailsSpectate = "trails_spectate";
+	internal const string KeyTrailsBots = "trails_bots";
+	internal const string KeyTrailColor = "trail_color";
 
 	/// <summary>Bottom HUD: rows split by '|', fields by ','</summary>
 	internal const string DefaultHudFields = "timer,speed|prespeed,keys,sync";
@@ -53,6 +59,8 @@ internal sealed class PlayerOptions
 	private bool _chatSplits, _chatOthersPb, _chatOthersRecords, _chatConnects;
 	private bool _hudTop, _hudSplits, _hudSpectators;
 	private string _hudFields = DefaultHudFields;
+	private bool _trailMine, _trailsOthers, _trailsOwn, _trailsSpectate, _trailsBots;
+	private string _trailColor = "";
 
 	internal PlayerOptions(PlayerProfile profile)
 	{
@@ -72,6 +80,12 @@ internal sealed class PlayerOptions
 		_hudTop = Bool(KeyHudTop, true);
 		_hudSplits = Bool(KeyHudSplits, true);
 		_hudSpectators = Bool(KeyHudSpectators, true);
+		_trailMine = Bool(KeyTrailMine, true);
+		_trailsOthers = Bool(KeyTrailsOthers, true);
+		_trailsOwn = Bool(KeyTrailsOwn, true);
+		_trailsSpectate = Bool(KeyTrailsSpectate, true);
+		_trailsBots = Bool(KeyTrailsBots, true);
+		_trailColor = _profile.Settings.TryGetValue(KeyTrailColor, out var trailColor) && TrailColors.IsValidCustom(trailColor) ? trailColor : "";
 
 		// A stored layout the HUD can't show falls back to the default
 		string fields = _profile.Settings.TryGetValue(KeyHudFields, out var value) ? value : DefaultHudFields;
@@ -128,6 +142,37 @@ internal sealed class PlayerOptions
 	internal bool HudTop { get => _hudTop; set { _hudTop = value; Save(KeyHudTop, value); } }
 	internal bool HudSplits { get => _hudSplits; set { _hudSplits = value; Save(KeyHudSplits, value); } }
 	internal bool HudSpectators { get => _hudSpectators; set { _hudSpectators = value; Save(KeyHudSpectators, value); } }
+
+	// ---- Trails ----
+
+	/// <summary>Draw my trail (off = nobody sees it)</summary>
+	internal bool TrailMine { get => _trailMine; set { _trailMine = value; Save(KeyTrailMine, value); } }
+
+	/// <summary>See other players' trails</summary>
+	internal bool TrailsOthers { get => _trailsOthers; set { _trailsOthers = value; Save(KeyTrailsOthers, value); } }
+
+	/// <summary>See my own trail</summary>
+	internal bool TrailsOwn { get => _trailsOwn; set { _trailsOwn = value; Save(KeyTrailsOwn, value); } }
+
+	/// <summary>See the trail of the player / bot I spectate</summary>
+	internal bool TrailsSpectate { get => _trailsSpectate; set { _trailsSpectate = value; Save(KeyTrailsSpectate, value); } }
+
+	/// <summary>See replay bots' trails</summary>
+	internal bool TrailsBots { get => _trailsBots; set { _trailsBots = value; Save(KeyTrailsBots, value); } }
+
+	/// <summary>Own trail color ("#RRGGBB" or "rainbow") - empty = the group's color. Only used while eligible.</summary>
+	internal string TrailColor
+	{
+		get => _trailColor;
+		set
+		{
+			_trailColor = value;
+			_profile.SetSetting(KeyTrailColor, value);
+		}
+	}
+
+	/// <summary>Any viewer toggle off - the transmit filter has work to do for this player</summary>
+	internal bool FiltersTrails => !_trailsOthers || !_trailsOwn || !_trailsSpectate || !_trailsBots;
 
 	/// <summary>The bottom HUD layout as stored (see DefaultHudFields)</summary>
 	internal string HudFields => _hudFields;

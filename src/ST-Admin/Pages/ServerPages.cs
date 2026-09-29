@@ -30,6 +30,7 @@ public partial class SurfTimer
 			ctx.Nav("Replay bots", $"{playing} / {slots} playing", "", AdminBotsPage),
 			ctx.Nav("Timer settings", "", "saved to timer_settings.json", AdminTimerSettingsPage),
 			ctx.Nav("Chat", ChatSettings.Current.Enabled ? "on" : "off", "format, colors, anti-spam", AdminChatPage),
+			ctx.Nav("Trails", TrailSettings.Current.Enabled ? "on" : "off", "look and colors per group", AdminTrailsPage),
 		};
 
 		if (CurrentMap != null)
@@ -190,6 +191,7 @@ public partial class SurfTimer
 		["replays_enabled"] = ("Replays", "record and play replays"),
 		["replay_permanent_map_bot"] = ("Permanent map replay bot", "loops the map WR, not counted in the max"),
 		["clan_tags_enabled"] = ("Clan tags", "players' clan tags on the scoreboard"),
+		["country_clan_tag"] = ("Country tag", "[DE] in front of the clan tag"),
 	};
 
 	private PanelPage AdminTimerSettingsPage() => new("Timer settings", ctx =>

@@ -18,6 +18,9 @@ public partial class SurfTimer
 	private readonly List<TransmitTarget> _transmitTargets = new();
 	private bool _anyoneHiding;
 
+	// Someone doesn't want to see some trails (their !options - Trails toggles, or hidden players / bots)
+	private bool _anyoneFilteringTrails;
+
 	/// <summary>
 	/// Collects the alive human and replay bot pawns (OnTick) - only when someone uses a hide option.
 	/// </summary>
@@ -25,6 +28,7 @@ public partial class SurfTimer
 	{
 		_transmitTargets.Clear();
 		_anyoneHiding = playerList.Values.Any(p => p.Options.HidePlayers || p.Options.HideBots);
+		_anyoneFilteringTrails = _trails.Count > 0 && (_anyoneHiding || playerList.Values.Any(p => p.Options.FiltersTrails));
 		if (!_anyoneHiding)
 			return;
 
@@ -67,7 +71,8 @@ public partial class SurfTimer
 	/// </summary>
 	private void OnCheckTransmit(CCheckTransmitInfoList infoList)
 	{
-		if (!_anyoneHiding || _transmitTargets.Count == 0)
+		bool hidePawns = _anyoneHiding && _transmitTargets.Count > 0;
+		if (!hidePawns && !_anyoneFilteringTrails)
 			return;
 
 		foreach ((CCheckTransmitInfo info, CCSPlayerController? viewer) in infoList)
@@ -76,7 +81,12 @@ public partial class SurfTimer
 				continue;
 
 			var options = player.Options;
-			if (!options.HidePlayers && !options.HideBots)
+
+			// Trails the viewer doesn't want (see Trails.cs)
+			if (_anyoneFilteringTrails && (options.FiltersTrails || options.HidePlayers || options.HideBots))
+				FilterTrailTransmit(info, viewer, options);
+
+			if (!hidePawns || (!options.HidePlayers && !options.HideBots))
 				continue;
 
 			uint ownPawn = viewer.PlayerPawn.Value?.Index ?? 0;

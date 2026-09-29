@@ -171,6 +171,13 @@ public partial class SurfTimer
 		// No lock - we use thread-safe method AddOrUpdate
 		playerList.AddOrUpdate(player.UserId ?? 0, p, (_, _) => p);
 
+		// First player on this map: the game mode config may have run after our map start apply
+		if (!player.IsBot && !_serverSettingsAppliedForPlayers)
+		{
+			_serverSettingsAppliedForPlayers = true;
+			ApplyServerSettings("first player joined");
+		}
+
 		// CS2 can drop custom HUD texts for existing players when someone joins - resend everyone's
 		CustomHud.ResendAll();
 

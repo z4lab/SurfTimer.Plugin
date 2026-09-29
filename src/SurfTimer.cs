@@ -55,9 +55,17 @@ public partial class SurfTimer : BasePlugin
 	internal static Database DB { get; private set; } = null!;
 	public static Map CurrentMap { get; private set; } = null!;
 
+	// server_settings.cfg was run for the first player of this map (Players.cs, OnPlayerConnectFull)
+	private bool _serverSettingsAppliedForPlayers;
+
 	/* ========== MAP START HOOKS ========== */
 	public void OnMapStart(string mapName)
 	{
+		// After the game mode config of the new map (see ApplyServerSettings) - twice, as its timing varies
+		_serverSettingsAppliedForPlayers = false;
+		AddTimer(2f, () => ApplyServerSettings("map start"), CounterStrikeSharp.API.Modules.Timers.TimerFlags.STOP_ON_MAPCHANGE);
+		AddTimer(10f, () => ApplyServerSettings("map start, again"), CounterStrikeSharp.API.Modules.Timers.TimerFlags.STOP_ON_MAPCHANGE);
+
 		// Initialise Map Object
 		if ((CurrentMap == null || CurrentMap.Name!.Equals(mapName)) && mapName.Contains("surf_"))
 		{
@@ -109,6 +117,7 @@ public partial class SurfTimer : BasePlugin
 		MapCvars.RestoreAll();
 		ChatPrompt.ForgetAll();
 		ClearHeldWeapons();
+		ForgetTrails();
 
 		// Clear/reset stuff here
 		CurrentMap = null!;
@@ -130,18 +139,25 @@ public partial class SurfTimer : BasePlugin
 		foreach (var player in playerList.Values)
 			player.TouchingTriggers.Clear();
 
+		ApplyServerSettings("round start");
+		return HookResult.Continue;
+	}
+
+	/// <summary>
+	/// Runs SurfTimer/server_settings.cfg, then the map's own cvar overrides (those win). Not only on round
+	/// start: after a map change CS2 also runs its game mode config (mp_timelimit, no autobhop, ...) and
+	/// the order varies - so it's also run shortly after map start and when the first player joins.
+	/// </summary>
+	private void ApplyServerSettings(string reason)
+	{
 		Server.ExecuteCommand("execifexists SurfTimer/server_settings.cfg");
-		// The config may set the same cvars as the map's overrides - those win
 		AddTimer(0.5f, () =>
 		{
 			if (CurrentMap != null)
 				MapCvars.Apply(CurrentMap.Settings);
-		});
-		_logger.LogTrace(
-			"[{Prefix}] Executed configuration: server_settings.cfg",
-			Config.PluginName
-		);
-		return HookResult.Continue;
+		}, CounterStrikeSharp.API.Modules.Timers.TimerFlags.STOP_ON_MAPCHANGE);
+
+		_logger.LogInformation("[{Prefix}] Executed configuration: server_settings.cfg ({Reason})", Config.PluginName, reason);
 	}
 
 	/* ========== PLUGIN LOAD ========== */
@@ -202,6 +218,8 @@ public partial class SurfTimer : BasePlugin
 		AddTimer(0.5f, EnforcePlayerVisibility, CounterStrikeSharp.API.Modules.Timers.TimerFlags.REPEAT);
 		// Dropped weapons are removed at once (see ST-Player/Weapons.cs)
 		RegisterListener<Listeners.OnEntityParentChanged>(OnWeaponParentChanged);
+		// Trails of ranked players / staff / replay bots (see ST-Trails/Trails.cs)
+		LoadTrailSettings();
 		// Player chat: formatted lines, hidden commands, admin panel prompts (see ST-Chat/ChatProcessor.cs)
 		RegisterChatProcessor();
 		// Ranks shown in chat - also refreshed whenever points change

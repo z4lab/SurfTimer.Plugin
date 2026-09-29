@@ -156,6 +156,7 @@ public partial class SurfTimer
 					ReplayId = pb.ReplayId,
 					RecordRank = pb.Rank,
 					RecordPlayerName = ownerName ?? oPlayer.Profile.Name ?? "N/A",
+					RecordPlayerId = ownerId ?? oPlayer.Profile.ID,
 					RecordRunTime = pb.RunTime,
 					Frames = frames,
 				};

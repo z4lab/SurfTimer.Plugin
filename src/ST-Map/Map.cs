@@ -509,6 +509,7 @@ public class Map : MapEntity
 		template.MapTimeID = wr?.ID ?? -1;
 		template.RecordRunTime = wr?.RunTime ?? -1;
 		template.RecordPlayerName = wr?.Name ?? "N/A";
+		template.RecordPlayerId = wr?.PlayerID ?? 0;
 		template.RecordRank = 1;
 		template.Frames = frames;
 		template.ReplayId = replayId;

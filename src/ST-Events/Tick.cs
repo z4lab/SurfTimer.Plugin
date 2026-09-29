@@ -110,6 +110,16 @@ public partial class SurfTimer
 			}
 		}
 
+		// Trail segments (Trails.cs) - draws every trail_settings segment_ticks
+		try
+		{
+			TickTrails();
+		}
+		catch (Exception ex)
+		{
+			LogTickError(ex, "trails");
+		}
+
 		// Once per second: unwatched bots, stuck slots, the permanent map bot (ReplayUpkeep.cs)
 		if (Server.TickCount % 64 == 0)
 		{

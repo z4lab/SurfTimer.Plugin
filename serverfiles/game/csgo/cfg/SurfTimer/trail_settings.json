@@ -1,0 +1,19 @@
+{
+  "enabled": true,
+  "length_seconds": 1.5,
+  "width": 3.0,
+  "segment_ticks": 6,
+  "min_speed": 50,
+  "colors": {
+    "1": "#FFD700",
+    "2": "#C0C0C0",
+    "3": "#CD7F32",
+    "top10": "#4FC3F7",
+    "top50": "#7986CB",
+    "top100": "#8FD18B",
+    "vip": "#A0E060",
+    "admin": "#B070E0",
+    "root": "#E53935",
+    "replay": "#FFFFFF"
+  }
+}
