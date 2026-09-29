@@ -701,11 +701,17 @@ public partial class SurfTimer
 #if DEBUG
 		player.Controller.PrintToChat($"CS2 Surf DEBUG >> CBaseTrigger_{ChatColors.LightRed}EndTouchFunc{ChatColors.Default} -> {ChatColors.Yellow}Bonus {zone.Number} Start Zone");
 #endif
+		// Only leaving the start of the bonus the player is on starts it. Leaving another bonus start -
+		// e.g. teleported out of b1 by !b 2 (its EndTouch can come after b2's StartTouch reset the timer) -
+		// or passing one during a map / stage run must not start the timer, cut the replay or overwrite
+		// the run's start speed.
+		if (player.Timer.IsStageMode || !player.Timer.IsBonusMode || zone.Number != player.Timer.Bonus)
+			return;
+
 		VectorT velocity = player.Controller.PlayerPawn.Value!.AbsVelocity.ToVector_t();
 
 		// A bonus run starts here - the map's exit limit applies
-		if (!player.Timer.IsStageMode && player.Timer.IsBonusMode)
-			ApplyExitLimit(player, ref velocity);
+		ApplyExitLimit(player, ref velocity);
 
 		// Replay
 		if (player.ReplayRecorder.IsRecording)
@@ -715,20 +721,17 @@ public partial class SurfTimer
 		}
 
 		// BONUS START ZONE
-		if (!player.Timer.IsStageMode && player.Timer.IsBonusMode)
-		{
-			player.Timer.Start();
-			player.ResetSync();
-			player.CountAttempt(1, zone.Number, finished: false);
-			// Set the CurrentRunData values
-			player.Stats.ThisRun.RunTime = player.Timer.Ticks;
+		player.Timer.Start();
+		player.ResetSync();
+		player.CountAttempt(1, zone.Number, finished: false);
+		// Set the CurrentRunData values
+		player.Stats.ThisRun.RunTime = player.Timer.Ticks;
 
-			player.ReplayRecorder.CurrentSituation = ReplayFrameSituation.START_ZONE_EXIT;
-			player.ReplayRecorder.BonusSituations.Add(player.ReplayRecorder.Frames.Count);
+		player.ReplayRecorder.CurrentSituation = ReplayFrameSituation.START_ZONE_EXIT;
+		player.ReplayRecorder.BonusSituations.Add(player.ReplayRecorder.Frames.Count);
 #if DEBUG
-			Console.WriteLine($"START_ZONE_EXIT: player.ReplayRecorder.BonusSituations.Add({player.ReplayRecorder.Frames.Count})");
+		Console.WriteLine($"START_ZONE_EXIT: player.ReplayRecorder.BonusSituations.Add({player.ReplayRecorder.Frames.Count})");
 #endif
-		}
 
 		// Prespeed display
 		player.HUD.NotifyPrespeed("", velocity.velMag());
