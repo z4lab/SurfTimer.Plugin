@@ -90,6 +90,7 @@ public partial class SurfTimer : BasePlugin
 		// Per-map cvar overrides back to the server's values, open chat prompts dropped
 		MapCvars.RestoreAll();
 		ChatPrompt.ForgetAll();
+		ClearHeldWeapons();
 
 		// Clear/reset stuff here
 		CurrentMap = null!;
@@ -181,6 +182,8 @@ public partial class SurfTimer : BasePlugin
 		// Hiding players / bots per viewer, and undoing maps that hide players (see Visibility.cs)
 		RegisterListener<Listeners.CheckTransmit>(OnCheckTransmit);
 		AddTimer(0.5f, EnforcePlayerVisibility, CounterStrikeSharp.API.Modules.Timers.TimerFlags.REPEAT);
+		// Dropped weapons are removed at once (see ST-Player/Weapons.cs)
+		RegisterListener<Listeners.OnEntityParentChanged>(OnWeaponParentChanged);
 		// Player chat: formatted lines, hidden commands, admin panel prompts (see ST-Chat/ChatProcessor.cs)
 		RegisterChatProcessor();
 		// Ranks shown in chat - also refreshed whenever points change
