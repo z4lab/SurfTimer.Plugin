@@ -1,4 +1,6 @@
 using CounterStrikeSharp.API;
+using CounterStrikeSharp.API.Modules.Utils;
+using Microsoft.Extensions.Logging;
 
 namespace SurfTimer;
 
@@ -10,6 +12,13 @@ namespace SurfTimer;
 public partial class SurfTimer
 {
 	private const int ReplaySpawnTimeoutSeconds = 15;
+
+	// The permanent bot's watchdog: how long it may stay not-playing before it's restarted, and the
+	// pause between restarts (a respawn takes ~1.5 s to start playing)
+	private const int PermanentStallSeconds = 3;
+	private const int PermanentRestartCooldownSeconds = 5;
+	private DateTime? _permanentStalledSince;
+	private DateTime _permanentLastRestart;
 
 	private void TickReplayUpkeep()
 	{
@@ -90,9 +99,16 @@ public partial class SurfTimer
 
 		if (permanent == null)
 		{
+			// Bots can't join an empty server (bot_join_after_player) - on map load the WR is often ready
+			// before anyone is in, so wait for the first player instead of creating a bot that never spawns
+			if (!playerList.Values.Any(p => p.Controller.IsValid && !p.Controller.IsBot)) // Humans are listed once fully connected
+				return;
+
 			var slot = new ReplayPlayer { IsPermanent = true };
 			slot.LoadContentFrom(wr!);
 			manager.Pool.Add(slot);
+			_permanentStalledSince = null;
+			_logger.LogInformation("[Replay] Permanent map bot: spawning for the map WR ({Player}, time {TimeId})", wr!.RecordPlayerName, wr.MapTimeID);
 			SpawnReplayBotDirectly(slot);
 			return;
 		}
@@ -100,6 +116,7 @@ public partial class SurfTimer
 		// A new map WR - the bot switches to it right away
 		if (permanent.Controller != null && permanent.MapTimeID != wr!.MapTimeID)
 		{
+			_logger.LogInformation("[Replay] Permanent map bot: new map WR ({Player}, time {TimeId})", wr.RecordPlayerName, wr.MapTimeID);
 			permanent.LoadContentFrom(wr);
 			permanent.LoadReplayData(-1);
 			if (permanent.Controller.PawnIsAlive)
@@ -111,6 +128,34 @@ public partial class SurfTimer
 			{
 				RestartIdleReplayBot(permanent);
 			}
+			return;
 		}
+
+		// Watchdog: a permanent bot that exists but isn't playing (dead, moved to spectator by a round
+		// restart, never started) is respawned and started again
+		var controller = permanent.Controller;
+		if (controller == null || !controller.IsValid)
+			return;
+
+		bool playing = permanent.IsPlaying && controller.PawnIsAlive
+			&& controller.Team is CsTeam.Terrorist or CsTeam.CounterTerrorist;
+		if (playing)
+		{
+			_permanentStalledSince = null;
+			return;
+		}
+
+		var now = DateTime.UtcNow;
+		_permanentStalledSince ??= now;
+		if ((now - _permanentStalledSince.Value).TotalSeconds < PermanentStallSeconds
+			|| (now - _permanentLastRestart).TotalSeconds < PermanentRestartCooldownSeconds)
+			return;
+
+		_logger.LogInformation("[Replay] Permanent map bot isn't playing (playing {Playing}, alive {Alive}, team {Team}) - restarting it",
+			permanent.IsPlaying, controller.PawnIsAlive, controller.Team);
+		_permanentLastRestart = now;
+		_permanentStalledSince = null;
+		permanent.LoadReplayData(-1);
+		RestartIdleReplayBot(permanent);
 	}
 }
