@@ -19,10 +19,13 @@ internal static class AdminPermissions
 
 	internal static readonly IReadOnlyList<string> Sections = [Map, Records, Players, Server, Database, Audit];
 
-	internal static bool Has(CCSPlayerController? controller, string flag)
+	/// <param name="flag">null = no permission needed</param>
+	internal static bool Has(CCSPlayerController? controller, string? flag)
 	{
 		if (controller == null || !controller.IsValid)
 			return false;
+		if (flag == null)
+			return true;
 		return AdminManager.PlayerHasPermissions(controller, Root) || AdminManager.PlayerHasPermissions(controller, flag);
 	}
 

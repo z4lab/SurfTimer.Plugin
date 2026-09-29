@@ -210,15 +210,13 @@ public class CurrentRun : RunStatsEntity
 			if (stage_run_time < SurfTimer.CurrentMap.StageWR[stage][pStyle].RunTime) // Player beat the Stage WR
 			{
 				int timeImprove = SurfTimer.CurrentMap.StageWR[stage][pStyle].RunTime - stage_run_time;
-				Server.PrintToChatAll($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["stagewr_improved",
-					player.Controller.PlayerName, stage, PlayerHud.FormatTime(stage_run_time), PlayerHud.FormatTime(timeImprove), PlayerHud.FormatTime(SurfTimer.CurrentMap.StageWR[stage][pStyle].RunTime)]}"
-				);
+				ChatAnnounce.Send(ChatAnnounce.Kind.Record, player, $"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["stagewr_improved",
+					player.Controller.PlayerName, stage, PlayerHud.FormatTime(stage_run_time), PlayerHud.FormatTime(timeImprove), PlayerHud.FormatTime(SurfTimer.CurrentMap.StageWR[stage][pStyle].RunTime)]}");
 			}
 			else if (SurfTimer.CurrentMap.StageWR[stage][pStyle].ID == -1) // No Stage record was set on the map
 			{
-				Server.PrintToChatAll($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["stagewr_set",
-					player.Controller.PlayerName, stage, PlayerHud.FormatTime(stage_run_time)]}"
-				);
+				ChatAnnounce.Send(ChatAnnounce.Kind.Record, player, $"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["stagewr_set",
+					player.Controller.PlayerName, stage, PlayerHud.FormatTime(stage_run_time)]}");
 			}
 			else if (player.Stats.StagePB[stage][pStyle] != null && player.Stats.StagePB[stage][pStyle].ID == -1) // Player first Stage personal best
 			{
@@ -229,9 +227,8 @@ public class CurrentRun : RunStatsEntity
 			else if (player.Stats.StagePB[stage][pStyle] != null && player.Stats.StagePB[stage][pStyle].RunTime > stage_run_time) // Player beating their existing Stage personal best
 			{
 				int timeImprove = player.Stats.StagePB[stage][pStyle].RunTime - stage_run_time;
-				Server.PrintToChatAll($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["stagepb_improved",
-					player.Controller.PlayerName, stage, PlayerHud.FormatTime(stage_run_time), PlayerHud.FormatTime(timeImprove), PlayerHud.FormatTime(player.Stats.StagePB[stage][pStyle].RunTime)]}"
-				);
+				ChatAnnounce.Send(ChatAnnounce.Kind.Pb, player, $"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["stagepb_improved",
+					player.Controller.PlayerName, stage, PlayerHud.FormatTime(stage_run_time), PlayerHud.FormatTime(timeImprove), PlayerHud.FormatTime(player.Stats.StagePB[stage][pStyle].RunTime)]}");
 			}
 
 			// Save stage run
@@ -286,15 +283,13 @@ public class CurrentRun : RunStatsEntity
 			if (checkpoint_run_time < SurfTimer.CurrentMap.CheckpointWR[checkpoint][pStyle].RunTime) // Player beat the Checkpoint WR
 			{
 				int timeImprove = SurfTimer.CurrentMap.CheckpointWR[checkpoint][pStyle].RunTime - checkpoint_run_time;
-				Server.PrintToChatAll($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["checkpointwr_improved",
-					player.Controller.PlayerName, checkpoint, PlayerHud.FormatTime(checkpoint_run_time), PlayerHud.FormatTime(timeImprove), PlayerHud.FormatTime(SurfTimer.CurrentMap.CheckpointWR[checkpoint][pStyle].RunTime)]}"
-				);
+				ChatAnnounce.Send(ChatAnnounce.Kind.Record, player, $"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["checkpointwr_improved",
+					player.Controller.PlayerName, checkpoint, PlayerHud.FormatTime(checkpoint_run_time), PlayerHud.FormatTime(timeImprove), PlayerHud.FormatTime(SurfTimer.CurrentMap.CheckpointWR[checkpoint][pStyle].RunTime)]}");
 			}
 			else if (SurfTimer.CurrentMap.CheckpointWR[checkpoint][pStyle].ID == -1) // No Checkpoint record was set on the map
 			{
-				Server.PrintToChatAll($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["checkpointwr_set",
-					player.Controller.PlayerName, checkpoint, PlayerHud.FormatTime(checkpoint_run_time)]}"
-				);
+				ChatAnnounce.Send(ChatAnnounce.Kind.Record, player, $"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["checkpointwr_set",
+					player.Controller.PlayerName, checkpoint, PlayerHud.FormatTime(checkpoint_run_time)]}");
 			}
 			else if (player.Stats.CheckpointPB[checkpoint][pStyle] != null && player.Stats.CheckpointPB[checkpoint][pStyle].ID == -1) // Player first Checkpoint personal best
 			{
@@ -305,9 +300,8 @@ public class CurrentRun : RunStatsEntity
 			else if (player.Stats.CheckpointPB[checkpoint][pStyle] != null && player.Stats.CheckpointPB[checkpoint][pStyle].RunTime > checkpoint_run_time) // Player beating their existing Checkpoint personal best
 			{
 				int timeImprove = player.Stats.CheckpointPB[checkpoint][pStyle].RunTime - checkpoint_run_time;
-				Server.PrintToChatAll($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["checkpointpb_improved",
-					player.Controller.PlayerName, checkpoint, PlayerHud.FormatTime(checkpoint_run_time), PlayerHud.FormatTime(timeImprove), PlayerHud.FormatTime(player.Stats.CheckpointPB[checkpoint][pStyle].RunTime)]}"
-				);
+				ChatAnnounce.Send(ChatAnnounce.Kind.Pb, player, $"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["checkpointpb_improved",
+					player.Controller.PlayerName, checkpoint, PlayerHud.FormatTime(checkpoint_run_time), PlayerHud.FormatTime(timeImprove), PlayerHud.FormatTime(player.Stats.CheckpointPB[checkpoint][pStyle].RunTime)]}");
 			}
 
 			// Save checkpoint segment run

@@ -365,10 +365,12 @@ public class PlayerHud
 		// Whose data to show: our own while alive, otherwise whoever we spectate (player or replay bot)
 		var (subject, replay) = ResolveSubject(allPlayers);
 
+		// Panels the viewer turned off in !options (HUD) are sent empty, which collapses them
+		var options = _player.Options;
 		SendCenter(subject, replay);
-		SendSlot(CustomHud.Top, TopRows(subject, replay));
-		SendSlot(CustomHud.Left, subject != null ? SplitRows(subject) : []);
-		SendSlot(CustomHud.Right, SpectatorRows(allPlayers));
+		SendSlot(CustomHud.Top, options.HudTop ? TopRows(subject, replay) : []);
+		SendSlot(CustomHud.Left, options.HudSplits && subject != null ? SplitRows(subject) : []);
+		SendSlot(CustomHud.Right, options.HudSpectators ? SpectatorRows(allPlayers) : []);
 		SendMenu(); // Refreshes live values (e.g. !spec times) - clicks re-render right away
 
 #if DEBUG
@@ -449,12 +451,14 @@ public class PlayerHud
 	private readonly record struct HudField(string Label, List<FieldSegment> Segments, bool Wide = false);
 
 	/// <summary>
-	/// Bottom center, as rows of fields: timer (wide) and speed, then prespeed, keys and sync.
+	/// Bottom center, as rows of fields in the viewer's layout (!options - HUD; by default timer (wide) and
+	/// speed, then prespeed, keys and sync).
 	/// </summary>
 	private void SendCenter(Player? subject, ReplayPlayer? replay)
 	{
 		string slotId = CustomHud.SlotId(CustomHud.Center);
-		bool visible = subject != null || (replay != null && ReplayTypeLabel(replay) != "");
+		bool visible = (subject != null || (replay != null && ReplayTypeLabel(replay) != ""))
+			&& _player.Options.HudRows.Count > 0; // A layout without fields hides the block
 
 		SendClass(slotId, "hidden", !visible);
 		SendClass(slotId, $"shift-{CustomHud.SlotShift[CustomHud.Center]}", true);
@@ -508,11 +512,16 @@ public class PlayerHud
 				? new FieldSegment(syncPercent.Value.ToString("00.00", CultureInfo.InvariantCulture) + "%", Mono: true)
 				: NotAvailable]);
 
-		List<List<HudField>> rows =
-		[
-			[timer, speed],
-			[prespeed, keys, sync],
-		];
+		HudField FieldOf(HudFieldKind kind) => kind switch
+		{
+			HudFieldKind.Timer => timer,
+			HudFieldKind.Speed => speed,
+			HudFieldKind.Prespeed => prespeed,
+			HudFieldKind.Keys => keys,
+			_ => sync,
+		};
+
+		var rows = _player.Options.HudRows.Select(row => row.Select(FieldOf).ToList()).ToList();
 
 		for (int r = 0; r < CustomHud.FieldRows; r++)
 		{
@@ -974,6 +983,10 @@ public class PlayerHud
 	/// </summary>
 	internal void DisplayCheckpointMessages()
 	{
+		// !options - Chat: own split messages
+		if (!_player.Options.ChatSplits)
+			return;
+
 		int pbTime;
 		int wrTime = -1;
 		float pbSpeed;
@@ -1126,6 +1139,10 @@ public class PlayerHud
 	/// <param name="exitVelocity">Player's velocity at the moment the stage was completed</param>
 	internal void DisplayStageMessage(short stage, int stageRunTime, VectorT exitVelocity)
 	{
+		// !options - Chat: own split messages
+		if (!_player.Options.ChatSplits)
+			return;
+
 		int style = _player.Timer.Style;
 		float exitSpeed = exitVelocity.velMag();
 
@@ -1192,6 +1209,10 @@ public class PlayerHud
 	/// <param name="exitVelocity">Player's velocity at the moment the checkpoint segment was completed</param>
 	internal void DisplayCheckpointSegmentMessage(short checkpoint, int checkpointRunTime, VectorT exitVelocity)
 	{
+		// !options - Chat: own split messages
+		if (!_player.Options.ChatSplits)
+			return;
+
 		int style = _player.Timer.Style;
 		float exitSpeed = exitVelocity.velMag();
 

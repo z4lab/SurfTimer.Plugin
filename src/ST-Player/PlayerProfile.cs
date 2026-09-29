@@ -11,7 +11,6 @@ public class PlayerProfile : PlayerProfileEntity
 	/// <summary>player_settings, loaded on connect</summary>
 	internal Dictionary<string, string> Settings { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
 
-	internal const string SettingHideSelf = "hideself";
 
 	/// <summary>Active timer ban (loaded on connect, kept up to date by the admin panel)</summary>
 	internal PlayerRepository.BanRow? Ban { get; set; }
@@ -43,9 +42,6 @@ public class PlayerProfile : PlayerProfileEntity
 		profile.Ban = await PlayerRepository.GetActiveBanAsync(profile.ID);
 		return profile;
 	}
-
-	internal bool GetBoolSetting(string key, bool fallback) =>
-		Settings.TryGetValue(key, out var value) ? value is "1" or "true" : fallback;
 
 	/// <summary>
 	/// Stores a setting (in the background).

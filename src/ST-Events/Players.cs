@@ -20,8 +20,8 @@ public partial class SurfTimer
 
 		if (!controller.IsBot)
 		{
-			// Re-apply !hideself on every spawn - the game resets the pawn's render state. Slight
-			// delay so the spawn has finished setting up the model/weapons first.
+			// Re-apply the hide-legs option on every spawn - the game resets the pawn's render state.
+			// Slight delay so the spawn has finished setting up the model/weapons first.
 			AddTimer(0.1f, () =>
 			{
 				if (controller.IsValid && playerList.TryGetValue(controller.UserId ?? 0, out var spawnedPlayer))
@@ -162,11 +162,8 @@ public partial class SurfTimer
 		var profile = Task.Run(() => PlayerProfile.CreateAsync(steamId, name, country, mapId)).GetAwaiter().GetResult();
 		var movement = new CCSPlayer_MovementServices(player.PlayerPawn.Value!.MovementServices!.Handle);
 
-		var p = new Player(player, movement, profile)
-		{
-			// Persisted !hideself choice (hidden by default)
-			HideSelf = profile.GetBoolSetting(PlayerProfile.SettingHideSelf, true),
-		};
+		// Options (legs, hiding, chat, HUD) come from the profile's stored settings
+		var p = new Player(player, movement, profile);
 
 		// No lock - we use thread-safe method AddOrUpdate
 		playerList.AddOrUpdate(player.UserId ?? 0, p, (_, _) => p);
@@ -192,9 +189,8 @@ public partial class SurfTimer
 		Server.NextFrame(() =>
 		{
 			// Print join messages
-			Server.PrintToChatAll($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["player_connected",
-				name, country]}"
-			);
+			ChatAnnounce.Send(ChatAnnounce.Kind.Connect, null, $"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["player_connected",
+				name, country]}");
 			_logger.LogTrace("[{Prefix}] {PlayerName} has connected from {Country}.",
 				Config.PluginName, name, playerList[player.UserId ?? 0].Profile.Country
 			);

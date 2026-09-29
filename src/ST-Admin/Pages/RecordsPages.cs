@@ -8,11 +8,11 @@ public partial class SurfTimer
 {
 	private const int BoardPageSize = 50;
 
-	private AdminPage AdminRecordsRoot() => new("Records", ctx =>
+	private PanelPage AdminRecordsRoot() => new("Records", ctx =>
 	{
 		var map = CurrentMap;
 		if (map == null || map.ID <= 0)
-			return [AdminContext.Info("No map loaded")];
+			return [PanelContext.Info("No map loaded")];
 
 		int style = ctx.Style;
 		var rows = new List<HudMenuItem>();
@@ -42,17 +42,17 @@ public partial class SurfTimer
 		internal List<TimeRepository.BoardRow> Rows { get; } = rows;
 	}
 
-	private AdminPage AdminBoardPage(int courseId, CourseKind kind, short number)
+	private PanelPage AdminBoardPage(int courseId, CourseKind kind, short number)
 	{
 		int limit = BoardPageSize;
-		return new AdminPage(CourseLabel(kind, number), ctx =>
+		return new PanelPage(CourseLabel(kind, number), ctx =>
 		{
 			int style = ctx.Style;
 			var board = ctx.Load("board", async () => new BoardData(await TimeRepository.GetLeaderboardAsync(courseId, style, 0, limit)));
 			if (board == null)
-				return [AdminContext.LoadingRow()];
+				return [PanelContext.LoadingRow()];
 			if (board.Rows.Count == 0)
-				return [AdminContext.Info("No times yet")];
+				return [PanelContext.Info("No times yet")];
 
 			var rows = board.Rows.Select(r => ctx.Nav($"#{r.Rank}  {r.PlayerName}", AdminFormat.Time(r.RunTime),
 				AdminFormat.Date(r.UpdatedAt), () => AdminTimePage(r.Id, kind, number))).ToList();
@@ -69,11 +69,11 @@ public partial class SurfTimer
 		});
 	}
 
-	private AdminPage AdminTimePage(int timeId, CourseKind kind, short number) => new("Time", ctx =>
+	private PanelPage AdminTimePage(int timeId, CourseKind kind, short number) => new("Time", ctx =>
 	{
 		var time = ctx.Load("time", () => TimeRepository.GetTimeAsync(timeId));
 		if (time == null)
-			return ctx.IsLoading("time") ? [AdminContext.LoadingRow()] : [AdminContext.Info("This time no longer exists")];
+			return ctx.IsLoading("time") ? [PanelContext.LoadingRow()] : [PanelContext.Info("This time no longer exists")];
 
 		string label = CourseLabel(kind, number);
 		float startSpeed = MathF.Sqrt(time.StartVelX * time.StartVelX + time.StartVelY * time.StartVelY);
@@ -81,11 +81,11 @@ public partial class SurfTimer
 
 		var rows = new List<HudMenuItem>
 		{
-			AdminContext.Info(time.PlayerName ?? "?", AdminFormat.Time(time.RunTime), $"#{time.Rank} of {time.TotalCount} · {label}"),
-			AdminContext.Info("Set", AdminFormat.Date(time.UpdatedAt), AdminFormat.Ago(time.UpdatedAt) + " ago"),
-			AdminContext.Info("Sync", time.Sync.HasValue ? $"{time.Sync:0.00}%" : "N/A"),
-			AdminContext.Info("Start / end speed", $"{startSpeed:0} / {endSpeed:0} u/s"),
-			AdminContext.Info("Replay", time.ReplayId != null ? "stored" : "none"),
+			PanelContext.Info(time.PlayerName ?? "?", AdminFormat.Time(time.RunTime), $"#{time.Rank} of {time.TotalCount} · {label}"),
+			PanelContext.Info("Set", AdminFormat.Date(time.UpdatedAt), AdminFormat.Ago(time.UpdatedAt) + " ago"),
+			PanelContext.Info("Sync", time.Sync.HasValue ? $"{time.Sync:0.00}%" : "N/A"),
+			PanelContext.Info("Start / end speed", $"{startSpeed:0} / {endSpeed:0} u/s"),
+			PanelContext.Info("Replay", time.ReplayId != null ? "stored" : "none"),
 		};
 
 		if (time.ReplayId != null && CurrentMap.ID == time.MapId)

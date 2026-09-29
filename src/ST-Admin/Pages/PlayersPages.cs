@@ -10,7 +10,7 @@ namespace SurfTimer;
 /// </summary>
 public partial class SurfTimer
 {
-	private AdminPage AdminPlayersRoot() => new("Players", ctx =>
+	private PanelPage AdminPlayersRoot() => new("Players", ctx =>
 	{
 		var rows = new List<HudMenuItem>
 		{
@@ -38,13 +38,13 @@ public partial class SurfTimer
 		internal List<PlayerProfileEntity> Players { get; } = players;
 	}
 
-	private AdminPage AdminSearchPage(string search) => new($"\"{search}\"", ctx =>
+	private PanelPage AdminSearchPage(string search) => new($"\"{search}\"", ctx =>
 	{
 		var result = ctx.Load("search", async () => new SearchData(await PlayerRepository.SearchAsync(search, 40)));
 		if (result == null)
-			return [AdminContext.LoadingRow()];
+			return [PanelContext.LoadingRow()];
 		if (result.Players.Count == 0)
-			return [AdminContext.Info("No players found", "", search)];
+			return [PanelContext.Info("No players found", "", search)];
 
 		return result.Players.Select(p =>
 		{
@@ -62,7 +62,7 @@ public partial class SurfTimer
 		internal PlayerRepository.BanRow? Ban { get; init; }
 	}
 
-	private AdminPage AdminPlayerPage(int playerId, string name) => new(name, ctx =>
+	private PanelPage AdminPlayerPage(int playerId, string name) => new(name, ctx =>
 	{
 		int style = ctx.Style;
 		var data = ctx.Load("player", async () => new PlayerData
@@ -72,9 +72,9 @@ public partial class SurfTimer
 			Ban = await PlayerRepository.GetActiveBanAsync(playerId),
 		});
 		if (data == null)
-			return [AdminContext.LoadingRow()];
+			return [PanelContext.LoadingRow()];
 		if (data.Profile == null)
-			return [AdminContext.Info("Player not found")];
+			return [PanelContext.Info("Player not found")];
 
 		var profile = data.Profile;
 		var online = playerList.Values.FirstOrDefault(p => p.Profile.ID == playerId && p.Controller.IsValid);
@@ -84,10 +84,10 @@ public partial class SurfTimer
 
 		var rows = new List<HudMenuItem>
 		{
-			AdminContext.Info("Points", AdminFormat.Number(summary.Points), $"rank #{summary.Rank}"),
-			AdminContext.Info("Playtime", AdminFormat.Duration(summary.PlayTime), $"{profile.Connections} visits"),
-			AdminContext.Info("Last seen", online != null ? "online now" : AdminFormat.Ago(lastSeen) + " ago", $"first seen {AdminFormat.Date(firstSeen)}"),
-			AdminContext.Info("Times", AdminFormat.Number(summary.Times), summary.HiddenTimes > 0 ? $"{summary.HiddenTimes} hidden" : ""),
+			PanelContext.Info("Points", AdminFormat.Number(summary.Points), $"rank #{summary.Rank}"),
+			PanelContext.Info("Playtime", AdminFormat.Duration(summary.PlayTime), $"{profile.Connections} visits"),
+			PanelContext.Info("Last seen", online != null ? "online now" : AdminFormat.Ago(lastSeen) + " ago", $"first seen {AdminFormat.Date(firstSeen)}"),
+			PanelContext.Info("Times", AdminFormat.Number(summary.Times), summary.HiddenTimes > 0 ? $"{summary.HiddenTimes} hidden" : ""),
 			ctx.Act("Open profile", "", "", () => OpenProfileById(ctx.Player.Controller, playerId), closes: true),
 		};
 
@@ -104,7 +104,7 @@ public partial class SurfTimer
 		{
 			var ban = data.Ban;
 			string until = ban.ExpiresAt is DateTime expires ? $"until {AdminFormat.Date(expires)}" : "permanent";
-			rows.Add(AdminContext.Info("Timer banned", until, $"{ban.Reason} · by {ban.AdminName ?? "console"}"));
+			rows.Add(PanelContext.Info("Timer banned", until, $"{ban.Reason} · by {ban.AdminName ?? "console"}"));
 			rows.Add(ctx.Act("Unban", "", "shows their times again", () => AdminUnban(ctx, playerId, name)));
 		}
 		else
@@ -119,12 +119,11 @@ public partial class SurfTimer
 		}
 		rows.Add(ctx.Danger("Wipe all times", "every map", () => AdminWipeConfirm("Wipe all times",
 			new TimeRepository.WipeScope(PlayerId: playerId), $"all times of {name}")));
-		rows.Add(ctx.Act("Reset settings", "", "hideself etc.", () =>
+		rows.Add(ctx.Act("Reset settings", "", "!options back to defaults", () =>
 		{
 			if (online != null)
 			{
-				online.Profile.Settings.Clear();
-				online.HideSelf = true; // The default
+				online.Options.ResetToDefaults();
 				online.ApplySelfVisibility();
 			}
 			ctx.Audit("reset settings", "player", playerId, name);
@@ -142,12 +141,12 @@ public partial class SurfTimer
 		internal List<PlayerRepository.NameRow> Names { get; } = names;
 	}
 
-	private AdminPage AdminNamesPage(int playerId, string name) => new("Names", ctx =>
+	private PanelPage AdminNamesPage(int playerId, string name) => new("Names", ctx =>
 	{
 		var data = ctx.Load("names", async () => new NamesData(await PlayerRepository.GetNamesAsync(playerId)));
 		if (data == null)
-			return [AdminContext.LoadingRow()];
-		return data.Names.Select(n => AdminContext.Info(n.Name, AdminFormat.Ago(n.LastUsedAt) + " ago", $"since {AdminFormat.Date(n.FirstUsedAt)}")).ToList();
+			return [PanelContext.LoadingRow()];
+		return data.Names.Select(n => PanelContext.Info(n.Name, AdminFormat.Ago(n.LastUsedAt) + " ago", $"since {AdminFormat.Date(n.FirstUsedAt)}")).ToList();
 	});
 
 	private sealed class SessionsData(List<PlayerRepository.SessionRow> sessions)
@@ -155,21 +154,21 @@ public partial class SurfTimer
 		internal List<PlayerRepository.SessionRow> Sessions { get; } = sessions;
 	}
 
-	private AdminPage AdminSessionsPage(int playerId, string name) => new("Sessions", ctx =>
+	private PanelPage AdminSessionsPage(int playerId, string name) => new("Sessions", ctx =>
 	{
 		var data = ctx.Load("sessions", async () => new SessionsData(await PlayerRepository.GetRecentSessionsAsync(playerId, 40)));
 		if (data == null)
-			return [AdminContext.LoadingRow()];
+			return [PanelContext.LoadingRow()];
 		return data.Sessions.Select(s =>
 		{
 			long seconds = (long)((s.LeftAt ?? s.LastHeartbeatAt) - s.JoinedAt).TotalSeconds;
-			return AdminContext.Info(AdminFormat.Date(s.JoinedAt), s.LeftAt == null ? "open" : AdminFormat.Duration(Math.Max(0, seconds)), s.MapName ?? "");
+			return PanelContext.Info(AdminFormat.Date(s.JoinedAt), s.LeftAt == null ? "open" : AdminFormat.Duration(Math.Max(0, seconds)), s.MapName ?? "");
 		}).ToList();
 	});
 
 	// ---- Timer bans ----
 
-	private AdminPage AdminBanPage(int playerId, string name) => new("Timer ban", ctx =>
+	private PanelPage AdminBanPage(int playerId, string name) => new("Timer ban", ctx =>
 	{
 		HudMenuItem Length(string label, TimeSpan? length) => ctx.Ask(label, "", "reason in chat",
 			LocalizationService.LocalizerNonNull["prompt_ban_reason", name], reason =>
@@ -182,7 +181,7 @@ public partial class SurfTimer
 
 		return
 		[
-			AdminContext.Info("While banned", "", "they can play, runs aren't saved, times are hidden"),
+			PanelContext.Info("While banned", "", "they can play, runs aren't saved, times are hidden"),
 			Length("1 day", TimeSpan.FromDays(1)),
 			Length("7 days", TimeSpan.FromDays(7)),
 			Length("30 days", TimeSpan.FromDays(30)),
@@ -190,7 +189,7 @@ public partial class SurfTimer
 		];
 	});
 
-	private void AdminBan(AdminContext ctx, int playerId, string name, string reason, TimeSpan? length)
+	private void AdminBan(PanelContext ctx, int playerId, string name, string reason, TimeSpan? length)
 	{
 		DateTime? expires = length.HasValue ? DateTime.UtcNow + length.Value : null;
 		int adminId = ctx.Player.Profile.ID;
@@ -213,7 +212,7 @@ public partial class SurfTimer
 		ctx.Audit("ban", "player", playerId, $"{name} {until}: {reason}");
 		// Back on the player page once it's done (the ban page is left)
 		ctx.Session.Stack.RemoveAt(ctx.Session.Stack.Count - 1);
-		var playerPage = new AdminContext(this, ctx.Session, ctx.Session.Top);
+		var playerPage = new PanelContext(this, ctx.Session, ctx.Session.Top);
 		playerPage.Run($"Banning {name}…", async () =>
 		{
 			await PlayerRepository.BanAsync(playerId, adminId, reason, expires);
@@ -227,7 +226,7 @@ public partial class SurfTimer
 		});
 	}
 
-	private void AdminUnban(AdminContext ctx, int playerId, string name)
+	private void AdminUnban(PanelContext ctx, int playerId, string name)
 	{
 		int adminId = ctx.Player.Profile.ID;
 		var online = playerList.Values.FirstOrDefault(p => p.Profile.ID == playerId && p.Controller.IsValid);

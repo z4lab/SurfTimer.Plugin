@@ -25,11 +25,12 @@ public class Player
 	// !repeat - send the player back to the start of each stage they finish (off on join)
 	internal bool IsRepeatMode { get; set; } = false;
 
-	// !hideself - player model hidden (on by default each join)
-	internal bool HideSelf { get; set; } = true;
+	// !options - client options (own legs, hiding players, chat, HUD), saved in player_settings
+	internal PlayerOptions Options { get; }
 
-	// !admin - the open admin panel (tab, pages), kept while connected
-	internal AdminSession? Admin { get; set; }
+	// !admin / !options - the open panels (tab, pages), kept while connected
+	internal PanelSession? Admin { get; set; }
+	internal PanelSession? OptionsPanel { get; set; }
 
 	// Anti-prehop/bhop state (map start zone + every stage start zone). Deliberately not on
 	// PlayerTimer - Timer.Reset() fires on every start-zone entry, which would wrongly clear this;
@@ -114,6 +115,7 @@ public class Player
 		this.MovementServices = MovementServices;
 
 		this.Profile = Profile;
+		this.Options = new PlayerOptions(Profile);
 
 		this.Timer = new PlayerTimer();
 		this.Stats = new PlayerStats();
@@ -140,9 +142,9 @@ public class Player
 	}
 
 	/// <summary>
-	/// Hides or shows the player's model per HideSelf - hiding also removes their own first-person
-	/// legs. Render alpha is networked to everyone, so a hidden player is invisible to all players.
-	/// Shadow and carried weapons are hidden too so there's no floating shadow/gun.
+	/// Own first-person legs per the hide-legs option: render alpha 254 hides them for the player
+	/// themselves while everyone else still sees a normal model (255 shows them). Also puts back what
+	/// the old !hideself changed (invisible weapons, no shadow).
 	/// </summary>
 	internal void ApplySelfVisibility()
 	{
@@ -150,11 +152,13 @@ public class Player
 		if (pawn == null || !pawn.IsValid)
 			return;
 
-		int alpha = this.HideSelf ? 0 : 255;
-		SetRenderAlpha(pawn, alpha);
+		EnforceVisible(pawn, this.Options.HideLegs ? LegsHiddenAlpha : 255);
 
-		pawn.ShadowStrength = this.HideSelf ? 0f : 1f;
-		Utilities.SetStateChanged(pawn, "CBaseModelEntity", "m_flShadowStrength");
+		if (pawn.ShadowStrength < 1f)
+		{
+			pawn.ShadowStrength = 1f;
+			Utilities.SetStateChanged(pawn, "CBaseModelEntity", "m_flShadowStrength");
+		}
 
 		var weapons = pawn.WeaponServices?.MyWeapons;
 		if (weapons == null)
@@ -163,10 +167,47 @@ public class Player
 		foreach (var handle in weapons)
 		{
 			var weapon = handle.Value;
-			if (weapon != null && weapon.IsValid)
-				SetRenderAlpha(weapon, alpha);
+			if (weapon != null && weapon.IsValid && weapon.Render.A != 255)
+				SetRenderAlpha(weapon, 255);
 		}
 	}
+
+	/// <summary>Render alpha that hides a player's own first-person legs only</summary>
+	internal const int LegsHiddenAlpha = 254;
+
+	/// <summary>
+	/// Makes a pawn visible again if a map hid it (render mode, alpha, EF_NODRAW) - only writes (and
+	/// networks) what's actually different. Returns true when something was changed.
+	/// </summary>
+	internal static bool EnforceVisible(CBaseModelEntity pawn, int alpha)
+	{
+		bool changed = false;
+
+		if (pawn.RenderMode != RenderMode_t.kRenderNormal)
+		{
+			pawn.RenderMode = RenderMode_t.kRenderNormal;
+			Utilities.SetStateChanged(pawn, "CBaseModelEntity", "m_nRenderMode");
+			changed = true;
+		}
+
+		if (pawn.Render.A != alpha)
+		{
+			SetRenderAlpha(pawn, alpha);
+			changed = true;
+		}
+
+		if ((pawn.Effects & EffectNoDraw) != 0)
+		{
+			pawn.Effects &= ~EffectNoDraw;
+			Utilities.SetStateChanged(pawn, "CBaseEntity", "m_fEffects");
+			changed = true;
+		}
+
+		return changed;
+	}
+
+	// EF_NODRAW - maps use it (AddOutput effects 32) to make players invisible
+	private const uint EffectNoDraw = 0x20;
 
 	private static void SetRenderAlpha(CBaseModelEntity entity, int alpha)
 	{

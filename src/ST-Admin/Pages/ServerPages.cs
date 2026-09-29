@@ -13,7 +13,7 @@ namespace SurfTimer;
 /// </summary>
 public partial class SurfTimer
 {
-	private AdminPage AdminServerRoot() => new("Server", ctx =>
+	private PanelPage AdminServerRoot() => new("Server", ctx =>
 	{
 		var uptime = DateTime.UtcNow - LoadedAt;
 		int humans = playerList.Values.Count(p => p.Controller.IsValid && !p.Controller.IsBot);
@@ -23,9 +23,9 @@ public partial class SurfTimer
 
 		var rows = new List<HudMenuItem>
 		{
-			AdminContext.Info("SurfTimer", ModuleVersion, $"up {AdminFormat.Duration((long)uptime.TotalSeconds)}"),
-			AdminContext.Info("Players", $"{humans} / {Server.MaxPlayers}", $"tick {tickRate}"),
-			AdminContext.Info("Memory", AdminFormat.Bytes(GC.GetTotalMemory(false)), "managed heap"),
+			PanelContext.Info("SurfTimer", ModuleVersion, $"up {AdminFormat.Duration((long)uptime.TotalSeconds)}"),
+			PanelContext.Info("Players", $"{humans} / {Server.MaxPlayers}", $"tick {tickRate}"),
+			PanelContext.Info("Memory", AdminFormat.Bytes(GC.GetTotalMemory(false)), "managed heap"),
 			ctx.Nav("Change map", CurrentMap?.Name ?? "", "recent maps, workshop id", AdminChangeMapPage),
 			ctx.Nav("Replay bots", $"{playing} / {slots} playing", "", AdminBotsPage),
 			ctx.Nav("Timer settings", "", "saved to timer_settings.json", AdminTimerSettingsPage),
@@ -35,8 +35,8 @@ public partial class SurfTimer
 		{
 			string name = CurrentMap.Name!;
 			ulong? workshopId = CurrentMap.WorkshopId;
-			rows.Add(ctx.Danger("Restart map", name, () => AdminContext.Confirm("Restart map",
-				_ => [AdminContext.Info("Reloads", name, "everyone's running times are lost")], "Restart", c =>
+			rows.Add(ctx.Danger("Restart map", name, () => PanelContext.Confirm("Restart map",
+				_ => [PanelContext.Info("Reloads", name, "everyone's running times are lost")], "Restart", c =>
 				{
 					c.Audit("restart map", "map", CurrentMap.ID, name);
 					c.Player.HUD.CloseMenu();
@@ -83,7 +83,7 @@ public partial class SurfTimer
 		internal List<MapRepository.MapRow> Maps { get; } = maps;
 	}
 
-	private AdminPage AdminChangeMapPage() => new("Change map", ctx =>
+	private PanelPage AdminChangeMapPage() => new("Change map", ctx =>
 	{
 		var rows = new List<HudMenuItem>
 		{
@@ -106,7 +106,7 @@ public partial class SurfTimer
 		var recent = ctx.Load("maps", async () => new MapsData(await MapRepository.GetRecentMapsAsync(60)));
 		if (recent == null)
 		{
-			rows.Add(AdminContext.LoadingRow());
+			rows.Add(PanelContext.LoadingRow());
 			return rows;
 		}
 
@@ -129,11 +129,11 @@ public partial class SurfTimer
 
 	// ---- Replay bots ----
 
-	private AdminPage AdminBotsPage() => new("Replay bots", ctx =>
+	private PanelPage AdminBotsPage() => new("Replay bots", ctx =>
 	{
 		var pool = CurrentMap?.ReplayManager?.Pool;
 		if (pool == null || pool.Count == 0)
-			return [AdminContext.Info("No replay bots", "", "they spawn when a replay is requested")];
+			return [PanelContext.Info("No replay bots", "", "they spawn when a replay is requested")];
 
 		var rows = pool.Select((slot, i) =>
 		{
@@ -145,7 +145,7 @@ public partial class SurfTimer
 				: "";
 
 			if (!slot.IsPlaying)
-				return AdminContext.Info($"Slot {i + 1}", slot.Controller == null ? "spawning" : "idle", "");
+				return PanelContext.Info($"Slot {i + 1}", slot.Controller == null ? "spawning" : "idle", "");
 
 			return ctx.Act($"Slot {i + 1} · {what}", "playing", sub, () =>
 			{
@@ -178,7 +178,7 @@ public partial class SurfTimer
 		["replays_enabled"] = ("Replays", "record and play replays"),
 	};
 
-	private AdminPage AdminTimerSettingsPage() => new("Timer settings", ctx =>
+	private PanelPage AdminTimerSettingsPage() => new("Timer settings", ctx =>
 	{
 		var rows = Config.LiveBoolSettings.Select(key =>
 		{
@@ -199,10 +199,10 @@ public partial class SurfTimer
 		return rows;
 	});
 
-	private AdminPage AdminNumberSettingPage(string title, string key, Func<int> current, int[] steps, int min, int max, string unit) => new(title, ctx =>
+	private PanelPage AdminNumberSettingPage(string title, string key, Func<int> current, int[] steps, int min, int max, string unit) => new(title, ctx =>
 	{
 		int value = current();
-		var rows = new List<HudMenuItem> { AdminContext.Info("Current", $"{value}{unit}", "timer_settings.json") };
+		var rows = new List<HudMenuItem> { PanelContext.Info("Current", $"{value}{unit}", "timer_settings.json") };
 		foreach (int step in steps)
 		{
 			rows.Add(ctx.Act($"+{step}", "", "", () => AdminSaveTimerSetting(ctx, key, JsonValue.Create(Math.Clamp(value + step, min, max)), "")));
@@ -212,7 +212,7 @@ public partial class SurfTimer
 		return rows;
 	});
 
-	private void AdminSaveTimerSetting(AdminContext ctx, string key, JsonNode value, string label)
+	private void AdminSaveTimerSetting(PanelContext ctx, string key, JsonNode value, string label)
 	{
 		string text = label.Length > 0 ? label : value.ToJsonString();
 		try

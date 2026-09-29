@@ -48,6 +48,10 @@ public partial class SurfTimer : BasePlugin
 
 	// Globals
 	private readonly ConcurrentDictionary<int, Player> playerList = new();
+
+	// For code outside the plugin class (chat announcements, transmit) - set in Load
+	private static SurfTimer? _instance;
+	internal static IEnumerable<Player> OnlinePlayers => _instance?.playerList.Values ?? Enumerable.Empty<Player>();
 	internal static Database DB { get; private set; } = null!;
 	public static Map CurrentMap { get; private set; } = null!;
 
@@ -124,6 +128,7 @@ public partial class SurfTimer : BasePlugin
 	/* ========== PLUGIN LOAD ========== */
 	public override void Load(bool hotReload)
 	{
+		_instance = this;
 		LocalizationService.Init(Localizer);
 
 		// === Database: connect, create / upgrade the schema, clean up after a crash ===
@@ -165,6 +170,9 @@ public partial class SurfTimer : BasePlugin
 		RegisterListener<Listeners.OnTick>(OnTick);
 		// Block map scripts' chat and bot kicks (see MapCommandFilter.cs)
 		RegisterMapCommandFilter();
+		// Hiding players / bots per viewer, and undoing maps that hide players (see Visibility.cs)
+		RegisterListener<Listeners.CheckTransmit>(OnCheckTransmit);
+		AddTimer(0.5f, EnforcePlayerVisibility, CounterStrikeSharp.API.Modules.Timers.TimerFlags.REPEAT);
 		// Chat input for the admin panel (see ChatPrompt.cs)
 		ChatPrompt.Register(this);
 		// Timer bans that ran out: times shown again - now and every hour

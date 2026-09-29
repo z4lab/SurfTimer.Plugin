@@ -6,17 +6,17 @@ using Microsoft.Extensions.Logging;
 namespace SurfTimer;
 
 /// <summary>
-/// What a page builder gets: the session and page, plus row factories. Every row action checks the
-/// section's permission again before it runs - hidden rows aren't the only protection.
+/// What a panel page builder gets: the session and page, plus row factories. Every row action checks
+/// the section's permission (if it has one) again before it runs - hidden rows aren't the only protection.
 /// </summary>
-internal sealed class AdminContext(SurfTimer plugin, AdminSession session, AdminPage page)
+internal sealed class PanelContext(SurfTimer plugin, PanelSession session, PanelPage page)
 {
 	private static readonly object Loading = new();
 	private sealed record Failure(string Message);
 
 	internal SurfTimer Plugin { get; } = plugin;
-	internal AdminSession Session { get; } = session;
-	internal AdminPage Page { get; } = page;
+	internal PanelSession Session { get; } = session;
+	internal PanelPage Page { get; } = page;
 	internal Player Player => Session.Player;
 	internal int Style => Player.Timer.Style;
 
@@ -26,7 +26,7 @@ internal sealed class AdminContext(SurfTimer plugin, AdminSession session, Admin
 			return true;
 
 		Session.Status = LocalizationService.LocalizerNonNull["admin_no_access"];
-		Plugin.AdminRefresh(Session);
+		Plugin.PanelRefresh(Session);
 		return false;
 	}
 
@@ -35,11 +35,11 @@ internal sealed class AdminContext(SurfTimer plugin, AdminSession session, Admin
 	internal static HudMenuItem Info(string text, string value = "", string sub = "") => HudMenuItem.Info(text, value, sub);
 
 	/// <summary>Opens a sub-page</summary>
-	internal HudMenuItem Nav(string text, string value, string sub, Func<AdminPage> open) =>
+	internal HudMenuItem Nav(string text, string value, string sub, Func<PanelPage> open) =>
 		new(text, _ =>
 		{
 			if (Allowed())
-				Plugin.AdminPush(Session, open());
+				Plugin.PanelPush(Session, open());
 		}, sub, () => value)
 		{ KeepOpen = true, Opens = true };
 
@@ -50,7 +50,7 @@ internal sealed class AdminContext(SurfTimer plugin, AdminSession session, Admin
 			if (!Allowed())
 				return;
 			set(!on);
-			Plugin.AdminRefresh(Session);
+			Plugin.PanelRefresh(Session);
 		}, sub, () => on ? "ON" : "OFF")
 		{ KeepOpen = true, Style = on ? HudMenuItemStyle.On : HudMenuItemStyle.Off };
 
@@ -64,12 +64,12 @@ internal sealed class AdminContext(SurfTimer plugin, AdminSession session, Admin
 				return;
 			act();
 			if (!closes)
-				Plugin.AdminRefresh(Session);
+				Plugin.PanelRefresh(Session);
 		}, sub, () => value)
 		{ KeepOpen = !closes };
 
 	/// <summary>A dangerous action - opens its confirmation page</summary>
-	internal HudMenuItem Danger(string text, string sub, Func<AdminPage> confirm) =>
+	internal HudMenuItem Danger(string text, string sub, Func<PanelPage> confirm) =>
 		Nav(text, "", sub, confirm) with { Style = HudMenuItemStyle.Danger };
 
 	/// <summary>Asks for a value in chat - apply returns an error to ask again, or null</summary>
@@ -77,13 +77,13 @@ internal sealed class AdminContext(SurfTimer plugin, AdminSession session, Admin
 		new(text, _ =>
 		{
 			if (Allowed())
-				Plugin.AdminAsk(Session, prompt, apply);
+				Plugin.PanelAsk(Session, prompt, apply);
 		}, sub, () => value)
 		{ KeepOpen = true, Opens = true };
 
 	/// <summary>Back to the previous page</summary>
 	internal HudMenuItem Back(string text = "Cancel") =>
-		new(text, _ => Plugin.AdminBack(Session), "", null) { KeepOpen = true };
+		new(text, _ => Plugin.PanelBack(Session), "", null) { KeepOpen = true };
 
 	// ---- Data ----
 
@@ -109,7 +109,7 @@ internal sealed class AdminContext(SurfTimer plugin, AdminSession session, Admin
 			}
 			catch (Exception ex)
 			{
-				Logger.LogError(ex, "[Admin] Loading '{Key}' of page '{Page}' failed", key, page.Title);
+				Logger.LogError(ex, "[Panel] Loading '{Key}' of page '{Page}' failed", key, page.Title);
 				result = new Failure(ex.Message);
 			}
 
@@ -118,7 +118,7 @@ internal sealed class AdminContext(SurfTimer plugin, AdminSession session, Admin
 				page.State[key] = result;
 				if (result is Failure failure)
 					session.Status = $"Loading failed: {failure.Message}";
-				plugin.AdminRefresh(session);
+				plugin.PanelRefresh(session);
 			});
 		});
 		return null;
@@ -144,7 +144,7 @@ internal sealed class AdminContext(SurfTimer plugin, AdminSession session, Admin
 		var session = Session;
 		var plugin = Plugin;
 		session.Status = working;
-		plugin.AdminRefresh(session);
+		plugin.PanelRefresh(session);
 
 		_ = Task.Run(async () =>
 		{
@@ -155,7 +155,7 @@ internal sealed class AdminContext(SurfTimer plugin, AdminSession session, Admin
 			}
 			catch (Exception ex)
 			{
-				Logger.LogError(ex, "[Admin] '{Working}' failed", working);
+				Logger.LogError(ex, "[Panel] '{Working}' failed", working);
 				status = $"Failed: {ex.Message}";
 			}
 
@@ -165,7 +165,7 @@ internal sealed class AdminContext(SurfTimer plugin, AdminSession session, Admin
 				if (then != null)
 					then(status);
 				else
-					plugin.AdminRefresh(session);
+					plugin.PanelRefresh(session);
 			});
 		});
 	}
@@ -174,7 +174,7 @@ internal sealed class AdminContext(SurfTimer plugin, AdminSession session, Admin
 	/// A confirmation page: what will happen (summary rows, may Load), then Confirm and Cancel. Confirm
 	/// goes back to the previous page and runs the action.
 	/// </summary>
-	internal static AdminPage Confirm(string title, Func<AdminContext, List<HudMenuItem>> summary, string confirmText, Action<AdminContext> onConfirm) =>
+	internal static PanelPage Confirm(string title, Func<PanelContext, List<HudMenuItem>> summary, string confirmText, Action<PanelContext> onConfirm) =>
 		new(title, ctx =>
 		{
 			var rows = summary(ctx);
@@ -185,9 +185,9 @@ internal sealed class AdminContext(SurfTimer plugin, AdminSession session, Admin
 			{
 				if (!ctx.Allowed())
 					return;
-				ctx.Plugin.AdminBack(ctx.Session);
+				ctx.Plugin.PanelBack(ctx.Session);
 				// The action runs with the page it came from (for reloads / going back)
-				onConfirm(new AdminContext(ctx.Plugin, ctx.Session, ctx.Session.Top));
+				onConfirm(new PanelContext(ctx.Plugin, ctx.Session, ctx.Session.Top));
 			}, "", null)
 			{ KeepOpen = true, Style = HudMenuItemStyle.Danger });
 			rows.Add(ctx.Back());
@@ -201,12 +201,12 @@ internal sealed class AdminContext(SurfTimer plugin, AdminSession session, Admin
 	internal void Done(string status)
 	{
 		Session.Status = status;
-		Plugin.AdminRefresh(Session);
+		Plugin.PanelRefresh(Session);
 	}
 
 	private static ILogger? _logger;
 	private static ILogger Logger => _logger ??=
-		SurfTimer.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Admin");
+		SurfTimer.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Panel");
 
 	internal static CCSPlayerController? Valid(CCSPlayerController? controller) =>
 		controller != null && controller.IsValid ? controller : null;

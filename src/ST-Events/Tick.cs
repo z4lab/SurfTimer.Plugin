@@ -15,6 +15,9 @@ public partial class SurfTimer
 		if (CurrentMap == null)
 			return;
 
+		// Pawns that viewers with a hide option don't receive (see Visibility.cs)
+		RefreshTransmitTargets();
+
 		foreach (var player in playerList.Values)
 		{
 			if (!player.Controller.IsValid)

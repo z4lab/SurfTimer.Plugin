@@ -7,47 +7,6 @@ using Microsoft.Extensions.Logging;
 
 namespace SurfTimer;
 
-/// <summary>
-/// One page of the admin panel: a title (breadcrumb part) and its rows, rebuilt on every refresh.
-/// State holds what the page loaded from the database (see AdminContext.Load).
-/// </summary>
-internal sealed class AdminPage(string title, Func<AdminContext, List<HudMenuItem>> build)
-{
-	internal string Title { get; } = title;
-	internal Func<AdminContext, List<HudMenuItem>> Build { get; } = build;
-	internal Dictionary<string, object?> State { get; } = new();
-}
-
-/// <summary>A tab of the panel - shown to admins with its permission</summary>
-internal sealed record AdminSection(string Name, string Flag, Func<AdminPage> Root);
-
-/// <summary>
-/// A player's open admin panel: a page stack per tab, the active tab and the last status line.
-/// Main thread only.
-/// </summary>
-internal sealed class AdminSession
-{
-	internal AdminSession(Player player, List<AdminSection> sections)
-	{
-		Player = player;
-		Sections = sections;
-		Stacks = sections.Select(s => new List<AdminPage> { s.Root() }).ToList();
-	}
-
-	internal Player Player { get; }
-	internal List<AdminSection> Sections { get; }
-	internal List<List<AdminPage>> Stacks { get; }
-	internal int ActiveTab { get; set; }
-	internal string Status { get; set; } = "";
-
-	/// <summary>The menu last shown - updates only go to the popup while it still shows this one</summary>
-	internal HudMenu? Shown { get; set; }
-
-	internal List<AdminPage> Stack => Stacks[ActiveTab];
-	internal AdminPage Top => Stack[^1];
-	internal AdminSection Section => Sections[ActiveTab];
-}
-
 public partial class SurfTimer
 {
 	internal static readonly DateTime LoadedAt = DateTime.UtcNow;
@@ -69,14 +28,14 @@ public partial class SurfTimer
 		// Keep the previous session (same tab / page) unless the rights changed
 		var session = admin.Admin;
 		if (session == null || !session.Sections.Select(s => s.Flag).SequenceEqual(sections.Select(s => s.Flag)))
-			admin.Admin = session = new AdminSession(admin, sections);
+			admin.Admin = session = new PanelSession("Admin", admin, sections);
 
 		session.Status = "";
-		AdminReopen(session);
+		PanelReopen(session);
 	}
 
 	/// <summary>All sections in tab order - the pages live in ST-Admin/Pages.</summary>
-	private List<AdminSection> AdminSections() =>
+	private List<PanelSection> AdminSections() =>
 	[
 		new("Map", AdminPermissions.Map, AdminMapRoot),
 		new("Records", AdminPermissions.Records, AdminRecordsRoot),
@@ -86,139 +45,10 @@ public partial class SurfTimer
 		new("Audit", AdminPermissions.Audit, AdminAuditRoot),
 	];
 
-	// ---- Rendering / navigation ----
-
-	private HudMenu AdminBuildMenu(AdminSession session)
-	{
-		var tabs = new List<HudMenuTab>();
-		for (int i = 0; i < session.Sections.Count; i++)
-		{
-			List<HudMenuItem> items;
-			if (i == session.ActiveTab)
-			{
-				var ctx = new AdminContext(this, session, session.Top);
-				try
-				{
-					items = session.Top.Build(ctx);
-				}
-				catch (Exception ex)
-				{
-					_logger.LogError(ex, "[Admin] Building page '{Page}' failed", session.Top.Title);
-					items = [HudMenuItem.Info("This page failed to load", "", ex.Message)];
-				}
-				if (items.Count == 0)
-					items.Add(HudMenuItem.Info("Nothing here", ""));
-			}
-			else
-			{
-				items = [HudMenuItem.Info("…", "")]; // Built when the tab is opened
-			}
-			tabs.Add(new HudMenuTab(session.Sections[i].Name, items));
-		}
-
-		var crumbs = session.Stack.Skip(1).Select(p => p.Title).ToList();
-		if (crumbs.Count > 2)
-			crumbs = ["…", .. crumbs.TakeLast(2)];
-		string title = crumbs.Count == 0 ? "Admin" : "Admin › " + string.Join(" › ", crumbs);
-
-		return new HudMenu(title, tabs)
-		{
-			ActiveTab = session.ActiveTab,
-			Status = session.Status,
-			OnBack = session.Stack.Count > 1 ? _ => AdminBack(session) : null,
-			OnTabChanged = (_, tab) => AdminSwitchTab(session, tab),
-		};
-	}
-
-	/// <summary>
-	/// Rebuilds the panel after a change - in place when the popup still shows it.
-	/// </summary>
-	internal void AdminRefresh(AdminSession session, bool resetPage = false)
-	{
-		if (!session.Player.Controller.IsValid)
-			return;
-
-		var previous = session.Shown;
-		var menu = AdminBuildMenu(session);
-		MenuPresenter.Update(session.Player, menu, resetPage, open => open != null && ReferenceEquals(open, previous));
-		if (!MenuPresenter.UsesPopup || ReferenceEquals(session.Player.HUD.Menu, menu))
-			session.Shown = menu;
-	}
-
-	/// <summary>
-	/// Shows the panel again (e.g. after a chat prompt closed it).
-	/// </summary>
-	internal void AdminReopen(AdminSession session)
-	{
-		if (!session.Player.Controller.IsValid)
-			return;
-
-		var menu = AdminBuildMenu(session);
-		MenuPresenter.Show(session.Player, menu);
-		session.Shown = menu;
-	}
-
-	internal void AdminPush(AdminSession session, AdminPage page)
-	{
-		session.Stack.Add(page);
-		session.Status = "";
-		AdminRefresh(session, resetPage: true);
-	}
-
-	internal void AdminBack(AdminSession session, string status = "")
-	{
-		if (session.Stack.Count > 1)
-			session.Stack.RemoveAt(session.Stack.Count - 1);
-		session.Status = status;
-		AdminRefresh(session, resetPage: true);
-	}
-
-	/// <summary>
-	/// Leaves a page after its background work finished - only if it's still the one shown (the admin
-	/// may have moved on meanwhile).
-	/// </summary>
-	internal void AdminBackFrom(AdminSession session, AdminPage page, string status)
-	{
-		if (ReferenceEquals(session.Top, page))
-		{
-			AdminBack(session, status);
-			return;
-		}
-		session.Status = status;
-		AdminRefresh(session);
-	}
-
-	private void AdminSwitchTab(AdminSession session, int tab)
-	{
-		if (tab < 0 || tab >= session.Sections.Count)
-			return;
-
-		// A tab starts at its root page with fresh data
-		session.ActiveTab = tab;
-		session.Stacks[tab] = [session.Sections[tab].Root()];
-		session.Status = "";
-		AdminRefresh(session, resetPage: true);
-	}
-
-	/// <summary>
-	/// Asks for a value in chat; the panel comes back afterwards (also on !cancel).
-	/// </summary>
-	/// <param name="apply">Gets the text - returns an error to ask again, or null when done</param>
-	internal void AdminAsk(AdminSession session, string prompt, Func<string, string?> apply)
-	{
-		ChatPrompt.Ask(session.Player, prompt, (_, text) =>
-		{
-			string? error = apply(text);
-			if (error == null)
-				AdminReopen(session);
-			return error;
-		}, _ => AdminReopen(session));
-	}
-
 	/// <summary>
 	/// Writes an admin_actions row (in the background).
 	/// </summary>
-	internal void AdminAudit(AdminSession session, string action, string targetType, long? targetId, string details)
+	internal void AdminAudit(PanelSession session, string action, string targetType, long? targetId, string details)
 	{
 		int adminId = session.Player.Profile.ID;
 		int? mapId = CurrentMap?.ID > 0 ? CurrentMap.ID : null;

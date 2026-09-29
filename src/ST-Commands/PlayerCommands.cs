@@ -187,17 +187,40 @@ public partial class SurfTimer
 		return true;
 	}
 
-	[ConsoleCommand("css_hideself", "Toggle hiding your own player model (and first-person legs)")]
+	// One-word shortcuts for the most used !options toggles (bindable) - same saved options as the menu
+
+	[ConsoleCommand("css_hideself", "Toggle hiding your own first-person legs")]
 	[CommandHelper(whoCanExecute: CommandUsage.CLIENT_ONLY)]
 	public void PlayerToggleHideSelf(CCSPlayerController? player, CommandInfo command)
 	{
 		if (player == null || !playerList.TryGetValue(player.UserId ?? 0, out var oPlayer))
 			return;
 
-		oPlayer.HideSelf = !oPlayer.HideSelf;
-		oPlayer.Profile.SetSetting(PlayerProfile.SettingHideSelf, oPlayer.HideSelf ? "1" : "0"); // Kept over reconnects
+		oPlayer.Options.HideLegs = !oPlayer.Options.HideLegs;
 		oPlayer.ApplySelfVisibility();
-		player.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull[oPlayer.HideSelf ? "hideself_on" : "hideself_off"]}");
+		PrintOptionChanged(player, oPlayer.Options.HideLegs ? "hidelegs_on" : "hidelegs_off");
+	}
+
+	[ConsoleCommand("css_hide", "Toggle hiding other players")]
+	[CommandHelper(whoCanExecute: CommandUsage.CLIENT_ONLY)]
+	public void PlayerToggleHidePlayers(CCSPlayerController? player, CommandInfo command)
+	{
+		if (player == null || !playerList.TryGetValue(player.UserId ?? 0, out var oPlayer))
+			return;
+
+		oPlayer.Options.HidePlayers = !oPlayer.Options.HidePlayers;
+		PrintOptionChanged(player, oPlayer.Options.HidePlayers ? "hideplayers_on" : "hideplayers_off");
+	}
+
+	[ConsoleCommand("css_hidebots", "Toggle hiding replay bots")]
+	[CommandHelper(whoCanExecute: CommandUsage.CLIENT_ONLY)]
+	public void PlayerToggleHideBots(CCSPlayerController? player, CommandInfo command)
+	{
+		if (player == null || !playerList.TryGetValue(player.UserId ?? 0, out var oPlayer))
+			return;
+
+		oPlayer.Options.HideBots = !oPlayer.Options.HideBots;
+		PrintOptionChanged(player, oPlayer.Options.HideBots ? "hidebots_on" : "hidebots_off");
 	}
 
 	[ConsoleCommand("css_repeat", "Toggle repeat mode - sends you back to the start of each stage you finish")]
@@ -207,25 +230,33 @@ public partial class SurfTimer
 		if (player == null || !playerList.TryGetValue(player.UserId ?? 0, out var oPlayer))
 			return;
 
-		if (oPlayer.IsRepeatMode)
+		PrintOptionChanged(player, SetRepeat(oPlayer, !oPlayer.IsRepeatMode));
+	}
+
+	private static void PrintOptionChanged(CCSPlayerController player, string key) =>
+		player.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull[key]} {LocalizationService.LocalizerNonNull["options_hint"]}");
+
+	/// <summary>
+	/// Turns repeat mode on / off (not saved - off on every join). Returns the lang key of the result.
+	/// Turning it on moves the player into stage mode on their current stage.
+	/// </summary>
+	internal string SetRepeat(Player oPlayer, bool on)
+	{
+		if (!on)
 		{
 			oPlayer.IsRepeatMode = false;
-			player.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["repeat_disabled"]}");
-			return;
+			return "repeat_disabled";
 		}
 
-		if (CurrentMap.Stages <= 0)
-		{
-			player.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["not_staged"]}");
-			return;
-		}
+		if (CurrentMap == null || CurrentMap.Stages <= 0)
+			return "not_staged";
 
 		oPlayer.IsRepeatMode = true;
-		player.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["repeat_enabled"]}");
 
 		// Switch into stage mode on the stage they're currently on (stage 1 = map start)
 		if (!oPlayer.Timer.IsStageMode)
-			TeleportToStage(player, oPlayer.Timer.Stage > 0 ? oPlayer.Timer.Stage : (short)1);
+			TeleportToStage(oPlayer.Controller, oPlayer.Timer.Stage > 0 ? oPlayer.Timer.Stage : (short)1);
+		return "repeat_enabled";
 	}
 
 	/// <summary>

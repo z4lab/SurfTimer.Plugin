@@ -78,16 +78,14 @@ public partial class SurfTimer
 			{
 				saveMapTime = true;
 				int timeImprove = CurrentMap.WR[pStyle].RunTime - player.Timer.Ticks;
-				Server.PrintToChatAll($"{Config.PluginPrefix} {PracticeString}{LocalizationService.LocalizerNonNull["mapwr_improved",
-					player.Controller.PlayerName, PlayerHud.FormatTime(player.Timer.Ticks), PlayerHud.FormatTime(timeImprove), PlayerHud.FormatTime(CurrentMap.WR[pStyle].RunTime)]}"
-				);
+				ChatAnnounce.Send(ChatAnnounce.Kind.Record, player, $"{Config.PluginPrefix} {PracticeString}{LocalizationService.LocalizerNonNull["mapwr_improved",
+					player.Controller.PlayerName, PlayerHud.FormatTime(player.Timer.Ticks), PlayerHud.FormatTime(timeImprove), PlayerHud.FormatTime(CurrentMap.WR[pStyle].RunTime)]}");
 			}
 			else if (CurrentMap.WR[pStyle].ID == -1) // No record was set on the map
 			{
 				saveMapTime = true;
-				Server.PrintToChatAll($"{Config.PluginPrefix} {PracticeString}{LocalizationService.LocalizerNonNull["mapwr_set",
-					player.Controller.PlayerName, PlayerHud.FormatTime(player.Timer.Ticks)]}"
-				);
+				ChatAnnounce.Send(ChatAnnounce.Kind.Record, player, $"{Config.PluginPrefix} {PracticeString}{LocalizationService.LocalizerNonNull["mapwr_set",
+					player.Controller.PlayerName, PlayerHud.FormatTime(player.Timer.Ticks)]}");
 			}
 			else if (player.Stats.PB[pStyle].RunTime <= 0) // Player first ever PersonalBest for the map
 			{
@@ -100,9 +98,8 @@ public partial class SurfTimer
 			{
 				saveMapTime = true;
 				int timeImprove = player.Stats.PB[pStyle].RunTime - player.Timer.Ticks;
-				Server.PrintToChatAll($"{Config.PluginPrefix} {PracticeString}{LocalizationService.LocalizerNonNull["mappb_improved",
-					player.Controller.PlayerName, PlayerHud.FormatTime(player.Timer.Ticks), PlayerHud.FormatTime(timeImprove), PlayerHud.FormatTime(player.Stats.PB[pStyle].RunTime)]}"
-				);
+				ChatAnnounce.Send(ChatAnnounce.Kind.Pb, player, $"{Config.PluginPrefix} {PracticeString}{LocalizationService.LocalizerNonNull["mappb_improved",
+					player.Controller.PlayerName, PlayerHud.FormatTime(player.Timer.Ticks), PlayerHud.FormatTime(timeImprove), PlayerHud.FormatTime(player.Stats.PB[pStyle].RunTime)]}");
 			}
 			else // Player did not beat their existing PersonalBest for the map nor the map record
 			{
@@ -497,16 +494,14 @@ public partial class SurfTimer
 		{
 			saveBonusTime = true;
 			int timeImprove = CurrentMap.BonusWR[bonus_idx][pStyle].RunTime - player.Timer.Ticks;
-			Server.PrintToChatAll($"{Config.PluginPrefix} {PracticeString}{LocalizationService.LocalizerNonNull["bonuswr_improved",
-				player.Controller.PlayerName, bonus_idx, PlayerHud.FormatTime(player.Timer.Ticks), PlayerHud.FormatTime(timeImprove), PlayerHud.FormatTime(CurrentMap.BonusWR[bonus_idx][pStyle].RunTime)]}"
-			);
+			ChatAnnounce.Send(ChatAnnounce.Kind.Record, player, $"{Config.PluginPrefix} {PracticeString}{LocalizationService.LocalizerNonNull["bonuswr_improved",
+				player.Controller.PlayerName, bonus_idx, PlayerHud.FormatTime(player.Timer.Ticks), PlayerHud.FormatTime(timeImprove), PlayerHud.FormatTime(CurrentMap.BonusWR[bonus_idx][pStyle].RunTime)]}");
 		}
 		else if (CurrentMap.BonusWR[bonus_idx][pStyle].ID == -1) // No Bonus record was set on the map
 		{
 			saveBonusTime = true;
-			Server.PrintToChatAll($"{Config.PluginPrefix} {PracticeString}{LocalizationService.LocalizerNonNull["bonuswr_set",
-				player.Controller.PlayerName, bonus_idx, PlayerHud.FormatTime(player.Timer.Ticks)]}"
-			);
+			ChatAnnounce.Send(ChatAnnounce.Kind.Record, player, $"{Config.PluginPrefix} {PracticeString}{LocalizationService.LocalizerNonNull["bonuswr_set",
+				player.Controller.PlayerName, bonus_idx, PlayerHud.FormatTime(player.Timer.Ticks)]}");
 		}
 		else if (player.Stats.BonusPB[bonus_idx][pStyle].RunTime <= 0) // Player first ever PersonalBest for the bonus
 		{
@@ -519,9 +514,8 @@ public partial class SurfTimer
 		{
 			saveBonusTime = true;
 			int timeImprove = player.Stats.BonusPB[bonus_idx][pStyle].RunTime - player.Timer.Ticks;
-			Server.PrintToChatAll($"{Config.PluginPrefix} {PracticeString}{LocalizationService.LocalizerNonNull["bonuspb_improved",
-				player.Controller.PlayerName, bonus_idx, PlayerHud.FormatTime(player.Timer.Ticks), PlayerHud.FormatTime(timeImprove), PlayerHud.FormatTime(player.Stats.BonusPB[bonus_idx][pStyle].RunTime)]}"
-			);
+			ChatAnnounce.Send(ChatAnnounce.Kind.Pb, player, $"{Config.PluginPrefix} {PracticeString}{LocalizationService.LocalizerNonNull["bonuspb_improved",
+				player.Controller.PlayerName, bonus_idx, PlayerHud.FormatTime(player.Timer.Ticks), PlayerHud.FormatTime(timeImprove), PlayerHud.FormatTime(player.Stats.BonusPB[bonus_idx][pStyle].RunTime)]}");
 		}
 		else // Player did not beat their existing personal best for the bonus
 		{

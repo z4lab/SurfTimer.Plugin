@@ -11,16 +11,16 @@ public partial class SurfTimer
 {
 	private static readonly string[] TierNames = ["", "beginner", "easy", "medium", "hard", "very hard", "extreme", "death", "impossible"];
 
-	private AdminPage AdminMapRoot() => new("Map", ctx =>
+	private PanelPage AdminMapRoot() => new("Map", ctx =>
 	{
 		var map = CurrentMap;
 		if (map == null || map.ID <= 0)
-			return [AdminContext.Info("No map loaded")];
+			return [PanelContext.Info("No map loaded")];
 
 		string layout = map.Stages > 0 ? "staged" : map.TotalCheckpoints > 0 ? $"linear · {map.TotalCheckpoints} checkpoints" : "linear";
 		var rows = new List<HudMenuItem>
 		{
-			AdminContext.Info(map.Name!, AdminFormat.Tier((byte)map.Tier), $"{map.Stages} stages · {map.Bonuses} bonuses · {layout}"),
+			PanelContext.Info(map.Name!, AdminFormat.Tier((byte)map.Tier), $"{map.Stages} stages · {map.Bonuses} bonuses · {layout}"),
 			ctx.Toggle("Ranked", map.Ranked, "gives points", ranked => AdminSetRanked(ctx, ranked)),
 			ctx.Nav("Map tier", AdminFormat.Tier((byte)map.Tier), "", () => AdminTierPage(CourseKind.Map, 0)),
 		};
@@ -40,7 +40,7 @@ public partial class SurfTimer
 		return rows;
 	});
 
-	private void AdminSetRanked(AdminContext ctx, bool ranked)
+	private void AdminSetRanked(PanelContext ctx, bool ranked)
 	{
 		var map = CurrentMap;
 		map.Ranked = ranked;
@@ -66,11 +66,11 @@ public partial class SurfTimer
 
 	// ---- Tiers ----
 
-	private AdminPage AdminTierPage(CourseKind kind, short number) => new($"{CourseLabel(kind, number)} tier", ctx =>
+	private PanelPage AdminTierPage(CourseKind kind, short number) => new($"{CourseLabel(kind, number)} tier", ctx =>
 	{
 		var course = CurrentMap.Course(kind, number);
 		if (course == null)
-			return [AdminContext.Info("Course not found")];
+			return [PanelContext.Info("Course not found")];
 
 		var rows = new List<HudMenuItem>();
 		for (byte tier = 1; tier <= 8; tier++)
@@ -83,7 +83,7 @@ public partial class SurfTimer
 		return rows;
 	});
 
-	private void AdminSetTier(AdminContext ctx, CourseKind kind, short number, byte? tier)
+	private void AdminSetTier(PanelContext ctx, CourseKind kind, short number, byte? tier)
 	{
 		var map = CurrentMap;
 		var course = map.Course(kind, number);
@@ -101,29 +101,29 @@ public partial class SurfTimer
 			foreach (int style in Config.Styles)
 				await PointsService.RecalculateMapAsync(mapId, style);
 			return $"{label} tier set to {AdminFormat.Tier(tier)}";
-		}, status => AdminBackFrom(ctx.Session, ctx.Page, status));
+		}, status => PanelBackFrom(ctx.Session, ctx.Page, status));
 	}
 
 	// ---- Stages / bonuses ----
 
-	private AdminPage AdminCourseListPage(CourseKind kind) => new(kind == CourseKind.Stage ? "Stages" : "Bonuses", ctx =>
+	private PanelPage AdminCourseListPage(CourseKind kind) => new(kind == CourseKind.Stage ? "Stages" : "Bonuses", ctx =>
 		CurrentMap.Courses.Where(c => c.Kind == kind).OrderBy(c => c.Number).Select(c =>
 		{
 			string sub = string.Join(" · ", new[] { c.Name, c.PointsEnabled ? null : "points off" }.Where(s => !string.IsNullOrEmpty(s)));
 			return ctx.Nav(CourseLabel(kind, c.Number), c.Tier is > 0 ? $"T{c.Tier}" : "map tier", sub, () => AdminCoursePage(kind, c.Number));
 		}).ToList());
 
-	private AdminPage AdminCoursePage(CourseKind kind, short number) => new(CourseLabel(kind, number), ctx =>
+	private PanelPage AdminCoursePage(CourseKind kind, short number) => new(CourseLabel(kind, number), ctx =>
 	{
 		var map = CurrentMap;
 		var course = map.Course(kind, number);
 		if (course == null)
-			return [AdminContext.Info("Course not found")];
+			return [PanelContext.Info("Course not found")];
 
 		string label = CourseLabel(kind, number);
 		return
 		[
-			AdminContext.Info(label, course.Tier is > 0 ? $"T{course.Tier}" : $"map tier ({AdminFormat.Tier((byte)map.Tier)})", course.Name ?? ""),
+			PanelContext.Info(label, course.Tier is > 0 ? $"T{course.Tier}" : $"map tier ({AdminFormat.Tier((byte)map.Tier)})", course.Name ?? ""),
 			ctx.Nav("Tier", course.Tier is > 0 ? $"T{course.Tier}" : "map tier", "overrides the map tier", () => AdminTierPage(kind, number)),
 			ctx.Ask("Name", course.Name ?? "none", "type in chat", LocalizationService.LocalizerNonNull["prompt_course_name"], text =>
 			{
@@ -159,11 +159,11 @@ public partial class SurfTimer
 
 	// ---- Authors / workshop id ----
 
-	private AdminPage AdminAuthorsPage() => new("Authors", ctx =>
+	private PanelPage AdminAuthorsPage() => new("Authors", ctx =>
 	{
 		var map = CurrentMap;
 		var authors = (map.Author ?? "").Split(", ", StringSplitOptions.RemoveEmptyEntries);
-		var rows = authors.Select((a, i) => AdminContext.Info($"{i + 1}", a)).ToList();
+		var rows = authors.Select((a, i) => PanelContext.Info($"{i + 1}", a)).ToList();
 		rows.Add(ctx.Ask("Set authors", "", "comma separated", LocalizationService.LocalizerNonNull["prompt_authors"], text =>
 		{
 			var list = text.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).ToList();
@@ -178,7 +178,7 @@ public partial class SurfTimer
 		return rows;
 	});
 
-	private void AdminSetAuthors(AdminContext ctx, List<string> authors)
+	private void AdminSetAuthors(PanelContext ctx, List<string> authors)
 	{
 		var map = CurrentMap;
 		map.Author = authors.Count > 0 ? string.Join(", ", authors) : null;
@@ -188,7 +188,7 @@ public partial class SurfTimer
 		ctx.Session.Status = authors.Count > 0 ? $"Authors: {map.Author}" : "Authors removed";
 	}
 
-	private string? AdminSetWorkshopId(AdminContext ctx, string text)
+	private string? AdminSetWorkshopId(PanelContext ctx, string text)
 	{
 		var map = CurrentMap;
 		ulong? id = null;
@@ -220,7 +220,7 @@ public partial class SurfTimer
 	/// <summary>
 	/// Stores (value) or removes (null) a map setting and applies the map's settings again.
 	/// </summary>
-	private void AdminSetMapSetting(AdminContext ctx, string key, string? value)
+	private void AdminSetMapSetting(PanelContext ctx, string key, string? value)
 	{
 		var map = CurrentMap;
 		int mapId = map.ID;
@@ -238,7 +238,7 @@ public partial class SurfTimer
 		ctx.Audit("map setting", "map", mapId, $"{map.Name}: {key} = {value ?? "(removed)"}");
 	}
 
-	private AdminPage AdminMapSettingsPage() => new("Map settings", ctx =>
+	private PanelPage AdminMapSettingsPage() => new("Map settings", ctx =>
 	{
 		var map = CurrentMap;
 		string cap = map.StartSpeedCap is float own
@@ -265,7 +265,7 @@ public partial class SurfTimer
 		];
 	});
 
-	private AdminPage AdminSpeedCapPage() => new("Start speed cap", ctx =>
+	private PanelPage AdminSpeedCapPage() => new("Start speed cap", ctx =>
 	{
 		var map = CurrentMap;
 		float current = map.StartSpeedCap ?? Config.StartSpeedCap;
@@ -280,7 +280,7 @@ public partial class SurfTimer
 
 		return
 		[
-			AdminContext.Info("Current", current <= 0 ? "no cap" : $"{current:0} u/s", source),
+			PanelContext.Info("Current", current <= 0 ? "no cap" : $"{current:0} u/s", source),
 			ctx.Act("+10", "", "", () => Set(current + 10)),
 			ctx.Act("-10", "", "", () => Set(current - 10)),
 			ctx.Act("+50", "", "", () => Set(current + 50)),
@@ -294,7 +294,7 @@ public partial class SurfTimer
 		];
 	});
 
-	private AdminPage AdminCvarsPage() => new("Cvars", ctx =>
+	private PanelPage AdminCvarsPage() => new("Cvars", ctx =>
 		MapCvars.Whitelist.Select(name =>
 		{
 			bool overridden = CurrentMap.Settings.ContainsKey(MapCvars.SettingKey(name));
@@ -302,14 +302,14 @@ public partial class SurfTimer
 			return ctx.Nav(name, MapCvars.Current(name), sub, () => AdminCvarPage(name));
 		}).ToList());
 
-	private AdminPage AdminCvarPage(string name) => new(name, ctx =>
+	private PanelPage AdminCvarPage(string name) => new(name, ctx =>
 	{
 		string key = MapCvars.SettingKey(name);
 		bool overridden = CurrentMap.Settings.TryGetValue(key, out var value);
 		var rows = new List<HudMenuItem>
 		{
-			AdminContext.Info("Current", MapCvars.Current(name)),
-			AdminContext.Info("Server value", MapCvars.Default(name), "restored on map end"),
+			PanelContext.Info("Current", MapCvars.Current(name)),
+			PanelContext.Info("Server value", MapCvars.Default(name), "restored on map end"),
 			ctx.Ask("Set for this map", overridden ? value! : "", "type in chat", LocalizationService.LocalizerNonNull["prompt_cvar", name], text =>
 			{
 				if (!MapCvars.IsValidValue(text))
@@ -330,7 +330,7 @@ public partial class SurfTimer
 		return rows;
 	});
 
-	private AdminPage AdminCustomKeysPage() => new("Custom keys", ctx =>
+	private PanelPage AdminCustomKeysPage() => new("Custom keys", ctx =>
 	{
 		var rows = CurrentMap.Settings.Where(s => IsCustomMapSetting(s.Key)).OrderBy(s => s.Key)
 			.Select(s => ctx.Nav(s.Key, s.Value, "", () => AdminCustomKeyPage(s.Key))).ToList();
@@ -349,14 +349,14 @@ public partial class SurfTimer
 		return rows;
 	});
 
-	private AdminPage AdminCustomKeyPage(string key) => new(key, ctx =>
+	private PanelPage AdminCustomKeyPage(string key) => new(key, ctx =>
 	{
 		if (!CurrentMap.Settings.TryGetValue(key, out var value))
-			return [AdminContext.Info("Removed")];
+			return [PanelContext.Info("Removed")];
 
 		return
 		[
-			AdminContext.Info(key, value),
+			PanelContext.Info(key, value),
 			ctx.Ask("Change value", "", "type in chat", LocalizationService.LocalizerNonNull["prompt_setting_value", key], text =>
 			{
 				if (text.Length > 255)
@@ -368,20 +368,20 @@ public partial class SurfTimer
 			ctx.Act("Remove", "", "", () =>
 			{
 				AdminSetMapSetting(ctx, key, null);
-				AdminBack(ctx.Session, $"{key} removed");
+				PanelBack(ctx.Session, $"{key} removed");
 			}),
 		];
 	});
 
 	// ---- Zones ----
 
-	private AdminPage AdminZonesPage() => new("Zones", ctx =>
+	private PanelPage AdminZonesPage() => new("Zones", ctx =>
 	{
 		var map = CurrentMap;
 		var rows = new List<HudMenuItem>
 		{
-			AdminContext.Info("Layout", map.Stages > 0 ? "staged" : "linear", map.StagedLinear ? "staged linear" : ""),
-			AdminContext.Info("Stages / bonuses", $"{map.Stages} / {map.Bonuses}", $"{map.TotalCheckpoints} checkpoints"),
+			PanelContext.Info("Layout", map.Stages > 0 ? "staged" : "linear", map.StagedLinear ? "staged linear" : ""),
+			PanelContext.Info("Stages / bonuses", $"{map.Stages} / {map.Bonuses}", $"{map.TotalCheckpoints} checkpoints"),
 		};
 
 		rows.AddRange(map.Zones.OrderBy(z => z.Key.Type).ThenBy(z => z.Key.Number).Select(z =>
@@ -397,7 +397,7 @@ public partial class SurfTimer
 				_ => z.Value.FirstOrDefault()?.Name ?? "Zone",
 			};
 			string names = string.Join(", ", z.Value.Select(t => t.Name).Distinct());
-			return AdminContext.Info(label, z.Value.Count == 1 ? "1 trigger" : $"{z.Value.Count} triggers", names);
+			return PanelContext.Info(label, z.Value.Count == 1 ? "1 trigger" : $"{z.Value.Count} triggers", names);
 		}));
 		return rows;
 	});
@@ -407,21 +407,21 @@ public partial class SurfTimer
 	/// <summary>
 	/// Confirmation page for deleting times: counts, then the wipe, points and reloads.
 	/// </summary>
-	private AdminPage AdminWipeConfirm(string title, TimeRepository.WipeScope scope, string what) => AdminContext.Confirm(title, ctx =>
+	private PanelPage AdminWipeConfirm(string title, TimeRepository.WipeScope scope, string what) => PanelContext.Confirm(title, ctx =>
 	{
 		var preview = ctx.Load("preview", () => TimeRepository.PreviewWipeAsync(scope));
 		if (preview == null)
-			return [AdminContext.LoadingRow()];
+			return [PanelContext.LoadingRow()];
 
 		var rows = new List<HudMenuItem>
 		{
-			AdminContext.Info("Deletes", "", what),
-			AdminContext.Info("Times", AdminFormat.Number(preview.Times), $"{AdminFormat.Number(preview.Players)} players"),
-			AdminContext.Info("Replays", AdminFormat.Number(preview.Replays), AdminFormat.Bytes(preview.ReplayBytes)),
+			PanelContext.Info("Deletes", "", what),
+			PanelContext.Info("Times", AdminFormat.Number(preview.Times), $"{AdminFormat.Number(preview.Players)} players"),
+			PanelContext.Info("Replays", AdminFormat.Number(preview.Replays), AdminFormat.Bytes(preview.ReplayBytes)),
 		};
 		if (scope.IncludesHistory)
-			rows.Add(AdminContext.Info("Run history", AdminFormat.Number(preview.History)));
-		rows.Add(AdminContext.Info("Points", "recalculated"));
+			rows.Add(PanelContext.Info("Run history", AdminFormat.Number(preview.History)));
+		rows.Add(PanelContext.Info("Points", "recalculated"));
 		return rows;
 	}, "Confirm", ctx =>
 	{
@@ -437,7 +437,7 @@ public partial class SurfTimer
 			foreach (var page in ctx.Session.Stack)
 				page.State.Clear();
 			if (scope.TimeId != null)
-				AdminBackFrom(ctx.Session, ctx.Page, status); // The time's own page is gone
+				PanelBackFrom(ctx.Session, ctx.Page, status); // The time's own page is gone
 			else
 				ctx.Done(status);
 		});
