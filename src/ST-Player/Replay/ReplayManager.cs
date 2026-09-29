@@ -13,6 +13,8 @@ public enum ReplayReuseResult
 	Spawning,
 	/// <summary>An idle slot was reclaimed and is playing the requested content immediately.</summary>
 	ReclaimedIdle,
+	/// <summary>The requester's own bot got the new content (one requested bot per player).</summary>
+	Replaced,
 	/// <summary>The pool is full and every slot is actively playing something else - request refused.</summary>
 	CapReached,
 }
@@ -33,7 +35,8 @@ public class ReplayManager
 	/// </summary>
 	public Dictionary<int, ReplayPlayer>[] AllCheckpointWR { get; set; } = Array.Empty<Dictionary<int, ReplayPlayer>>();
 	/// <summary>
-	/// On-demand pool of replay bots, capped at Config.ReplayPoolCap. Each slot either awaits a
+	/// On-demand pool of replay bots, capped at Config.ReplayPoolCap (plus the optional permanent map
+	/// WR bot, IsPermanent, which isn't counted). Each slot either awaits a
 	/// spawning bot (Controller == null), is actively playing (IsPlaying == true), or is idle
 	/// (Controller != null, IsPlaying == false, IdleSince set) awaiting reclaim or a kick timeout.
 	/// </summary>
@@ -225,49 +228,68 @@ public class ReplayManager
 		return false;
 	}
 
+	/// <summary>Requested (non-permanent) bots - what Config.ReplayPoolCap limits</summary>
+	internal int RequestedCount => this.Pool.Count(s => !s.IsPermanent);
+
+	internal ReplayPlayer? PermanentSlot => this.Pool.Find(s => s.IsPermanent);
+
 	/// <summary>
-	/// Decides whether the requested content is already playing, needs a fresh bot spawned,
-	/// can reclaim an idle pool slot, or must be refused because the pool is full and everything
-	/// in it is actively playing something else.
+	/// Decides whether the requested content is already playing, goes into the requester's own bot,
+	/// needs a fresh bot spawned, can reclaim an idle pool slot, or must be refused because the pool is
+	/// full and everything in it is actively playing something else.
 	/// </summary>
 	/// <param name="contentTemplate">A content template (MapWR / AllStageWR[..][..] / AllBonusWR[..][..] / AllCheckpointWR[..][..], or an ad-hoc PB template) to load into a pool slot.</param>
 	/// <param name="requestedByPlayerId">-1 for WR content, else the PB owner's Profile.ID.</param>
 	/// <param name="repeatCount">How many times the replay should play before going idle.</param>
-	internal (ReplayReuseResult Result, ReplayPlayer? Slot) RequestReplay(ReplayPlayer contentTemplate, int requestedByPlayerId, int repeatCount)
+	/// <param name="requesterUserId">UserId of the player asking - each player has at most one requested bot.</param>
+	internal (ReplayReuseResult Result, ReplayPlayer? Slot) RequestReplay(ReplayPlayer contentTemplate, int requestedByPlayerId, int repeatCount, int? requesterUserId)
 	{
-		// 1. Already playing this exact content - just spectate it, don't touch the pool
+		// 1. Already playing this exact content (the permanent map bot too) - just spectate it
 		foreach (var slot in this.Pool)
 		{
 			if (slot.IsPlaying && slot.MapTimeID == contentTemplate.MapTimeID)
 				return (ReplayReuseResult.AlreadyPlaying, slot);
 		}
 
-		// 2. Room in the pool - append a new slot, awaiting a freshly-spawned bot
-		if (this.Pool.Count < Config.ReplayPoolCap)
+		// 2. The requester already has a bot - it gets the new content (side effects: caller)
+		var own = requesterUserId == null ? null : this.Pool.Find(s => !s.IsPermanent && s.RequesterUserId == requesterUserId);
+		if (own != null)
 		{
-			var newSlot = new ReplayPlayer();
+			own.LoadContentFrom(contentTemplate, requestedByPlayerId);
+			own.LoadReplayData(repeatCount);
+			own.IdleSince = null;
+			own.LastWatchedAt = DateTime.UtcNow;
+			return (ReplayReuseResult.Replaced, own);
+		}
+
+		// 3. Room in the pool - append a new slot, awaiting a freshly-spawned bot
+		if (this.RequestedCount < Config.ReplayPoolCap)
+		{
+			var newSlot = new ReplayPlayer { RequesterUserId = requesterUserId };
 			newSlot.LoadContentFrom(contentTemplate, requestedByPlayerId);
 			this.Pool.Add(newSlot);
 			return (ReplayReuseResult.Spawning, newSlot);
 		}
 
-		// 3. Pool full - try to reclaim a genuinely idle slot (has a live Controller but isn't playing;
+		// 4. Pool full - try to reclaim a genuinely idle slot (has a live Controller but isn't playing;
 		//    distinct from a slot still awaiting spawn, which has Controller == null). Only data is
 		//    updated here - the caller (which has access to AddTimer, unlike this plain class) is
 		//    responsible for the team switch / RemoveWeapons / Start / FormatBotName side effects.
 		foreach (var slot in this.Pool)
 		{
-			if (slot.Controller != null && !slot.IsPlaying)
+			if (!slot.IsPermanent && slot.Controller != null && !slot.IsPlaying)
 			{
 				slot.LoadContentFrom(contentTemplate, requestedByPlayerId);
 				slot.LoadReplayData(repeatCount);
 				slot.IdleSince = null;
+				slot.RequesterUserId = requesterUserId;
+				slot.LastWatchedAt = DateTime.UtcNow;
 
 				return (ReplayReuseResult.ReclaimedIdle, slot);
 			}
 		}
 
-		// 4. Pool full, nothing idle to reclaim - refuse
+		// 5. Pool full, nothing idle to reclaim - refuse
 		return (ReplayReuseResult.CapReached, null);
 	}
 }

@@ -44,8 +44,11 @@ public partial class SurfTimer
 			if (slot.Controller != null)
 				continue;
 
-			slot.SetController(controller, Config.ReplayRepeatCount);
-			slot.LoadReplayData(Config.ReplayRepeatCount);
+			// The permanent map bot loops forever, requested ones play Config.ReplayRepeatCount times
+			int repeat = slot.IsPermanent ? -1 : Config.ReplayRepeatCount;
+			slot.SetController(controller, repeat);
+			slot.LoadReplayData(repeat);
+			slot.LastWatchedAt = DateTime.UtcNow; // Grace period for the requester to start watching
 
 			// CS2 kicks bots without a pending spectator team when another player joins (cs2kz-metamod)
 			controller.PendingTeamNum = 1;
@@ -253,6 +256,13 @@ public partial class SurfTimer
 				int userId = player.UserId ?? 0;
 				ChatPrompt.Forget(userId);
 				ForgetChatSpam(userId);
+
+				// Their replay bot stays until nobody watches it (OnTick upkeep)
+				foreach (var slot in CurrentMap?.ReplayManager.Pool ?? [])
+				{
+					if (slot.RequesterUserId == userId)
+						slot.RequesterUserId = null;
+				}
 
 				if (playerList.TryGetValue(userId, out var playerData))
 				{

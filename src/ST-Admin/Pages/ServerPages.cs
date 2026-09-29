@@ -177,6 +177,7 @@ public partial class SurfTimer
 		["protect_replay_bots"] = ("Protect replay bots", "block map bot kicks"),
 		["replay_bot_direct_spawn"] = ("Direct bot spawn", "CreateBot instead of bot_quota"),
 		["replays_enabled"] = ("Replays", "record and play replays"),
+		["replay_permanent_map_bot"] = ("Permanent map replay bot", "loops the map WR, not counted in the max"),
 	};
 
 	private PanelPage AdminTimerSettingsPage() => new("Timer settings", ctx =>
@@ -190,8 +191,13 @@ public partial class SurfTimer
 				if (key == "popup_menus" && !on)
 					ctx.Player.HUD.CloseMenu();
 				AdminSaveTimerSetting(ctx, key, JsonValue.Create(on), on ? "on" : "off");
+				if (key == "replay_permanent_map_bot" || key == "replays_enabled")
+					UpdatePermanentReplayBot(); // Spawns / removes the permanent map bot right away
 			});
 		}).ToList();
+
+		rows.Add(ctx.Nav("Replay bots max", Config.ReplayPoolCap.ToString(), "requested bots at a time",
+			() => AdminNumberSettingPage("Replay bots max", "replay_pool_cap", () => Config.ReplayPoolCap, [1], 1, 10, "")));
 
 		rows.Add(ctx.Nav("Start speed cap", Config.StartSpeedCap <= 0 ? "no cap" : $"{Config.StartSpeedCap} u/s", "default for all maps",
 			() => AdminNumberSettingPage("Start speed cap", "start_speed_cap", () => Config.StartSpeedCap, [10, 50], 0, 10000, " u/s")));

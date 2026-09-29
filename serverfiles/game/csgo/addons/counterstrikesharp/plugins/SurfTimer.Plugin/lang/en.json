@@ -42,6 +42,7 @@
 	"stage_message": "Stage [{yellow}{0}{default}]: {yellow}{1}{default} {yellow}({2}){default} [PB: {3} | WR: {4}]",
 	"replay_pool_full": "{red}All {green}{0}{red} replay slots are currently in use. Try again shortly.",
 	"replay_spawning": "{green}Spawning a replay bot, please wait...",
+	"replay_replaced": "{grey}Your replay bot now plays the new replay.",
 	"replay_no_pb": "{red}No replay data was saved for this run.",
 	"replay_none": "{grey}There are no replays on this map yet.",
 	"spec_none": "{grey}Nobody to spectate right now.",

@@ -39,6 +39,12 @@ public class ReplayPlayer
 	public DateTime? IdleSince { get; set; } = null; // Set when this slot finishes a replay and goes idle
 	public int? PendingSpectatorUserId { get; set; } = null; // UserId of whoever is waiting to auto-spectate once this slot's bot spawns
 
+	// Pool bookkeeping (ReplayManager / OnTick upkeep)
+	internal bool IsPermanent { get; set; } // The always-on map WR bot - not counted in the cap, never idled or kicked for being unwatched
+	internal int? RequesterUserId { get; set; } // Player who requested this bot - one requested bot per player
+	internal DateTime LastWatchedAt { get; set; } = DateTime.UtcNow; // Last time someone spectated it (or it was spawned / given new content)
+	internal DateTime CreatedAt { get; } = DateTime.UtcNow; // For slots whose bot never arrives
+
 	// Tracking
 	public List<ReplayFrame> Frames { get; set; } = new List<ReplayFrame>();
 	public List<int> StageEnterSituations { get; set; } = new List<int>();

@@ -182,7 +182,7 @@ public partial class SurfTimer
 	/// </summary>
 	private void ApplyReplayRequest(CCSPlayerController player, ReplayPlayer contentTemplate, int requestedByPlayerId)
 	{
-		var (result, slot) = CurrentMap.ReplayManager.RequestReplay(contentTemplate, requestedByPlayerId, Config.ReplayRepeatCount);
+		var (result, slot) = CurrentMap.ReplayManager.RequestReplay(contentTemplate, requestedByPlayerId, Config.ReplayRepeatCount, player.UserId);
 
 		switch (result)
 		{
@@ -197,19 +197,28 @@ public partial class SurfTimer
 				break;
 
 			case ReplayReuseResult.ReclaimedIdle:
-				// Idle bots are dead on Spectator (GoIdle) - rejoin and respawn so there's a live pawn.
-				slot!.Controller!.PendingTeamNum = 1; // CS2 kicks bots without it when a player joins
-				slot.Controller.ChangeTeam(CsTeam.Terrorist);
-				slot.Controller.Respawn();
-				AddTimer(1.5f, () =>
-				{
-					if (slot.Controller == null || !slot.Controller.IsValid)
-						return;
+				RestartIdleReplayBot(slot!);
+				SpectateTarget(player, slot!.Controller!);
+				break;
 
-					slot.Controller.RemoveWeapons();
+			case ReplayReuseResult.Replaced:
+				player.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["replay_replaced"]}");
+				if (slot!.Controller == null)
+				{
+					// Its bot is still on the way - it spawns with the new content
+					slot.PendingSpectatorUserId = player.UserId;
+					break;
+				}
+
+				if (slot.Controller.PawnIsAlive)
+				{
 					slot.Start();
 					slot.FormatBotName();
-				});
+				}
+				else
+				{
+					RestartIdleReplayBot(slot);
+				}
 				SpectateTarget(player, slot.Controller);
 				break;
 
@@ -217,6 +226,25 @@ public partial class SurfTimer
 				player.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["replay_pool_full", Config.ReplayPoolCap]}");
 				break;
 		}
+	}
+
+	/// <summary>
+	/// Idle bots are dead on Spectator (GoIdle) - rejoin and respawn so there's a live pawn, then play.
+	/// </summary>
+	private void RestartIdleReplayBot(ReplayPlayer slot)
+	{
+		slot.Controller!.PendingTeamNum = 1; // CS2 kicks bots without it when a player joins
+		slot.Controller.ChangeTeam(CsTeam.Terrorist);
+		slot.Controller.Respawn();
+		AddTimer(1.5f, () =>
+		{
+			if (slot.Controller == null || !slot.Controller.IsValid)
+				return;
+
+			slot.Controller.RemoveWeapons();
+			slot.Start();
+			slot.FormatBotName();
+		});
 	}
 
 	/// <summary>

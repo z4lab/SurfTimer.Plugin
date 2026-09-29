@@ -73,7 +73,7 @@ public static class Config
 	/// Timer settings the !admin panel can change live - written back to timer_settings.json.
 	/// </summary>
 	internal static readonly IReadOnlyList<string> LiveBoolSettings =
-		["popup_menus", "block_map_chat", "protect_replay_bots", "replay_bot_direct_spawn", "replays_enabled"];
+		["popup_menus", "block_map_chat", "protect_replay_bots", "replay_bot_direct_spawn", "replays_enabled", "replay_permanent_map_bot"];
 
 	internal static bool GetLiveBool(string key) => key switch
 	{
@@ -82,6 +82,7 @@ public static class Config
 		"protect_replay_bots" => ProtectReplayBots,
 		"replay_bot_direct_spawn" => ReplayBotDirectSpawn,
 		"replays_enabled" => ReplaysEnabled,
+		"replay_permanent_map_bot" => ReplayPermanentMapBot,
 		_ => false,
 	};
 
@@ -104,12 +105,24 @@ public static class Config
 		ReplayBotDirectSpawn = TimerSettings.GetBool("replay_bot_direct_spawn", true);
 		StartSpeedCap = TimerSettings.GetInt("start_speed_cap", 260);
 		StartExitSpeedLimit = TimerSettings.GetInt("start_exit_speed_limit", 600);
+		ReplayPoolCap = Math.Clamp(TimerSettings.GetInt("replay_pool_cap", 5), 1, 10);
+		ReplayPermanentMapBot = TimerSettings.GetBool("replay_permanent_map_bot", false);
 	}
 
 	/// <summary>
-	/// Maximum number of distinct replays that can play concurrently via !replay.
+	/// Maximum number of requested replay bots at a time (!replay) - the permanent map bot isn't counted.
 	/// </summary>
-	public const int ReplayPoolCap = 3;
+	public static int ReplayPoolCap { get; private set; } = Math.Clamp(TimerSettings.GetInt("replay_pool_cap", 5), 1, 10);
+
+	/// <summary>
+	/// An always-on bot looping the map WR (not counted in ReplayPoolCap).
+	/// </summary>
+	public static bool ReplayPermanentMapBot { get; private set; } = TimerSettings.GetBool("replay_permanent_map_bot", false);
+
+	/// <summary>
+	/// Seconds a requested replay bot may go without any spectator before it's removed.
+	/// </summary>
+	public const int ReplayUnwatchedTimeoutSeconds = 10;
 	/// <summary>
 	/// How many times a replay bot repeats its replay before going idle.
 	/// </summary>

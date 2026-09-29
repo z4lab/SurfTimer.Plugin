@@ -100,6 +100,19 @@ public partial class SurfTimer
 				CurrentMap.KickReplayBot(i);
 			}
 		}
+
+		// Once per second: unwatched bots, stuck slots, the permanent map bot (ReplayUpkeep.cs)
+		if (Server.TickCount % 64 == 0)
+		{
+			try
+			{
+				TickReplayUpkeep();
+			}
+			catch (Exception ex)
+			{
+				LogTickError(ex, "replay upkeep");
+			}
+		}
 	}
 
 	private void LogTickError(Exception ex, string what)
