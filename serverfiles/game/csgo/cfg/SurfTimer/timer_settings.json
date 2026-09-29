@@ -8,5 +8,6 @@
 	"block_map_chat": true,
 	"protect_replay_bots": true,
 	"replay_bot_direct_spawn": true,
-	"start_speed_cap": 260
+	"start_speed_cap": 260,
+	"start_exit_speed_limit": 600
 }

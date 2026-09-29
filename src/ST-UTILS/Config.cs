@@ -64,6 +64,12 @@ public static class Config
 	public static int StartSpeedCap { get; private set; } = TimerSettings.GetInt("start_speed_cap", 260);
 
 	/// <summary>
+	/// Default hard limit (u/s, horizontal) when leaving a run start - only on maps that turn the limit on
+	/// (exit_speed_limit map setting), which can also set their own value.
+	/// </summary>
+	public static int StartExitSpeedLimit { get; private set; } = TimerSettings.GetInt("start_exit_speed_limit", 600);
+
+	/// <summary>
 	/// Timer settings the !admin panel can change live - written back to timer_settings.json.
 	/// </summary>
 	internal static readonly IReadOnlyList<string> LiveBoolSettings =
@@ -97,6 +103,7 @@ public static class Config
 		ProtectReplayBots = TimerSettings.GetBool("protect_replay_bots", true);
 		ReplayBotDirectSpawn = TimerSettings.GetBool("replay_bot_direct_spawn", true);
 		StartSpeedCap = TimerSettings.GetInt("start_speed_cap", 260);
+		StartExitSpeedLimit = TimerSettings.GetInt("start_exit_speed_limit", 600);
 	}
 
 	/// <summary>

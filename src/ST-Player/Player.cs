@@ -346,4 +346,25 @@ public class Player
 			this.StartZoneSpeedCapActive = false;
 		}
 	}
+
+	/// <summary>
+	/// Hard limit when leaving a run start (map setting exit_speed_limit): scales the horizontal speed
+	/// down to the limit, keeping direction and vertical speed. velocity is the exit velocity the caller
+	/// uses (prespeed, start velocities) - updated when capped. Returns true when it was capped.
+	/// </summary>
+	internal bool ClampExitSpeed(float limit, ref VectorT velocity, out float before)
+	{
+		before = MathF.Sqrt(velocity.X * velocity.X + velocity.Y * velocity.Y);
+		if (limit <= 0 || before <= limit)
+			return false;
+
+		var pawn = this.Controller.PlayerPawn.Value;
+		if (pawn == null || !pawn.IsValid)
+			return false;
+
+		float scale = limit / before;
+		velocity = new VectorT(velocity.X * scale, velocity.Y * scale, velocity.Z);
+		Extensions.Teleport(pawn, null, null, velocity);
+		return true;
+	}
 }

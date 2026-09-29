@@ -194,6 +194,8 @@ public partial class SurfTimer
 
 		rows.Add(ctx.Nav("Start speed cap", Config.StartSpeedCap <= 0 ? "no cap" : $"{Config.StartSpeedCap} u/s", "default for all maps",
 			() => AdminNumberSettingPage("Start speed cap", "start_speed_cap", () => Config.StartSpeedCap, [10, 50], 0, 10000, " u/s")));
+		rows.Add(ctx.Nav("Exit speed limit", $"{Config.StartExitSpeedLimit} u/s", "default for maps that turn it on",
+			() => AdminNumberSettingPage("Exit speed limit", "start_exit_speed_limit", () => Config.StartExitSpeedLimit, [10, 50], 100, 10000, " u/s")));
 		rows.Add(ctx.Nav("Stage / CP WR points", Config.PointsSegmentWr.ToString(), "per segment WR",
 			() => AdminNumberSettingPage("Stage / CP WR points", "points_segment_wr", () => Config.PointsSegmentWr, [1, 5], 0, 1000, "")));
 		return rows;
@@ -208,7 +210,8 @@ public partial class SurfTimer
 			rows.Add(ctx.Act($"+{step}", "", "", () => AdminSaveTimerSetting(ctx, key, JsonValue.Create(Math.Clamp(value + step, min, max)), "")));
 			rows.Add(ctx.Act($"-{step}", "", "", () => AdminSaveTimerSetting(ctx, key, JsonValue.Create(Math.Clamp(value - step, min, max)), "")));
 		}
-		rows.Add(ctx.Act("Off (0)", "", "", () => AdminSaveTimerSetting(ctx, key, JsonValue.Create(0), "")));
+		if (min == 0)
+			rows.Add(ctx.Act("Off (0)", "", "", () => AdminSaveTimerSetting(ctx, key, JsonValue.Create(0), "")));
 		return rows;
 	});
 

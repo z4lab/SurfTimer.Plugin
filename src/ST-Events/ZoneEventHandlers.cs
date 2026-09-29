@@ -544,9 +544,26 @@ public partial class SurfTimer
 		player.ReplayRecorder.CurrentSituation = ReplayFrameSituation.END_ZONE_EXIT;
 	}
 
+	/// <summary>
+	/// The map's hard limit on leaving a run start (exit_speed_limit map setting) - before the exit
+	/// velocity is used for the timer, prespeed and start velocities.
+	/// </summary>
+	private static void ApplyExitLimit(Player player, ref VectorT velocity)
+	{
+		if (CurrentMap?.ExitSpeedLimit is not float limit || !player.ClampExitSpeed(limit, ref velocity, out float before))
+			return;
+
+		player.Controller.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["prespeed_capped",
+			before.ToString("0"), limit.ToString("0")]}");
+	}
+
 	private static void EndTouchHandleMapStartZone(Player player, ZoneInfo zone, [CallerMemberName] string methodName = "")
 	{
 		VectorT velocity = player.Controller.PlayerPawn.Value!.AbsVelocity.ToVector_t();
+
+		// A map run starts here (or stage 1 in stage mode - its start is the map start) - the map's exit limit applies
+		if (!player.Timer.IsBonusMode && (!player.Timer.IsStageMode || player.Timer.Stage <= 1))
+			ApplyExitLimit(player, ref velocity);
 
 		// MAP START ZONE
 		if (!player.Timer.IsStageMode && !player.Timer.IsBonusMode)
@@ -588,6 +605,10 @@ public partial class SurfTimer
 #endif
 		VectorT velocity = player.Controller.PlayerPawn.Value!.AbsVelocity.ToVector_t();
 		short stage = zone.Number;
+
+		// Only where a stage run starts (stage mode) - passing a stage start during a map run is mid-run speed
+		if (player.Timer.IsStageMode && player.Timer.Stage == stage)
+			ApplyExitLimit(player, ref velocity);
 
 		// Set replay situation
 		player.ReplayRecorder.CurrentSituation = ReplayFrameSituation.STAGE_ZONE_EXIT;
@@ -681,6 +702,10 @@ public partial class SurfTimer
 		player.Controller.PrintToChat($"CS2 Surf DEBUG >> CBaseTrigger_{ChatColors.LightRed}EndTouchFunc{ChatColors.Default} -> {ChatColors.Yellow}Bonus {zone.Number} Start Zone");
 #endif
 		VectorT velocity = player.Controller.PlayerPawn.Value!.AbsVelocity.ToVector_t();
+
+		// A bonus run starts here - the map's exit limit applies
+		if (!player.Timer.IsStageMode && player.Timer.IsBonusMode)
+			ApplyExitLimit(player, ref velocity);
 
 		// Replay
 		if (player.ReplayRecorder.IsRecording)

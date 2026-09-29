@@ -211,7 +211,7 @@ public partial class SurfTimer
 
 	private static readonly HashSet<string> KnownMapSettings = new(StringComparer.OrdinalIgnoreCase)
 	{
-		Map.SettingStagedLinear, Map.SettingStartSpeedCap, Map.SettingReplays,
+		Map.SettingStagedLinear, Map.SettingStartSpeedCap, Map.SettingReplays, Map.SettingExitLimit, Map.SettingExitLimitValue,
 	};
 
 	private static bool IsCustomMapSetting(string key) =>
@@ -255,6 +255,13 @@ public partial class SurfTimer
 				ctx.Session.Status = on ? "Staged linear on (applies to new runs)" : "Staged linear off";
 			}),
 			ctx.Nav("Start speed cap", cap, "bhop cap in start zones", AdminSpeedCapPage),
+			ctx.Toggle("Exit speed limit", map.ExitLimitEnabled, "caps speed leaving run starts", on =>
+			{
+				AdminSetMapSetting(ctx, Map.SettingExitLimit, on ? "1" : null);
+				ctx.Session.Status = on ? $"Leaving a run start is capped at {map.ExitSpeedLimit:0} u/s" : "No exit speed limit on this map";
+			}),
+			ctx.Nav("Exit limit value", map.ExitSpeedLimitValue is float ownLimit ? $"{ownLimit:0} u/s" : $"{Config.StartExitSpeedLimit} u/s (default)",
+				map.ExitLimitEnabled ? "" : "limit is off", AdminExitLimitPage),
 			ctx.Toggle("Record replays", map.RecordReplays, "store replays of new PBs", on =>
 			{
 				AdminSetMapSetting(ctx, Map.SettingReplays, on ? null : "0");
@@ -290,6 +297,36 @@ public partial class SurfTimer
 			{
 				AdminSetMapSetting(ctx, Map.SettingStartSpeedCap, null);
 				ctx.Session.Status = $"Start speed cap follows the default ({Config.StartSpeedCap})";
+			}),
+		];
+	});
+
+	private PanelPage AdminExitLimitPage() => new("Exit limit value", ctx =>
+	{
+		var map = CurrentMap;
+		float current = map.ExitSpeedLimitValue ?? Config.StartExitSpeedLimit;
+		string source = map.ExitSpeedLimitValue == null ? "timer_settings.json default" : "this map";
+
+		void Set(float value)
+		{
+			value = Math.Clamp(value, 100, 10000);
+			AdminSetMapSetting(ctx, Map.SettingExitLimitValue, value.ToString("0", CultureInfo.InvariantCulture));
+			ctx.Session.Status = map.ExitLimitEnabled
+				? $"Exit speed limit {value:0} u/s"
+				: $"Exit speed limit {value:0} u/s (turn the limit on in Map settings)";
+		}
+
+		return
+		[
+			PanelContext.Info("Current", $"{current:0} u/s", source),
+			ctx.Act("+10", "", "", () => Set(current + 10)),
+			ctx.Act("-10", "", "", () => Set(current - 10)),
+			ctx.Act("+50", "", "", () => Set(current + 50)),
+			ctx.Act("-50", "", "", () => Set(current - 50)),
+			ctx.Act("Use default", $"{Config.StartExitSpeedLimit}", "timer_settings.json", () =>
+			{
+				AdminSetMapSetting(ctx, Map.SettingExitLimitValue, null);
+				ctx.Session.Status = $"Exit speed limit follows the default ({Config.StartExitSpeedLimit})";
 			}),
 		];
 	});

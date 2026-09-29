@@ -56,6 +56,7 @@
 	"hidebots_on": "Replay bots are now {lime}hidden{default} for you.",
 	"hidebots_off": "Replay bots are now {red}visible{default}.",
 	"options_hint": "{grey}(more in {yellow}!options{grey})",
+	"prespeed_capped": "{grey}Prespeed capped: {red}{0}{grey} → {yellow}{1}{grey} u/s",
 	"spec_manual_hint": "Press {yellow}M{default} and choose {yellow}Spectator{default} - you'll be put on {lime}{0}{default} automatically.",
 	"admin_no_access": "{red}You don't have access to the admin panel.",
 	"prompt_cancel_hint": "{grey}(type {yellow}!cancel{grey} to abort)",

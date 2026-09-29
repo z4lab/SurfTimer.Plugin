@@ -248,6 +248,20 @@ public class Map : MapEntity
 	internal const string SettingStagedLinear = "staged_linear";
 	internal const string SettingStartSpeedCap = "start_speed_cap";
 	internal const string SettingReplays = "replays_enabled";
+	internal const string SettingExitLimit = "exit_speed_limit";
+	internal const string SettingExitLimitValue = "exit_speed_limit_value";
+
+	/// <summary>The map turns the hard limit on leaving run starts on (exit_speed_limit)</summary>
+	internal bool ExitLimitEnabled { get; private set; }
+
+	/// <summary>
+	/// Hard horizontal speed limit when leaving a run start (u/s) - null when the map doesn't use one.
+	/// Follows a live change of the timer_settings.json default.
+	/// </summary>
+	internal float? ExitSpeedLimit => ExitLimitEnabled ? ExitSpeedLimitValue ?? Config.StartExitSpeedLimit : null;
+
+	/// <summary>The map's own exit limit value - null follows Config.StartExitSpeedLimit</summary>
+	internal float? ExitSpeedLimitValue { get; private set; }
 
 	/// <summary>Start zone bhop cap of this map (u/s, 0 = off) - null uses Config.StartSpeedCap</summary>
 	internal float? StartSpeedCap { get; private set; }
@@ -333,6 +347,13 @@ public class Map : MapEntity
 			&& float.TryParse(cap, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float parsed)
 			? Math.Max(0, parsed)
 			: null;
+
+		this.ExitSpeedLimitValue = Settings.TryGetValue(SettingExitLimitValue, out var limit)
+			&& float.TryParse(limit, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float parsedLimit)
+			&& parsedLimit > 0
+			? parsedLimit
+			: null;
+		this.ExitLimitEnabled = IsTrue(SettingExitLimit, false);
 
 		var snapshot = new Dictionary<string, string>(Settings, StringComparer.OrdinalIgnoreCase);
 		Server.NextFrame(() => MapCvars.Apply(snapshot));
