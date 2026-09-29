@@ -20,6 +20,10 @@ public partial class SurfTimer
 	private DateTime? _permanentStalledSince;
 	private DateTime _permanentLastRestart;
 
+	// The permanent bot is created this long after a player is first alive on a team (map load)
+	private const int PermanentJoinDelaySeconds = 3;
+	private DateTime? _permanentHumanSince;
+
 	private void TickReplayUpkeep()
 	{
 		var manager = CurrentMap?.ReplayManager;
@@ -99,9 +103,18 @@ public partial class SurfTimer
 
 		if (permanent == null)
 		{
-			// Bots can't join an empty server (bot_join_after_player) - on map load the WR is often ready
-			// before anyone is in, so wait for the first player instead of creating a bot that never spawns
-			if (!playerList.Values.Any(p => p.Controller.IsValid && !p.Controller.IsBot)) // Humans are listed once fully connected
+			// On map load the WR is ready before anyone is in. A bot created then either can't join
+			// (bot_join_after_player) or is kicked by the round restart CS2 does when the first player
+			// joins ("BeginMatch") - so wait until a player is alive on a team, and a moment longer
+			bool humanPlaying = playerList.Values.Any(p => p.Controller.IsValid && !p.Controller.IsBot
+				&& p.Controller.PawnIsAlive && p.Controller.Team is CsTeam.Terrorist or CsTeam.CounterTerrorist);
+			if (!humanPlaying)
+			{
+				_permanentHumanSince = null;
+				return;
+			}
+			_permanentHumanSince ??= DateTime.UtcNow;
+			if ((DateTime.UtcNow - _permanentHumanSince.Value).TotalSeconds < PermanentJoinDelaySeconds)
 				return;
 
 			var slot = new ReplayPlayer { IsPermanent = true };

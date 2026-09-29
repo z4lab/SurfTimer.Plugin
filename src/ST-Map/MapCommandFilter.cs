@@ -56,6 +56,24 @@ public partial class SurfTimer
 		("mp_autoteambalance", "0"),
 	];
 
+	private CCSGameRulesProxy? _gameRulesProxy;
+
+	/// <summary>
+	/// Stops CS2's "Game commencing" restart. The game clears CCSGameRules.FirstConnected whenever one
+	/// team is empty and restarts the match when both teams have players again - so every replay bot
+	/// joining T while players are CT (or the first player joining) reset everyone. Kept set every tick,
+	/// before the game rules think, so the restart never triggers. Surf has no matches to start.
+	/// </summary>
+	private void KeepGameCommenced()
+	{
+		if (_gameRulesProxy == null || !_gameRulesProxy.IsValid)
+			_gameRulesProxy = Utilities.FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules").FirstOrDefault();
+
+		var rules = _gameRulesProxy?.GameRules;
+		if (rules != null && !rules.FirstConnected)
+			rules.FirstConnected = true;
+	}
+
 	private void EnforceBotConVars()
 	{
 		if (!Config.ProtectReplayBots)

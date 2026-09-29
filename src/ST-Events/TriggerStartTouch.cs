@@ -6,24 +6,25 @@ namespace SurfTimer;
 public partial class SurfTimer
 {
 	/// <summary>
+	/// The player behind a trigger touch - null for anything that isn't a player pawn with a controller
+	/// (props, projectiles, or a bot's pawn while the bot is being kicked).
+	/// </summary>
+	private static CCSPlayerController? ControllerOfActivator(CEntityInstance? activator)
+	{
+		if (activator == null || !activator.IsValid || activator.DesignerName != "player")
+			return null;
+
+		var controller = new CCSPlayerPawn(activator.Handle).Controller.Value;
+		return controller != null && controller.IsValid ? new CCSPlayerController(controller.Handle) : null;
+	}
+
+	/// <summary>
 	/// Handler for trigger start touch hook - CBaseTrigger_StartTouchFunc
 	/// </summary>
 	internal HookResult OnTriggerStartTouch(CEntityIOOutput output, string name, CEntityInstance activator, CEntityInstance caller, CVariant value, float delay)
 	{
 		CBaseTrigger trigger = new CBaseTrigger(caller.Handle);
-		CBaseEntity entity = new CBaseEntity(activator.Handle);
-		CCSPlayerController client = null!;
-
-		try
-		{
-			client = new CCSPlayerController(new CCSPlayerPawn(entity.Handle).Controller.Value!.Handle);
-		}
-		catch (Exception ex)
-		{
-			_logger.LogError(ex, "[{ClassName}] OnTriggerStartTouch -> Could not assign `client` (name: {Name}). Exception: {Exception}",
-				nameof(SurfTimer), name, ex.Message
-			);
-		}
+		CCSPlayerController? client = ControllerOfActivator(activator);
 
 		if (client == null || !client.IsValid || !client.PawnIsAlive || !playerList.ContainsKey((int)client.UserId!)) // !playerList.ContainsKey((int)client.UserId!) make sure to not check for user_id that doesnt exists
 		{

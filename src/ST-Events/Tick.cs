@@ -15,6 +15,9 @@ public partial class SurfTimer
 		if (CurrentMap == null)
 			return;
 
+		// No "Game commencing" match restart when bots / the first player join (see MapCommandFilter.cs)
+		KeepGameCommenced();
+
 		// Pawns that viewers with a hide option don't receive (see Visibility.cs)
 		RefreshTransmitTargets();
 

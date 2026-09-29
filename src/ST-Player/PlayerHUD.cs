@@ -1,4 +1,5 @@
 using CounterStrikeSharp.API;
+using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Utils;
 using System.Globalization;
 using System.Net;
@@ -370,7 +371,9 @@ public class PlayerHud
 		SendCenter(subject, replay);
 		SendSlot(CustomHud.Top, options.HudTop ? TopRows(subject, replay) : []);
 		SendSlot(CustomHud.Left, options.HudSplits && subject != null ? SplitRows(subject) : []);
-		SendSlot(CustomHud.Right, options.HudSpectators ? SpectatorRows(allPlayers) : []);
+		// Spectators of whoever this HUD shows - ourselves while alive, else the watched player / replay bot
+		var watched = subject?.Controller ?? replay?.Controller;
+		SendSlot(CustomHud.Right, options.HudSpectators ? SpectatorRows(allPlayers, watched) : []);
 		SendMenu(); // Refreshes live values (e.g. !spec times) - clicks re-render right away
 
 #if DEBUG
@@ -761,15 +764,16 @@ public class PlayerHud
 	}
 
 	/// <summary>
-	/// Everyone currently spectating this player.
+	/// Everyone currently spectating the watched player (this player while alive, or whoever / whichever
+	/// replay bot they spectate - then they're on the list themselves).
 	/// </summary>
-	private List<List<HudElement>> SpectatorRows(ICollection<Player> allPlayers)
+	private List<List<HudElement>> SpectatorRows(ICollection<Player> allPlayers, CCSPlayerController? watched)
 	{
-		if (!_player.Controller.PawnIsAlive)
+		if (watched == null || !watched.IsValid || !watched.PawnIsAlive)
 			return [];
 
 		var spectators = allPlayers
-			.Where(p => p != _player && p.Controller.IsValid && p.IsSpectating(_player.Controller))
+			.Where(p => p.Controller.IsValid && !p.Controller.Equals(watched) && p.IsSpectating(watched))
 			.Select(p => p.Controller.PlayerName)
 			.ToList();
 

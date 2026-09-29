@@ -6,27 +6,13 @@ namespace SurfTimer;
 public partial class SurfTimer
 {
 	/// <summary>
-	/// Handler for trigger end touch hook - CBaseTrigger_EndTouchFunc.
-	/// 
-	/// Sometimes this gets triggered when a player joins the server (for the 2nd time) so we assign `client` to `null` to bypass the error.
-	/// - T
+	/// Handler for trigger end touch hook - CBaseTrigger_EndTouchFunc. Also fires for pawns without a
+	/// controller (e.g. a bot being kicked, a player rejoining) - those are ignored.
 	/// </summary>
 	internal HookResult OnTriggerEndTouch(CEntityIOOutput output, string name, CEntityInstance activator, CEntityInstance caller, CVariant value, float delay)
 	{
 		CBaseTrigger trigger = new CBaseTrigger(caller.Handle);
-		CBaseEntity entity = new CBaseEntity(activator.Handle);
-		CCSPlayerController client = null!;
-
-		try
-		{
-			client = new CCSPlayerController(new CCSPlayerPawn(entity.Handle).Controller.Value!.Handle);
-		}
-		catch (Exception ex)
-		{
-			_logger.LogError(ex, "[{ClassName}] OnTriggerEndTouch -> Could not assign `client` (name: {Name}). Exception: {Exception}",
-				nameof(SurfTimer), name, ex.Message
-			);
-		}
+		CCSPlayerController? client = ControllerOfActivator(activator);
 
 		if (client == null || !client.IsValid || client.UserId == -1 || !playerList.TryGetValue(client.UserId ?? 0, out Player? player))
 			return HookResult.Continue;
