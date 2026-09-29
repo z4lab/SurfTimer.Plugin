@@ -18,7 +18,7 @@ public partial class SurfTimer
 				SaveChatSettings(ctx, "enabled", on ? "on" : "off");
 			}),
 			ctx.Ask("Format", settings.Format, "type in chat",
-				"Type the chat format in chat - it needs {name} and {message}, e.g. {rank} ~ {name}: {message}", text =>
+				"Type the chat format in chat - it needs {name} and {message}. Also: {rank} {ranknum} {points} {country} {team} {prefix} and colors like {grey}. e.g. {grey}[{country}] {rank} ~ {name}: {message}", text =>
 				{
 					if (!ChatSettings.IsValidFormat(text))
 						return "The format needs {name} and {message} (max 128 characters)";
@@ -26,6 +26,7 @@ public partial class SurfTimer
 					SaveChatSettings(ctx, "format", text);
 					return null;
 				}),
+			PanelContext.Info("Placeholders", "", "{rank} {ranknum} {points} {name} {message} {country} {team} {prefix} {grey} ..."),
 			ctx.Act("Reset format", "", ChatSettings.DefaultFormat, () =>
 			{
 				settings.Format = ChatSettings.DefaultFormat;

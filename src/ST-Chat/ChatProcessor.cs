@@ -200,13 +200,32 @@ public partial class SurfTimer
 		string prefix = string.Join(" ", prefixes.Where(p => p.Length > 0));
 		string prefixText = prefix.Length > 0 ? $"{ChatColors.Grey}{prefix}{ChatColors.Default}" : "";
 
-		// Tokens are replaced once, so braces typed in the message stay text
+		// Country code from the GeoIP lookup on connect - "XX" (unknown) and "LL" (local network) aren't real ones
+		string? countryCode = player?.Profile.Country;
+		string country = countryCode is { Length: 2 } && countryCode != "XX" && countryCode != "LL"
+			? countryCode.ToUpperInvariant()
+			: settings.UnknownCountry;
+
+		string teamText = sender.Team switch
+		{
+			CsTeam.CounterTerrorist => "CT",
+			CsTeam.Terrorist => "T",
+			CsTeam.Spectator => "SPEC",
+			_ => "",
+		};
+
+		// Tokens are replaced once, so braces typed in the message stay text. Plain values ({country},
+		// {team}, {points}, {ranknum}) have no color of their own - color them in the format, e.g. {grey}[{country}]
 		string line = FormatToken.Replace(settings.Format, match => match.Groups[1].Value.ToLowerInvariant() switch
 		{
 			"rank" => rankText,
+			"ranknum" => rank?.ToString() ?? "-",
+			"points" => (player?.Profile.ServerPoints ?? 0).ToString("N0", System.Globalization.CultureInfo.InvariantCulture),
 			"name" => nameText,
 			"message" => $"{ChatColors.Default}{text}",
 			"prefix" => prefixText,
+			"country" => country,
+			"team" => teamText,
 			string color when ChatSettings.Colors.TryGetValue(color, out char c) => c.ToString(),
 			_ => match.Value,
 		});
@@ -260,7 +279,7 @@ public partial class SurfTimer
 				Server.NextFrame(() =>
 				{
 					foreach (var player in online)
-						player.Profile.ServerRank = ranks.TryGetValue(player.Profile.ID, out int rank) ? rank : null;
+						player.Profile.SetServerRank(ranks.TryGetValue(player.Profile.ID, out var standing) ? standing : null);
 				});
 			}
 			catch (Exception ex)

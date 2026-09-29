@@ -1,9 +1,10 @@
 {
 	"enabled": true,
-	"format": "{rank} ~ {name}: {message}",
+	"format": "{grey}[{country}] {rank} {name}: {message}",
 	"team_prefix": "(Team)",
 	"spectator_prefix": "*SPEC*",
 	"dead_prefix": "*DEAD*",
+	"unknown_country": "--",
 	"rank_colors": {
 		"1": "gold",
 		"2": "silver",

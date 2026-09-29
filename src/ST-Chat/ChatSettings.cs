@@ -8,6 +8,9 @@ namespace SurfTimer;
 /// <summary>
 /// cfg/SurfTimer/chat_settings.json - the chat processor's format, colors, role flags and anti-spam.
 /// Created with the defaults when missing; changed through !admin (Server - Chat).
+/// Format placeholders: {rank} (colored [#n] / [-]), {ranknum}, {points}, {name} (colored), {message},
+/// {country} (ISO code, unknown_country if unknown), {team} (CT / T / SPEC), {prefix} (team / spec /
+/// dead tags) and color names like {grey}.
 /// </summary>
 internal sealed class ChatSettings
 {
@@ -19,6 +22,8 @@ internal sealed class ChatSettings
 	[JsonPropertyName("team_prefix")] public string TeamPrefix { get; set; } = "(Team)";
 	[JsonPropertyName("spectator_prefix")] public string SpectatorPrefix { get; set; } = "*SPEC*";
 	[JsonPropertyName("dead_prefix")] public string DeadPrefix { get; set; } = "*DEAD*";
+	/// <summary>{country} for players without a known country (GeoIP failed / local network)</summary>
+	[JsonPropertyName("unknown_country")] public string UnknownCountry { get; set; } = "--";
 	[JsonPropertyName("rank_colors")] public RankColorSettings RankColors { get; set; } = new();
 	[JsonPropertyName("name_colors")] public NameColorSettings NameColors { get; set; } = new();
 	[JsonPropertyName("flags")] public FlagSettings Flags { get; set; } = new();

@@ -209,23 +209,24 @@ internal static class PlayerRepository
 	{
 		public int PlayerId { get; set; }
 		public long Rank { get; set; }
+		public long Points { get; set; }
 	}
 
 	/// <summary>
-	/// Server rank by points (normal style) of the given players - players without points aren't in the
+	/// Server rank and points (normal style) of the given players - players without points aren't in the
 	/// result. Same rank rule as !profile: strictly more points + 1.
 	/// </summary>
-	internal static async Task<Dictionary<int, int>> GetServerRanksAsync(IReadOnlyCollection<int> playerIds)
+	internal static async Task<Dictionary<int, (int Rank, long Points)>> GetServerRanksAsync(IReadOnlyCollection<int> playerIds)
 	{
 		if (playerIds.Count == 0)
-			return new Dictionary<int, int>();
+			return new Dictionary<int, (int Rank, long Points)>();
 
 		var rows = await SurfTimer.DB.QueryAsync<RankRow>(@"
-			SELECT ps.`player_id`,
+			SELECT ps.`player_id`, ps.`points`,
 				(SELECT COUNT(*) FROM `{p}player_stats` o WHERE o.`style_id` = 0 AND o.`points` > ps.`points`) + 1 AS `Rank`
 			FROM `{p}player_stats` ps
 			WHERE ps.`style_id` = 0 AND ps.`points` > 0 AND ps.`player_id` IN @Ids", new { Ids = playerIds });
-		return rows.ToDictionary(r => r.PlayerId, r => (int)r.Rank);
+		return rows.ToDictionary(r => r.PlayerId, r => ((int)r.Rank, r.Points));
 	}
 
 	// ---- Timer bans ----

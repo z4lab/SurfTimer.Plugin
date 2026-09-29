@@ -15,6 +15,9 @@ public class PlayerProfile : PlayerProfileEntity
 	/// <summary>Server rank by points (null = no points) - shown in chat, refreshed after points change</summary>
 	internal int? ServerRank { get; set; }
 
+	/// <summary>Points (normal style) - refreshed together with ServerRank</summary>
+	internal long ServerPoints { get; set; }
+
 	/// <summary>Active timer ban (loaded on connect, kept up to date by the admin panel)</summary>
 	internal PlayerRepository.BanRow? Ban { get; set; }
 
@@ -43,8 +46,15 @@ public class PlayerProfile : PlayerProfileEntity
 		profile.SessionId = await PlayerRepository.OpenSessionAsync(profile.ID, mapId);
 		profile.Settings = await PlayerRepository.GetSettingsAsync(profile.ID);
 		profile.Ban = await PlayerRepository.GetActiveBanAsync(profile.ID);
-		profile.ServerRank = (await PlayerRepository.GetServerRanksAsync([profile.ID])).TryGetValue(profile.ID, out int rank) ? rank : null;
+		profile.SetServerRank((await PlayerRepository.GetServerRanksAsync([profile.ID])).TryGetValue(profile.ID, out var standing) ? standing : null);
 		return profile;
+	}
+
+	/// <summary>Rank and points from GetServerRanksAsync - null means no points (unranked)</summary>
+	internal void SetServerRank((int Rank, long Points)? standing)
+	{
+		ServerRank = standing?.Rank;
+		ServerPoints = standing?.Points ?? 0;
 	}
 
 	/// <summary>
