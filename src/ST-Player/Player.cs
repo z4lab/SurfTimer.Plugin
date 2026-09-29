@@ -367,4 +367,78 @@ public class Player
 		Extensions.Teleport(pawn, null, null, velocity);
 		return true;
 	}
+
+	// ---- Idle checker ----
+
+	private int _lastActivityTick = Server.TickCount;
+	private float _lastIdleX, _lastIdleY, _lastIdleZ, _lastIdlePitch, _lastIdleYaw;
+
+	/// <summary>No movement, input or looking around for Config.IdleThresholdSeconds</summary>
+	internal bool IsIdle { get; private set; }
+
+	/// <summary>
+	/// Idle checker (every tick, alive players): after Config.IdleThresholdSeconds without movement, input
+	/// or view changes the replay recording is stopped and its frames freed. The timer keeps running - a
+	/// run that was idle saves without a replay. In a start zone recording restarts as soon as the
+	/// player is active again.
+	/// </summary>
+	internal void TickIdle()
+	{
+		var pawn = this.Controller.PlayerPawn.Value;
+		if (pawn == null || !pawn.IsValid || pawn.AbsOrigin == null)
+			return;
+
+		var pos = pawn.AbsOrigin;
+		var angles = pawn.EyeAngles;
+		float dx = pos.X - _lastIdleX, dy = pos.Y - _lastIdleY, dz = pos.Z - _lastIdleZ;
+		bool moved = dx * dx + dy * dy + dz * dz > 1f;
+		bool turned = MathF.Abs(angles.X - _lastIdlePitch) > 0.1f || MathF.Abs(angles.Y - _lastIdleYaw) > 0.1f;
+		bool input = this.Controller.Buttons != 0;
+		(_lastIdleX, _lastIdleY, _lastIdleZ, _lastIdlePitch, _lastIdleYaw) = (pos.X, pos.Y, pos.Z, angles.X, angles.Y);
+
+		int now = Server.TickCount;
+		var recorder = this.ReplayRecorder;
+
+		if (moved || turned || input)
+		{
+			_lastActivityTick = now;
+			if (this.IsIdle)
+			{
+				this.IsIdle = false;
+				// Back from idle before a run - the next run gets a replay
+				if (!this.Timer.IsRunning)
+					RestartRecordingInStartZone();
+			}
+		}
+
+		// A run whose recording was dropped is over once its timer stops - record again from the next start
+		if (recorder.DroppedForRun && !this.Timer.IsRunning)
+		{
+			recorder.ClearDropped();
+			RestartRecordingInStartZone();
+		}
+
+		int threshold = Config.IdleThresholdSeconds;
+		if (threshold <= 0 || this.IsIdle || now - _lastActivityTick < threshold * 64)
+			return;
+
+		// A scheduled save still trims these frames - try again next tick
+		if (recorder.IsSaving)
+			return;
+
+		this.IsIdle = true;
+		if (this.Timer.IsRunning)
+			recorder.DropForRun();
+		else
+			recorder.StopAndFree();
+	}
+
+	private void RestartRecordingInStartZone()
+	{
+		if (!this.IsTouchingAnyStartZone || this.ReplayRecorder.IsSaving)
+			return;
+
+		this.ReplayRecorder.Reset();
+		this.ReplayRecorder.Start();
+	}
 }

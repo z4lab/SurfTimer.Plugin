@@ -15,6 +15,12 @@ public class ReplayRecorder
 	}
 
 	public bool IsRecording { get; set; } = false;
+
+	/// <summary>
+	/// The idle checker dropped this run's recording - nothing is recorded (Start does nothing) and the
+	/// run saves without a replay, until Reset starts a new run.
+	/// </summary>
+	internal bool DroppedForRun { get; private set; }
 	private int _pendingSaves = 0;
 	/// <summary>
 	/// True while any delayed run save is scheduled or in flight - resets are blocked so the
@@ -46,6 +52,7 @@ public class ReplayRecorder
 
 	internal void Reset([CallerMemberName] string methodName = "")
 	{
+		this.DroppedForRun = false;
 		this.IsRecording = false;
 		this.Frames.Clear();
 		this.StageEnterSituations.Clear();
@@ -64,6 +71,10 @@ public class ReplayRecorder
 
 	internal void Start([CallerMemberName] string methodName = "")
 	{
+		// The run's recording was dropped (idle) - it stays off until Reset starts a new run
+		if (this.DroppedForRun)
+			return;
+
 		this.IsRecording = true;
 
 #if DEBUG
@@ -83,6 +94,35 @@ public class ReplayRecorder
 		);
 #endif
 	}
+
+	/// <summary>
+	/// Stops recording and releases the recorded frames - a new list, so the large backing array is left
+	/// to the garbage collector (Clear would keep its capacity).
+	/// </summary>
+	internal void StopAndFree()
+	{
+		this.IsRecording = false;
+		this.Frames = new List<ReplayFrame>();
+		this.StageEnterSituations.Clear();
+		this.StageExitSituations.Clear();
+		this.CheckpointEnterSituations.Clear();
+		this.CheckpointExitSituations.Clear();
+		this.MapSituations.Clear();
+		this.BonusSituations.Clear();
+		this.CurrentSituation = ReplayFrameSituation.NONE;
+	}
+
+	/// <summary>
+	/// Idle during a run: no replay for this run - recording stays off until the next Reset.
+	/// </summary>
+	internal void DropForRun()
+	{
+		StopAndFree();
+		this.DroppedForRun = true;
+	}
+
+	/// <summary>The run has ended (timer not running any more) - the next Start may record again</summary>
+	internal void ClearDropped() => this.DroppedForRun = false;
 
 	internal void Tick(Player player, [CallerMemberName] string methodName = "")
 	{

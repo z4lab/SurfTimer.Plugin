@@ -33,6 +33,7 @@ public partial class SurfTimer
 				{
 					player.Timer.Tick();
 					player.ReplayRecorder.Tick(player);
+					player.TickIdle();
 					player.TickStartZoneSpeedCap();
 					player.TickRemoveLandingSlowdown();
 					player.TickSync();

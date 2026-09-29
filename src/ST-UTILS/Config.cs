@@ -107,7 +107,14 @@ public static class Config
 		StartExitSpeedLimit = TimerSettings.GetInt("start_exit_speed_limit", 600);
 		ReplayPoolCap = Math.Clamp(TimerSettings.GetInt("replay_pool_cap", 5), 1, 10);
 		ReplayPermanentMapBot = TimerSettings.GetBool("replay_permanent_map_bot", false);
+		IdleThresholdSeconds = Math.Max(0, TimerSettings.GetInt("idle_threshold_seconds", 60));
 	}
+
+	/// <summary>
+	/// Seconds without movement, input or looking around after which a player's replay recording is
+	/// stopped and freed (0 = off). The timer keeps running.
+	/// </summary>
+	public static int IdleThresholdSeconds { get; private set; } = Math.Max(0, TimerSettings.GetInt("idle_threshold_seconds", 60));
 
 	/// <summary>
 	/// Maximum number of requested replay bots at a time (!replay) - the permanent map bot isn't counted.

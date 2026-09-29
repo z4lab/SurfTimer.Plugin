@@ -196,6 +196,8 @@ public partial class SurfTimer
 			});
 		}).ToList();
 
+		rows.Add(ctx.Nav("Idle threshold", Config.IdleThresholdSeconds <= 0 ? "off" : $"{Config.IdleThresholdSeconds} s", "stops replay recording of idle players",
+			() => AdminNumberSettingPage("Idle threshold", "idle_threshold_seconds", () => Config.IdleThresholdSeconds, [10, 60], 0, 3600, " s")));
 		rows.Add(ctx.Nav("Replay bots max", Config.ReplayPoolCap.ToString(), "requested bots at a time",
 			() => AdminNumberSettingPage("Replay bots max", "replay_pool_cap", () => Config.ReplayPoolCap, [1], 1, 10, "")));
 

@@ -118,7 +118,9 @@ public class CurrentRun : RunStatsEntity
 
 		// Everything from the live run is taken here, on the main thread, before the first await.
 		// No replay when replays are off globally or for this map.
-		bool storeReplay = Config.ReplaysEnabled && map.RecordReplays;
+		// No replay either when the idle checker dropped this run's recording.
+		bool storeReplay = Config.ReplaysEnabled && map.RecordReplays
+			&& !player.ReplayRecorder.DroppedForRun && player.ReplayRecorder.Frames.Count > 0;
 		var frames = !storeReplay ? new List<ReplayFrame>() : player.ReplayRecorder.TrimReplay(
 			player,
 			type: recType,
