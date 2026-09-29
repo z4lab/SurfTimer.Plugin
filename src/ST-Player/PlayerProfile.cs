@@ -12,6 +12,9 @@ public class PlayerProfile : PlayerProfileEntity
 	internal Dictionary<string, string> Settings { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
 
 
+	/// <summary>Server rank by points (null = no points) - shown in chat, refreshed after points change</summary>
+	internal int? ServerRank { get; set; }
+
 	/// <summary>Active timer ban (loaded on connect, kept up to date by the admin panel)</summary>
 	internal PlayerRepository.BanRow? Ban { get; set; }
 
@@ -40,6 +43,7 @@ public class PlayerProfile : PlayerProfileEntity
 		profile.SessionId = await PlayerRepository.OpenSessionAsync(profile.ID, mapId);
 		profile.Settings = await PlayerRepository.GetSettingsAsync(profile.ID);
 		profile.Ban = await PlayerRepository.GetActiveBanAsync(profile.ID);
+		profile.ServerRank = (await PlayerRepository.GetServerRanksAsync([profile.ID])).TryGetValue(profile.ID, out int rank) ? rank : null;
 		return profile;
 	}
 

@@ -29,6 +29,7 @@ public partial class SurfTimer
 			ctx.Nav("Change map", CurrentMap?.Name ?? "", "recent maps, workshop id", AdminChangeMapPage),
 			ctx.Nav("Replay bots", $"{playing} / {slots} playing", "", AdminBotsPage),
 			ctx.Nav("Timer settings", "", "saved to timer_settings.json", AdminTimerSettingsPage),
+			ctx.Nav("Chat", ChatSettings.Current.Enabled ? "on" : "off", "format, colors, anti-spam", AdminChatPage),
 		};
 
 		if (CurrentMap != null)

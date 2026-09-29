@@ -109,6 +109,9 @@ internal static class PointsService
 				}
 			});
 
+			// Ranks shown in chat move with the points
+			SurfTimer.QueueServerRankRefresh();
+
 #if DEBUG
 			Logger.LogDebug("[PointsService] Map {MapId} style {Style}: {Rows} point rows, {Affected} totals updated",
 				mapId, style, rows.Count, affected.Count);

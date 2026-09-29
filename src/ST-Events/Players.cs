@@ -252,6 +252,7 @@ public partial class SurfTimer
 			{
 				int userId = player.UserId ?? 0;
 				ChatPrompt.Forget(userId);
+				ForgetChatSpam(userId);
 
 				if (playerList.TryGetValue(userId, out var playerData))
 				{

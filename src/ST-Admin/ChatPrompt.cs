@@ -39,7 +39,8 @@ internal static class ChatPrompt
 	internal static void ForgetAll() => _pending.Clear();
 
 	/// <summary>
-	/// say / say_team listener - swallows the message of a player with an open prompt.
+	/// Takes the message of a player with an open prompt (called first by the chat processor's
+	/// say / say_team listener) - Continue when there's no prompt.
 	/// </summary>
 	internal static HookResult OnSay(CCSPlayerController? player, CommandInfo info)
 	{
@@ -73,14 +74,5 @@ internal static class ChatPrompt
 			player.PrintToChat($"{Config.PluginPrefix} {ChatColors.Red}{error}{ChatColors.Default} {LocalizationService.LocalizerNonNull["prompt_cancel_hint"]}");
 		}
 		return HookResult.Handled;
-	}
-
-	/// <summary>
-	/// Registers the say listeners - called from Load.
-	/// </summary>
-	internal static void Register(BasePlugin plugin)
-	{
-		plugin.AddCommandListener("say", OnSay, HookMode.Pre);
-		plugin.AddCommandListener("say_team", OnSay, HookMode.Pre);
 	}
 }

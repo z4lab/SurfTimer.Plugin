@@ -203,6 +203,31 @@ internal static class PlayerRepository
 			LEFT JOIN `{p}player_stats` ps ON ps.`player_id` = @PlayerId AND ps.`style_id` = @Style",
 			new { PlayerId = playerId, Style = style }) ?? new SummaryRow();
 
+	// ---- Server rank (chat) ----
+
+	private sealed class RankRow
+	{
+		public int PlayerId { get; set; }
+		public long Rank { get; set; }
+	}
+
+	/// <summary>
+	/// Server rank by points (normal style) of the given players - players without points aren't in the
+	/// result. Same rank rule as !profile: strictly more points + 1.
+	/// </summary>
+	internal static async Task<Dictionary<int, int>> GetServerRanksAsync(IReadOnlyCollection<int> playerIds)
+	{
+		if (playerIds.Count == 0)
+			return new Dictionary<int, int>();
+
+		var rows = await SurfTimer.DB.QueryAsync<RankRow>(@"
+			SELECT ps.`player_id`,
+				(SELECT COUNT(*) FROM `{p}player_stats` o WHERE o.`style_id` = 0 AND o.`points` > ps.`points`) + 1 AS `Rank`
+			FROM `{p}player_stats` ps
+			WHERE ps.`style_id` = 0 AND ps.`points` > 0 AND ps.`player_id` IN @Ids", new { Ids = playerIds });
+		return rows.ToDictionary(r => r.PlayerId, r => (int)r.Rank);
+	}
+
 	// ---- Timer bans ----
 
 	internal sealed class BanRow

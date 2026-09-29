@@ -1,0 +1,31 @@
+{
+  "enabled": true,
+  "format": "{rank} ~ {name}: {message}",
+  "team_prefix": "(Team)",
+  "spectator_prefix": "*SPEC*",
+  "dead_prefix": "*DEAD*",
+  "rank_colors": {
+    "1": "gold",
+    "2": "silver",
+    "3": "orange",
+    "top10": "lightblue",
+    "other": "grey",
+    "unranked": "grey"
+  },
+  "name_colors": {
+    "root": "red",
+    "admin": "purple",
+    "vip": "lime",
+    "default": "team"
+  },
+  "flags": {
+    "root": "@css/root",
+    "admin": "@css/generic",
+    "vip": "@css/reservation"
+  },
+  "antispam": {
+    "enabled": true,
+    "min_gap_seconds": 1.0,
+    "duplicate_window_seconds": 10
+  }
+}

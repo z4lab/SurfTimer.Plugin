@@ -126,6 +126,14 @@ public partial class SurfTimer : BasePlugin
 	}
 
 	/* ========== PLUGIN LOAD ========== */
+	/// <summary>
+	/// Other plugins' APIs are available now - CS2-SimpleAdmin's gags for the chat processor.
+	/// </summary>
+	public override void OnAllPluginsLoaded(bool hotReload)
+	{
+		SimpleAdminGags.Resolve(_logger);
+	}
+
 	public override void Load(bool hotReload)
 	{
 		_instance = this;
@@ -173,8 +181,10 @@ public partial class SurfTimer : BasePlugin
 		// Hiding players / bots per viewer, and undoing maps that hide players (see Visibility.cs)
 		RegisterListener<Listeners.CheckTransmit>(OnCheckTransmit);
 		AddTimer(0.5f, EnforcePlayerVisibility, CounterStrikeSharp.API.Modules.Timers.TimerFlags.REPEAT);
-		// Chat input for the admin panel (see ChatPrompt.cs)
-		ChatPrompt.Register(this);
+		// Player chat: formatted lines, hidden commands, admin panel prompts (see ST-Chat/ChatProcessor.cs)
+		RegisterChatProcessor();
+		// Ranks shown in chat - also refreshed whenever points change
+		AddTimer(300f, QueueServerRankRefresh, CounterStrikeSharp.API.Modules.Timers.TimerFlags.REPEAT);
 		// Timer bans that ran out: times shown again - now and every hour
 		LiftExpiredBans();
 		AddTimer(3600f, LiftExpiredBans, CounterStrikeSharp.API.Modules.Timers.TimerFlags.REPEAT);
