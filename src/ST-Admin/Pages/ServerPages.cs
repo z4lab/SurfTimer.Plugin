@@ -41,16 +41,27 @@ public partial class SurfTimer
 				{
 					c.Audit("restart map", "map", CurrentMap.ID, name);
 					c.Player.HUD.CloseMenu();
-					if (workshopId != null)
-						ChangeToWorkshopMap(workshopId.Value, name);
-					else
-						ChangeLevelTo(name);
+					RestartCurrentMap();
 				})));
 		}
 		return rows;
 	});
 
 	// ---- Map change (also used by !map) ----
+
+	/// <summary>
+	/// Loads the current map again (by workshop id when known, else by name from the collection).
+	/// </summary>
+	internal void RestartCurrentMap()
+	{
+		if (CurrentMap?.Name == null)
+			return;
+
+		if (CurrentMap.WorkshopId is ulong workshopId)
+			ChangeToWorkshopMap(workshopId, CurrentMap.Name);
+		else
+			ChangeLevelTo(CurrentMap.Name);
+	}
 
 	private static readonly Regex MapNamePattern = new("^[A-Za-z0-9_\\-]+$", RegexOptions.Compiled);
 

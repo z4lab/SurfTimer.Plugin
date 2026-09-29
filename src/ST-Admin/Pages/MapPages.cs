@@ -212,6 +212,7 @@ public partial class SurfTimer
 	private static readonly HashSet<string> KnownMapSettings = new(StringComparer.OrdinalIgnoreCase)
 	{
 		Map.SettingStagedLinear, Map.SettingStartSpeedCap, Map.SettingReplays, Map.SettingExitLimit, Map.SettingExitLimitValue,
+		Map.SettingStagesAsCheckpoints,
 	};
 
 	private static bool IsCustomMapSetting(string key) =>
@@ -247,13 +248,28 @@ public partial class SurfTimer
 		int cvars = map.Settings.Keys.Count(k => k.StartsWith(MapCvars.SettingPrefix, StringComparison.OrdinalIgnoreCase));
 		int custom = map.Settings.Keys.Count(IsCustomMapSetting);
 
-		return
-		[
-			ctx.Toggle("Staged linear", map.StagedLinear, "checkpoints count as stages", on =>
+		var rows = new List<HudMenuItem>();
+
+		// Only maps with stage zones (sN_start) have these two modes
+		if (map.StageZoneCount > 0)
+		{
+			if (!map.StagesAsCheckpoints)
 			{
-				AdminSetMapSetting(ctx, Map.SettingStagedLinear, on ? "1" : null);
-				ctx.Session.Status = on ? "Staged linear on (applies to new runs)" : "Staged linear off";
-			}),
+				rows.Add(ctx.Toggle("Staged linear", map.StagedLinear, "stages kept, no speed cap in stage starts 2+", on =>
+				{
+					AdminSetMapSetting(ctx, Map.SettingStagedLinear, on ? "1" : null);
+					ctx.Session.Status = on ? "Staged linear on (applies to new runs)" : "Staged linear off";
+				}));
+			}
+
+			rows.Add(ctx.Nav("Stages as checkpoints", map.StagesAsCheckpoints ? "ON" : "OFF",
+				map.StagesAsCheckpoints ? "map is linear - stage starts are checkpoints" : "turn the stages into checkpoints (linear map)",
+				() => AdminStagesAsCheckpointsConfirm(!map.StagesAsCheckpoints)) with
+			{ Style = map.StagesAsCheckpoints ? HudMenuItemStyle.On : HudMenuItemStyle.Off });
+		}
+
+		rows.AddRange(
+		[
 			ctx.Nav("Start speed cap", cap, "bhop cap in start zones", AdminSpeedCapPage),
 			ctx.Toggle("Exit speed limit", map.ExitLimitEnabled, "caps speed leaving run starts", on =>
 			{
@@ -269,8 +285,60 @@ public partial class SurfTimer
 			}),
 			ctx.Nav("Cvars", cvars == 0 ? "none" : $"{cvars} set", "movement cvars for this map", AdminCvarsPage),
 			ctx.Nav("Custom keys", custom.ToString(), "free key / value notes", AdminCustomKeysPage),
-		];
+		]);
+		return rows;
 	});
+
+	/// <summary>
+	/// Switching "stages as checkpoints" changes the map's structure: the records of the mode being left
+	/// (stage times, or the checkpoint segment times of the converted map) are deleted and the map
+	/// restarts in the new mode. Map times stay - their splits line up (stage N start = checkpoint N-1).
+	/// </summary>
+	private PanelPage AdminStagesAsCheckpointsConfirm(bool enable)
+	{
+		var map = CurrentMap;
+		var leftKind = enable ? CourseKind.Stage : CourseKind.Checkpoint;
+		var scope = new TimeRepository.WipeScope(MapId: map.ID, KindId: (byte)leftKind);
+		string what = enable ? "stage records" : "checkpoint segment records";
+
+		return PanelContext.Confirm(enable ? "Stages as checkpoints" : "Back to stages", ctx =>
+		{
+			var preview = ctx.Load("preview", () => TimeRepository.PreviewWipeAsync(scope));
+			if (preview == null)
+				return [PanelContext.LoadingRow()];
+
+			return
+			[
+				PanelContext.Info(enable ? "Map becomes linear" : "Map gets its stages back", "", "applies after a map restart"),
+				PanelContext.Info($"Deletes {what}", AdminFormat.Number(preview.Times), $"{AdminFormat.Number(preview.Players)} players"),
+				PanelContext.Info("Replays", AdminFormat.Number(preview.Replays), AdminFormat.Bytes(preview.ReplayBytes)),
+				PanelContext.Info("Run history", AdminFormat.Number(preview.History)),
+				PanelContext.Info("Map records", "kept"),
+				PanelContext.Info("Map restarts", map.Name ?? "", "everyone's running times are lost"),
+			];
+		}, enable ? "Convert and restart" : "Revert and restart", ctx =>
+		{
+			ctx.Audit("stages as checkpoints", "map", map.ID, $"{map.Name}: {(enable ? "on" : "off")} - {what} deleted");
+			ctx.Run($"Deleting {what}…", async () =>
+			{
+				var affected = await TimeRepository.WipeAsync(scope);
+				if (enable)
+					await MapRepository.SetSettingAsync(map.ID, Map.SettingStagesAsCheckpoints, "1");
+				else
+					await MapRepository.DeleteSettingAsync(map.ID, Map.SettingStagesAsCheckpoints);
+				await AdminAfterTimesChangedAsync(affected);
+				return $"Deleted {affected.Times} time(s) - restarting the map";
+			}, status =>
+			{
+				ctx.Done(status);
+				if (!status.StartsWith("Failed"))
+				{
+					ctx.Player.HUD.CloseMenu();
+					RestartCurrentMap();
+				}
+			});
+		});
+	}
 
 	private PanelPage AdminSpeedCapPage() => new("Start speed cap", ctx =>
 	{

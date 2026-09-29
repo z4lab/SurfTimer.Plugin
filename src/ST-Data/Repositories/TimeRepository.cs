@@ -314,7 +314,7 @@ internal static class TimeRepository
 	/// What a delete / wipe covers - one time, a course, a map and / or a player's times. Wipes (all but a
 	/// single time) also delete the run history of what they cover.
 	/// </summary>
-	internal sealed record WipeScope(int? TimeId = null, int? CourseId = null, int? MapId = null, int? PlayerId = null)
+	internal sealed record WipeScope(int? TimeId = null, int? CourseId = null, int? MapId = null, int? PlayerId = null, byte? KindId = null)
 	{
 		internal bool IncludesHistory => TimeId == null;
 
@@ -325,6 +325,7 @@ internal static class TimeRepository
 			if (CourseId != null) parts.Add($"{times}.`course_id` = @CourseId");
 			if (MapId != null) parts.Add($"{courses}.`map_id` = @MapId");
 			if (PlayerId != null) parts.Add($"{times}.`player_id` = @PlayerId");
+			if (KindId != null) parts.Add($"{courses}.`kind_id` = @KindId");
 			return parts.Count == 0 ? "1 = 0" : string.Join(" AND ", parts); // Never "everything"
 		}
 	}

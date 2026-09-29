@@ -66,9 +66,27 @@ public partial class SurfTimer : BasePlugin
 			Server.NextWorldUpdateAsync(async () => // NextWorldUpdate runs even during server hibernation
 			{
 				_logger.LogInformation($"[CS2 Surf] {Config.PluginName} {ModuleVersion} - loading map {mapName}");
-				CurrentMap = new Map(mapName);
+				CurrentMap = new Map(mapName, LoadStagesAsCheckpoints(mapName));
 				await CurrentMap.InitializeAsync();
 			});
+		}
+	}
+
+	/// <summary>
+	/// The map's stages_as_checkpoints setting - needed before its zones are read, so it's loaded right
+	/// away (one small query; same as player connects, on the main thread). Off when it can't be read.
+	/// </summary>
+	private bool LoadStagesAsCheckpoints(string mapName)
+	{
+		try
+		{
+			string? value = Task.Run(() => MapRepository.GetSettingByNameAsync(mapName, Map.SettingStagesAsCheckpoints)).GetAwaiter().GetResult();
+			return value is "1" or "true";
+		}
+		catch (Exception ex)
+		{
+			_logger.LogError(ex, "[{Prefix}] Reading the zone mode of {Map} failed - loading it with stages", Config.PluginName, mapName);
+			return false;
 		}
 	}
 

@@ -69,13 +69,18 @@ public class Map : MapEntity
 	private readonly ILogger<Map> _logger;
 
 	// Constructor
-	internal Map(string name)
+	/// <param name="stagesAsCheckpoints">The map's stages_as_checkpoints setting - read before the zones load</param>
+	internal Map(string name, bool stagesAsCheckpoints = false)
 	{
 		// Resolve the logger instance from the DI container
 		_logger = SurfTimer.ServiceProvider.GetRequiredService<ILogger<Map>>();
 
 		// Set map name
 		this.Name = name;
+
+		// Stages as checkpoints decides how the zones are read - fixed until the map loads again
+		this.StagesAsCheckpoints = stagesAsCheckpoints;
+		ZoneName.StagesAsCheckpoints = stagesAsCheckpoints;
 
 		// Load zones
 		MapLoadZones();
@@ -162,7 +167,13 @@ public class Map : MapEntity
 			if (!ZoneName.TryParse(name, out ZoneType type, out short number))
 				continue;
 
+			if (type == ZoneType.StageStart)
+				this.StageZoneCount = Math.Max(this.StageZoneCount, number);
+
+			// Teleport targets by the map's own names (spawn_s2_start), then the zone mode
 			var (teleport, angles) = FindTeleportTarget(trigger, type, number, destinations);
+			if (!ZoneName.Remap(ref type, ref number))
+				continue;
 			var zone = new ZoneInfo(trigger.Index, name!, type, number, teleport, angles);
 
 			if (!this.Zones.TryGetValue((type, number), out var list))
@@ -246,6 +257,16 @@ public class Map : MapEntity
 	internal Dictionary<string, string> Settings { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
 
 	internal const string SettingStagedLinear = "staged_linear";
+	internal const string SettingStagesAsCheckpoints = "stages_as_checkpoints";
+
+	/// <summary>
+	/// The map was loaded with its stages as checkpoints (linear). Fixed per load - changing the setting
+	/// needs a map restart.
+	/// </summary>
+	internal bool StagesAsCheckpoints { get; }
+
+	/// <summary>Stage zones the map itself has (sN_start), whatever the zone mode</summary>
+	internal short StageZoneCount { get; private set; }
 	internal const string SettingStartSpeedCap = "start_speed_cap";
 	internal const string SettingReplays = "replays_enabled";
 	internal const string SettingExitLimit = "exit_speed_limit";

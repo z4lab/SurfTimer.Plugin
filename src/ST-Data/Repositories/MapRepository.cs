@@ -116,6 +116,14 @@ internal static class MapRepository
 			new { MapId = mapId }))
 		.ToDictionary(s => s.SettingKey, s => s.Value, StringComparer.OrdinalIgnoreCase);
 
+	/// <summary>
+	/// One setting of a map by its name (before the map's row is loaded) - null when unset or unknown map.
+	/// </summary>
+	internal static Task<string?> GetSettingByNameAsync(string mapName, string key) =>
+		SurfTimer.DB.QueryFirstOrDefaultAsync<string>(@"
+			SELECT ms.`value` FROM `{p}map_settings` ms JOIN `{p}maps` m ON m.`id` = ms.`map_id`
+			WHERE m.`name` = @Name AND ms.`setting_key` = @Key", new { Name = mapName, Key = key });
+
 	internal static Task SetSettingAsync(int mapId, string key, string value) =>
 		SurfTimer.DB.ExecuteAsync(@"
 			INSERT INTO `{p}map_settings` (`map_id`, `setting_key`, `value`, `updated_at`)

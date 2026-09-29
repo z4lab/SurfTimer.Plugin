@@ -27,7 +27,7 @@ internal sealed record ZoneInfo(uint TriggerIndex, string Name, ZoneType Type, s
 	{
 		zone = null!;
 		string? name = trigger.Entity?.Name;
-		if (!ZoneName.TryParse(name, out var type, out var number))
+		if (!ZoneName.TryParse(name, out var type, out var number) || !ZoneName.Remap(ref type, ref number))
 			return false;
 
 		zone = new ZoneInfo(trigger.Index, name!, type, number, trigger.AbsOrigin!.ToVector_t(), null);
@@ -53,6 +53,33 @@ internal static class ZoneName
 	private static readonly Regex Checkpoint = new($@"^map_c(?:p|heckpoint)([1-9][0-9]?){Suffix}$", Options);
 	private static readonly Regex BonusStart = new($@"^b(?:onus)?([1-9][0-9]?)_start{Suffix}$", Options);
 	private static readonly Regex BonusEnd = new($@"^b(?:onus)?([1-9][0-9]?)_end{Suffix}$", Options);
+
+	/// <summary>
+	/// The loaded map runs "stages as checkpoints" (map setting stages_as_checkpoints): stage starts
+	/// count as checkpoints and the map is linear. Set when the map object is created.
+	/// </summary>
+	internal static bool StagesAsCheckpoints { get; set; }
+
+	/// <summary>
+	/// Applies the map's zone mode to a parsed zone. With stages as checkpoints stage N's start is
+	/// checkpoint N-1 (stage 1 is the map start), and the map's own checkpoint zones are ignored so the
+	/// numbering stays unique. Returns false for a zone that doesn't count.
+	/// </summary>
+	public static bool Remap(ref ZoneType type, ref short number)
+	{
+		if (!StagesAsCheckpoints)
+			return true;
+
+		if (type == ZoneType.Checkpoint)
+			return false;
+
+		if (type == ZoneType.StageStart)
+		{
+			type = ZoneType.Checkpoint;
+			number = (short)(number - 1);
+		}
+		return true;
+	}
 
 	/// <summary>
 	/// Parses a trigger name into its zone role and number (map start = 1, map end = 0).
