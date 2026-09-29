@@ -60,6 +60,7 @@ public partial class SurfTimer
 		{
 			EnforceBotConVars();
 			UpdateScoreboard();
+			UpdateClanTags();
 		}
 
 		// Need to disable maps from executing their cfgs. Currently idk how (But seriusly it a security issue)

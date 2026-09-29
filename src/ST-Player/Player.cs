@@ -28,6 +28,9 @@ public class Player
 	// !options - client options (own legs, hiding players, chat, HUD), saved in player_settings
 	internal PlayerOptions Options { get; }
 
+	// Clan tag taken off while clan tags are disabled (see Scoreboard.cs) - put back when enabled again
+	internal string? HiddenClanTag { get; set; }
+
 	// !admin / !options - the open panels (tab, pages), kept while connected
 	internal PanelSession? Admin { get; set; }
 	internal PanelSession? OptionsPanel { get; set; }

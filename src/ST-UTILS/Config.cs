@@ -73,7 +73,7 @@ public static class Config
 	/// Timer settings the !admin panel can change live - written back to timer_settings.json.
 	/// </summary>
 	internal static readonly IReadOnlyList<string> LiveBoolSettings =
-		["popup_menus", "block_map_chat", "protect_replay_bots", "replay_bot_direct_spawn", "replays_enabled", "replay_permanent_map_bot"];
+		["popup_menus", "block_map_chat", "protect_replay_bots", "replay_bot_direct_spawn", "replays_enabled", "replay_permanent_map_bot", "clan_tags_enabled"];
 
 	internal static bool GetLiveBool(string key) => key switch
 	{
@@ -83,6 +83,7 @@ public static class Config
 		"replay_bot_direct_spawn" => ReplayBotDirectSpawn,
 		"replays_enabled" => ReplaysEnabled,
 		"replay_permanent_map_bot" => ReplayPermanentMapBot,
+		"clan_tags_enabled" => ClanTagsEnabled,
 		_ => false,
 	};
 
@@ -108,7 +109,13 @@ public static class Config
 		ReplayPoolCap = Math.Clamp(TimerSettings.GetInt("replay_pool_cap", 5), 1, 10);
 		ReplayPermanentMapBot = TimerSettings.GetBool("replay_permanent_map_bot", false);
 		IdleThresholdSeconds = Math.Max(0, TimerSettings.GetInt("idle_threshold_seconds", 60));
+		ClanTagsEnabled = TimerSettings.GetBool("clan_tags_enabled", true);
 	}
+
+	/// <summary>
+	/// Players' clan tags on the scoreboard - off clears them (and puts them back when turned on again).
+	/// </summary>
+	public static bool ClanTagsEnabled { get; private set; } = TimerSettings.GetBool("clan_tags_enabled", true);
 
 	/// <summary>
 	/// Seconds without movement, input or looking around after which a player's replay recording is

@@ -189,6 +189,7 @@ public partial class SurfTimer
 		["replay_bot_direct_spawn"] = ("Direct bot spawn", "CreateBot instead of bot_quota"),
 		["replays_enabled"] = ("Replays", "record and play replays"),
 		["replay_permanent_map_bot"] = ("Permanent map replay bot", "loops the map WR, not counted in the max"),
+		["clan_tags_enabled"] = ("Clan tags", "players' clan tags on the scoreboard"),
 	};
 
 	private PanelPage AdminTimerSettingsPage() => new("Timer settings", ctx =>
