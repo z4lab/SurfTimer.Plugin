@@ -54,9 +54,13 @@ public partial class SurfTimer
 			}
 		}
 
-		// Maps can change bot settings so bots can't join - set them back about once a second
+		// Maps can change bot settings so bots can't join - set them back about once a second.
+		// Scoreboard score = -rank (see Scoreboard.cs), kept in line at the same pace.
 		if (Server.TickCount % 64 == 0)
+		{
 			EnforceBotConVars();
+			UpdateScoreboard();
+		}
 
 		// Need to disable maps from executing their cfgs. Currently idk how (But seriusly it a security issue)
 		ConVar? bot_quota = ConVar.Find("bot_quota");
