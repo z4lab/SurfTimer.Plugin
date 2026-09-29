@@ -33,7 +33,40 @@ public partial class SurfTimer
 	[CommandHelper(whoCanExecute: CommandUsage.CLIENT_ONLY)]
 	public void GivePistol(CCSPlayerController? player, CommandInfo command)
 	{
-		if (player == null || !CanReceiveWeapon(player))
+		if (player != null)
+			GivePistolItem(player, DefaultPistol(player.Team));
+	}
+
+	[ConsoleCommand("css_usp", "Get a USP-S")]
+	[CommandHelper(whoCanExecute: CommandUsage.CLIENT_ONLY)]
+	public void GiveUsp(CCSPlayerController? player, CommandInfo command)
+	{
+		if (player != null)
+			GivePistolItem(player, "weapon_usp_silencer");
+	}
+
+	[ConsoleCommand("css_p2000", "Get a P2000")]
+	[CommandHelper(whoCanExecute: CommandUsage.CLIENT_ONLY)]
+	public void GiveP2000(CCSPlayerController? player, CommandInfo command)
+	{
+		if (player != null)
+			GivePistolItem(player, "weapon_hkp2000");
+	}
+
+	[ConsoleCommand("css_glock", "Get a Glock-18")]
+	[CommandHelper(whoCanExecute: CommandUsage.CLIENT_ONLY)]
+	public void GiveGlock(CCSPlayerController? player, CommandInfo command)
+	{
+		if (player != null)
+			GivePistolItem(player, "weapon_glock");
+	}
+
+	/// <summary>
+	/// Gives a pistol - only when the player is alive and doesn't carry one already.
+	/// </summary>
+	private static void GivePistolItem(CCSPlayerController player, string weapon)
+	{
+		if (!CanReceiveWeapon(player))
 			return;
 
 		if (WeaponInSlot(player, gear_slot_t.GEAR_SLOT_PISTOL) != null)
@@ -42,7 +75,7 @@ public partial class SurfTimer
 			return;
 		}
 
-		player.GiveNamedItem(DefaultPistol(player.Team));
+		player.GiveNamedItem(weapon);
 		player.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["weapon_given_pistol"]}");
 	}
 
