@@ -47,7 +47,8 @@ public partial class SurfTimer
 
 	/// <summary>
 	/// Teleports the player (velocity zeroed) to the nearest trigger of a zone - maps can have several
-	/// per zone (e.g. one per side of a course). Returns false if the map has no such zone.
+	/// per zone (e.g. one per side of a course) - or to their !startpos of that start zone. Returns false
+	/// if the map has no such zone.
 	/// </summary>
 	private bool TeleportToZone(CCSPlayerController player, ZoneType type, short number)
 	{
@@ -60,11 +61,21 @@ public partial class SurfTimer
 		if (zone == null)
 			return false;
 
+		// The player's own start position in this start zone (!startpos), if they set one
+		VectorT position = zone.Teleport;
+		QAngleT? angles = null;
+		if (playerList.TryGetValue(player.UserId ?? 0, out var oPlayer)
+			&& oPlayer.StartPositions.TryGetValue((type, number), out var startPos))
+		{
+			position = startPos.Position;
+			angles = startPos.Angles;
+		}
+
 		Server.NextFrame(() =>
 		{
 			var target = player.PlayerPawn.Value;
 			if (target != null && target.IsValid)
-				Extensions.Teleport(target, zone.Teleport, null, new VectorT(0, 0, 0));
+				Extensions.Teleport(target, position, angles, new VectorT(0, 0, 0));
 		});
 		return true;
 	}
