@@ -450,7 +450,9 @@ public partial class SurfTimer
 		player.ReplayRecorder.Start(); // Start replay recording
 		player.ReplayRecorder.CurrentSituation = ReplayFrameSituation.START_ZONE_ENTER;
 		player.ReplayRecorder.BonusSituations.Add(player.ReplayRecorder.Frames.Count);
+#if DEBUG
 		Console.WriteLine($"START_ZONE_ENTER: player.ReplayRecorder.BonusSituations.Add({player.ReplayRecorder.Frames.Count})");
+#endif
 
 		player.HUD.Notify($"Bonus Start ({zone.Name})");
 
