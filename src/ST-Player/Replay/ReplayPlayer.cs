@@ -30,6 +30,7 @@ public class ReplayPlayer
 
 	public int RecordRank { get; set; } = -1; // This is used to determine whether replay is for wr or for pb
 	public string RecordPlayerName { get; set; } = "N/A";
+	internal List<ReplayManager.BestSegmentPart>? BestSegmentParts { get; set; } // Best segments replay: its parts, for the HUD
 	internal int RecordPlayerId { get; set; } // players.id of whoever set the replayed run - 0 when unknown / several (best segments)
 	internal string? TrailColor { get; set; } // Trail color from the holder's rank group (Trails.cs), for TrailColorPlayerId
 	internal int TrailColorPlayerId { get; set; }
@@ -151,6 +152,7 @@ public class ReplayPlayer
 		this.RecordRank = source.RecordRank;
 		this.RecordPlayerName = source.RecordPlayerName;
 		this.RecordPlayerId = source.RecordPlayerId;
+		this.BestSegmentParts = source.BestSegmentParts;
 		this.RecordRunTime = source.RecordRunTime;
 		this.Frames = source.Frames;
 		this.StageEnterSituations = source.StageEnterSituations;

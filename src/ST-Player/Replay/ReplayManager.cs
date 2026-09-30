@@ -120,6 +120,9 @@ public class ReplayManager
 
 	internal static string BestSegmentsLabel => SurfTimer.CurrentMap.Stages > 0 ? "Best Stage WRs" : "Best Checkpoint WRs";
 
+	/// <summary>One segment WR inside the best segments replay - StartFrame is where it begins in the chained frames</summary>
+	internal sealed record BestSegmentPart(int Number, string Holder, int Time, int StartFrame);
+
 	/// <summary>
 	/// The WR replay of every segment in order - null unless every segment has one.
 	/// </summary>
@@ -171,9 +174,11 @@ public class ReplayManager
 			return null;
 
 		var frames = new List<ReplayFrame>();
+		var parts = new List<BestSegmentPart>(segments.Count);
 		for (int i = 0; i < segments.Count; i++)
 		{
 			var segment = segments[i];
+			parts.Add(new BestSegmentPart(i + 1, segment.RecordPlayerName, segment.RecordRunTime, frames.Count));
 			var (start, end) = segment.GetRunWindow();
 			bool first = i == 0;
 			bool last = i == segments.Count - 1;
@@ -214,6 +219,7 @@ public class ReplayManager
 			RecordPlayerName = BestSegmentsLabel,
 			RecordRunTime = segments.Sum(s => s.RecordRunTime),
 			Frames = frames,
+			BestSegmentParts = parts,
 		};
 	}
 

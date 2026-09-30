@@ -370,7 +370,11 @@ public class PlayerHud
 		var options = _player.Options;
 		SendCenter(subject, replay);
 		SendSlot(CustomHud.Top, options.HudTop ? TopRows(subject, replay) : []);
-		SendSlot(CustomHud.Left, options.HudSplits && subject != null ? SplitRows(subject) : []);
+		// Left: the run's splits - or, spectating the best segments bot, every segment WR it chains
+		var leftRows = subject != null ? SplitRows(subject)
+			: replay?.Type == ReplayManager.BestSegmentsType ? BestSegmentRows(replay)
+			: [];
+		SendSlot(CustomHud.Left, options.HudSplits ? leftRows : []);
 		// Spectators of whoever this HUD shows - ourselves while alive, else the watched player / replay bot
 		var watched = subject?.Controller ?? replay?.Controller;
 		SendSlot(CustomHud.Right, options.HudSpectators ? SpectatorRows(allPlayers, watched) : []);
@@ -760,6 +764,36 @@ public class PlayerHud
 			rows.Add(row);
 		}
 
+		return rows;
+	}
+
+	/// <summary>
+	/// The best segments replay's parts: every stage / checkpoint WR with its holder and time, the one
+	/// playing highlighted. More parts than lines: the list moves along, keeping the playing one centered.
+	/// </summary>
+	private List<List<HudElement>> BestSegmentRows(ReplayPlayer replay)
+	{
+		var parts = replay.BestSegmentParts;
+		if (parts == null || parts.Count == 0)
+			return [];
+
+		int frame = replay.PlayedFrameIndex;
+		int active = Math.Max(0, parts.FindLastIndex(p => p.StartFrame <= frame));
+		int first = Math.Clamp(active - MaxSplitLines / 2, 0, Math.Max(0, parts.Count - MaxSplitLines));
+		string label = SurfTimer.CurrentMap.Stages > 0 ? "S" : "CP";
+
+		var rows = new List<List<HudElement>> { new() { new("", ReplayManager.BestSegmentsLabel, SpectatorColor, Label: true) } };
+		for (int i = first; i < Math.Min(parts.Count, first + MaxSplitLines); i++)
+		{
+			var part = parts[i];
+			bool playing = i == active;
+			string holder = part.Holder.Length > 16 ? part.Holder[..15] + "…" : part.Holder;
+			rows.Add(
+			[
+				new($"{label}{part.Number}", FormatTime(part.Time), playing ? RankColorWr : ""),
+				new("", holder, playing ? RankColorWr : SpectatorColor, Size: HudSize.Small),
+			]);
+		}
 		return rows;
 	}
 
