@@ -48,7 +48,7 @@ public partial class SurfTimer
 		return rows;
 	});
 
-	// ---- Map change (also used by !map) ----
+	// ---- Map change (also used by !changemap) ----
 
 	/// <summary>
 	/// Loads the current map again (by workshop id when known, else by name from the collection).

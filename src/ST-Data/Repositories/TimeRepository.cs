@@ -235,6 +235,14 @@ internal static class TimeRepository
 		SurfTimer.DB.QueryFirstOrDefaultAsync<TimeRow>(SelectTime + " WHERE t.`id` = @Id", new { Id = timeId });
 
 	/// <summary>
+	/// A player's PB on one course in a style, with its rank - null when they have none.
+	/// </summary>
+	internal static Task<TimeRow?> GetPlayerTimeAsync(int courseId, int style, int playerId) =>
+		SurfTimer.DB.QueryFirstOrDefaultAsync<TimeRow>(
+			SelectTime + " WHERE t.`course_id` = @CourseId AND t.`style_id` = @Style AND t.`player_id` = @PlayerId",
+			new { CourseId = courseId, Style = style, PlayerId = playerId });
+
+	/// <summary>
 	/// A player's PBs on one map, with ranks.
 	/// </summary>
 	internal static Task<List<TimeRow>> GetPlayerMapTimesAsync(int playerId, int mapId) =>
