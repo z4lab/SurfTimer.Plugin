@@ -90,7 +90,7 @@ public partial class SurfTimer
 				continue;
 
 			uint ownPawn = viewer.PlayerPawn.Value?.Index ?? 0;
-			uint observed = viewer.ObserverPawn.Value?.ObserverServices?.ObserverTarget.Value?.Index ?? 0;
+			uint observed = ObservedPawn(viewer)?.Index ?? 0;
 
 			foreach (var target in _transmitTargets)
 			{
@@ -104,6 +104,23 @@ public partial class SurfTimer
 					info.TransmitEntities.Remove(weapon);
 			}
 		}
+	}
+
+	/// <summary>
+	/// The pawn a player is spectating right now - null while they're alive (CS2 keeps the observer pawn and
+	/// its last target after they leave spectator) or not watching anyone.
+	/// </summary>
+	internal static CBaseEntity? ObservedPawn(CCSPlayerController controller)
+	{
+		if (controller.PawnIsAlive)
+			return null;
+
+		var services = controller.ObserverPawn.Value?.ObserverServices;
+		if (services == null || services.ObserverMode == (byte)ObserverMode_t.OBS_MODE_NONE)
+			return null;
+
+		var target = services.ObserverTarget.Value;
+		return target != null && target.IsValid ? target : null;
 	}
 
 	/// <summary>

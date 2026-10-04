@@ -41,8 +41,7 @@ public partial class SurfTimer
 			if (!controller.IsValid || controller.IsBot)
 				continue;
 
-			var target = controller.ObserverPawn.Value?.ObserverServices?.ObserverTarget.Value;
-			if (target != null && target.IsValid)
+			if (ObservedPawn(controller) is { } target)
 				watched.Add(target.Index);
 		}
 

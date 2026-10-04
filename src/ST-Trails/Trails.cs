@@ -285,7 +285,7 @@ public partial class SurfTimer
 	/// </summary>
 	private void FilterTrailTransmit(CCheckTransmitInfo info, CCSPlayerController viewer, PlayerOptions options)
 	{
-		uint observed = viewer.ObserverPawn.Value?.ObserverServices?.ObserverTarget.Value is { } target && target.IsValid
+		uint observed = ObservedPawn(viewer) is { } target
 			? new CCSPlayerPawn(target.Handle).Controller.Value?.Index ?? 0
 			: 0;
 
