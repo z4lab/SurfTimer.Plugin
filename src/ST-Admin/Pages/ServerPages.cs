@@ -72,7 +72,9 @@ public partial class SurfTimer
 	internal static bool IsValidMapName(string mapName) => MapNamePattern.IsMatch(mapName);
 
 	/// <summary>
-	/// Changes to a map of the server's workshop collection (host_workshop_collection) by name.
+	/// Changes to a map by name: by its workshop id when it was played before (works even outside the
+	/// collection), else from the server's workshop collection (host_workshop_collection). A change that
+	/// doesn't happen is reported - the map isn't available.
 	/// </summary>
 	internal void ChangeLevelTo(string mapName)
 	{
@@ -80,9 +82,32 @@ public partial class SurfTimer
 		if (!IsValidMapName(mapName))
 			return;
 
-		Server.PrintToChatAll($"{Config.PluginPrefix} Changing map to {ChatColors.Green}{mapName}{ChatColors.Default}...");
-		// A moment for the chat message to arrive
-		AddTimer(2.0f, () => Server.ExecuteCommand($"ds_workshop_changelevel {mapName}"));
+		Task.Run(async () =>
+		{
+			ulong? workshopId = null;
+			try
+			{
+				workshopId = (await MapRepository.GetByNameAsync(mapName))?.WorkshopId;
+			}
+			catch (Exception ex)
+			{
+				_logger.LogError(ex, "[{ClassName}] Looking up map '{Map}' failed - changing by name", nameof(SurfTimer), mapName);
+			}
+
+			Server.NextFrame(() =>
+			{
+				if (workshopId is ulong id && id > 0)
+				{
+					ChangeToWorkshopMap(id, mapName);
+					return;
+				}
+
+				Server.PrintToChatAll($"{Config.PluginPrefix} Changing map to {ChatColors.Green}{mapName}{ChatColors.Default}...");
+				// A moment for the chat message to arrive
+				AddTimer(2.0f, () => Server.ExecuteCommand($"ds_workshop_changelevel {mapName}"));
+				ReportIfMapUnchanged(mapName, MapChangeTimeoutSeconds, "isn't in the workshop collection");
+			});
+		});
 	}
 
 	/// <summary>
@@ -92,6 +117,27 @@ public partial class SurfTimer
 	{
 		Server.PrintToChatAll($"{Config.PluginPrefix} Changing map to {ChatColors.Green}{label ?? workshopId.ToString()}{ChatColors.Default}...");
 		AddTimer(2.0f, () => Server.ExecuteCommand($"host_workshop_map {workshopId}"));
+		// A map not downloaded yet is downloaded first - more time before calling it failed
+		ReportIfMapUnchanged(label ?? workshopId.ToString(), WorkshopChangeTimeoutSeconds, "couldn't be loaded (wrong workshop id or download failed)");
+	}
+
+	private const float MapChangeTimeoutSeconds = 12f;
+	private const float WorkshopChangeTimeoutSeconds = 90f;
+
+	/// <summary>
+	/// Still on the same map after the timeout: the change didn't happen - say so instead of nothing.
+	/// The timer dies with a map change.
+	/// </summary>
+	private void ReportIfMapUnchanged(string target, float seconds, string why)
+	{
+		string? current = CurrentMap?.Name;
+		AddTimer(seconds, () =>
+		{
+			if (CurrentMap?.Name != current)
+				return;
+			Server.PrintToChatAll($"{Config.PluginPrefix} {ChatColors.Red}{target} {why}{ChatColors.Default} - staying on {current}.");
+			_logger.LogWarning("[{ClassName}] Map change to '{Target}' didn't happen ({Why})", nameof(SurfTimer), target, why);
+		}, CounterStrikeSharp.API.Modules.Timers.TimerFlags.STOP_ON_MAPCHANGE);
 	}
 
 	private sealed class MapsData(List<MapRepository.MapRow> maps)

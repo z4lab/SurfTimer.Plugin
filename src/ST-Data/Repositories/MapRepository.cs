@@ -89,6 +89,11 @@ internal static class MapRepository
 			SELECT `id`, `name`, `ranked`, `workshop_id`, `created_at`, `last_played_at` FROM `{p}maps`
 			ORDER BY `last_played_at` DESC LIMIT @Limit", new { Limit = limit });
 
+	/// <summary>A map's row by its exact name - null when it was never played</summary>
+	internal static Task<MapRow?> GetByNameAsync(string name) =>
+		SurfTimer.DB.QueryFirstOrDefaultAsync<MapRow>(
+			"SELECT `id`, `name`, `ranked`, `workshop_id`, `created_at`, `last_played_at` FROM `{p}maps` WHERE `name` = @Name", new { Name = name });
+
 	internal static Task<List<int>> GetAllIdsAsync() =>
 		SurfTimer.DB.QueryAsync<int>("SELECT `id` FROM `{p}maps`");
 
