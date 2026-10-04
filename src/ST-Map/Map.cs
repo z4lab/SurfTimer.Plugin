@@ -292,6 +292,9 @@ public class Map : MapEntity
 
 	internal ulong? WorkshopId { get; set; }
 
+	/// <summary>Splits of map runs at a rank (#10, group cutoffs) for the HUD splits panel</summary>
+	internal SplitTargets SplitTargets { get; } = new();
+
 	/// <summary>All courses of the map (from the database, incl. ones whose zones were removed)</summary>
 	internal IEnumerable<MapRepository.CourseRow> Courses => _courses.Values;
 
@@ -438,6 +441,9 @@ public class Map : MapEntity
 				SetReplayData(type, style, number, frames, time.ReplayId);
 			}
 		}
+
+		// Ranks moved - the HUD's #10 / group / rank-above split targets are loaded again when next needed
+		Server.NextFrame(SplitTargets.Clear);
 	}
 
 	/// <summary>

@@ -137,6 +137,45 @@ public partial class SurfTimer
 	private static string DescribeHud(string fields) => string.Join(" | ", fields.Split('|')
 		.Select(row => string.Join(", ", row.Split(',').Select(f => Enum.TryParse(f, true, out HudFieldKind kind) ? HudFieldLabels[kind] : f))));
 
+	private static string SplitTargetLabel(SplitTarget target) => target switch
+	{
+		SplitTarget.Off => "off",
+		SplitTarget.Pb => "PB",
+		SplitTarget.Wr => "WR",
+		SplitTarget.Top10 => "top 10",
+		_ => $"G{target - SplitTarget.G1 + 1}",
+	};
+
+	/// <summary>What the splits panel compares the run against</summary>
+	private PanelPage OptionsSplitTargetPage() => new("Splits panel", ctx =>
+	{
+		var options = ctx.Player.Options;
+		int completions = CurrentMap?.MapCompletions.GetValueOrDefault(ctx.Style) ?? 0;
+
+		HudMenuItem Row(SplitTarget target, string text, string sub) =>
+			ctx.Act(text, options.HudSplitTarget == target ? "current" : "", sub, () =>
+			{
+				options.HudSplitTarget = target;
+				PanelBackFrom(ctx.Session, ctx.Page, $"Splits panel: {SplitTargetLabel(target)}");
+			});
+
+		var rows = new List<HudMenuItem>
+		{
+			Row(SplitTarget.Off, "Off", "no splits panel"),
+			Row(SplitTarget.Pb, "Personal best", "your own PB run"),
+			Row(SplitTarget.Wr, "World record", ""),
+			Row(SplitTarget.Top10, "Top 10", "#10, or one rank above you"),
+		};
+		for (int group = 1; group <= PointsCalculator.GroupCount; group++)
+		{
+			string range = completions < 11 ? "no groups on this map yet"
+				: PointsCalculator.GroupFirstRank(completions, group) > completions ? "not reached on this map yet"
+				: $"ranks {PointsCalculator.GroupFirstRank(completions, group)}-{Math.Min(PointsCalculator.GroupLastRank(completions, group), completions)} on this map";
+			rows.Add(Row(SplitTarget.G1 + (group - 1), $"Group {group}", range));
+		}
+		return rows;
+	});
+
 	private PanelPage OptionsHudRoot() => new("HUD", ctx =>
 	{
 		var options = ctx.Player.Options;
@@ -157,7 +196,7 @@ public partial class SurfTimer
 
 		rows.Add(ctx.Nav("Custom layout", preset ?? "custom", "fields, order and rows", OptionsHudFieldsPage));
 		rows.Add(ctx.Toggle("Top bar", options.HudTop, "rank, PB and WR", on => options.HudTop = on));
-		rows.Add(ctx.Toggle("Splits panel", options.HudSplits, "left side", on => options.HudSplits = on));
+		rows.Add(ctx.Nav("Splits panel", SplitTargetLabel(options.HudSplitTarget), "left side - compare against", OptionsSplitTargetPage));
 		rows.Add(ctx.Toggle("Spectator list", options.HudSpectators, "right side", on => options.HudSpectators = on));
 		return rows;
 	});

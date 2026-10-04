@@ -10,6 +10,20 @@ internal enum HudFieldKind
 	Sync,
 }
 
+/// <summary>What the HUD splits panel compares the run against (!options - HUD)</summary>
+internal enum SplitTarget
+{
+	Off,
+	Pb,
+	Wr,
+	Top10,
+	G1,
+	G2,
+	G3,
+	G4,
+	G5,
+}
+
 /// <summary>
 /// A player's client options (!options), stored in player_settings. Values are cached here - several
 /// are read every tick (transmit, HUD) - and saved in the background when changed.
@@ -24,7 +38,8 @@ internal sealed class PlayerOptions
 	internal const string KeyChatOthersRecords = "chat_others_records";
 	internal const string KeyChatConnects = "chat_connects";
 	internal const string KeyHudTop = "hud_top";
-	internal const string KeyHudSplits = "hud_splits";
+	internal const string KeyHudSplits = "hud_splits"; // Old on / off switch - only read to migrate to KeyHudSplitTarget
+	internal const string KeyHudSplitTarget = "hud_splits_target";
 	internal const string KeyHudSpectators = "hud_spectators";
 	internal const string KeyHudFields = "hud_fields";
 	internal const string KeyTrailMine = "trail_mine";
@@ -57,7 +72,8 @@ internal sealed class PlayerOptions
 
 	private bool _hideLegs, _hidePlayers, _hideBots;
 	private bool _chatSplits, _chatOthersPb, _chatOthersRecords, _chatConnects;
-	private bool _hudTop, _hudSplits, _hudSpectators;
+	private bool _hudTop, _hudSpectators;
+	private SplitTarget _hudSplitTarget = SplitTarget.Pb;
 	private string _hudFields = DefaultHudFields;
 	private bool _trailMine, _trailsOthers, _trailsOwn, _trailsSpectate, _trailsBots;
 	private string _trailColor = "";
@@ -78,7 +94,10 @@ internal sealed class PlayerOptions
 		_chatOthersRecords = Bool(KeyChatOthersRecords, true);
 		_chatConnects = Bool(KeyChatConnects, true);
 		_hudTop = Bool(KeyHudTop, true);
-		_hudSplits = Bool(KeyHudSplits, true);
+		_hudSplitTarget = _profile.Settings.TryGetValue(KeyHudSplitTarget, out var target)
+			&& Enum.TryParse(target, ignoreCase: true, out SplitTarget parsed) && Enum.IsDefined(parsed)
+				? parsed
+				: Bool(KeyHudSplits, true) ? SplitTarget.Pb : SplitTarget.Off;
 		_hudSpectators = Bool(KeyHudSpectators, true);
 		_trailMine = Bool(KeyTrailMine, true);
 		_trailsOthers = Bool(KeyTrailsOthers, true);
@@ -140,7 +159,20 @@ internal sealed class PlayerOptions
 	// ---- HUD ----
 
 	internal bool HudTop { get => _hudTop; set { _hudTop = value; Save(KeyHudTop, value); } }
-	internal bool HudSplits { get => _hudSplits; set { _hudSplits = value; Save(KeyHudSplits, value); } }
+
+	/// <summary>The splits panel is shown (anything but Off)</summary>
+	internal bool HudSplits => _hudSplitTarget != SplitTarget.Off;
+
+	internal SplitTarget HudSplitTarget
+	{
+		get => _hudSplitTarget;
+		set
+		{
+			_hudSplitTarget = value;
+			_profile.SetSetting(KeyHudSplitTarget, value.ToString().ToLowerInvariant());
+		}
+	}
+
 	internal bool HudSpectators { get => _hudSpectators; set { _hudSpectators = value; Save(KeyHudSpectators, value); } }
 
 	// ---- Trails ----

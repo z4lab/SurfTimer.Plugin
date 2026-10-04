@@ -371,7 +371,7 @@ public class PlayerHud
 		SendCenter(subject, replay);
 		SendSlot(CustomHud.Top, options.HudTop ? TopRows(subject, replay) : []);
 		// Left: the run's splits - or, spectating the best segments bot, every segment WR it chains
-		var leftRows = subject != null ? SplitRows(subject)
+		var leftRows = subject != null ? SplitRows(subject, options.HudSplitTarget)
 			: replay?.Type == ReplayManager.BestSegmentsType ? BestSegmentRows(replay)
 			: [];
 		SendSlot(CustomHud.Left, options.HudSplits ? leftRows : []);
@@ -734,9 +734,10 @@ public class PlayerHud
 	}
 
 	/// <summary>
-	/// The current map run's last stage/checkpoint splits, compared to the PB run's splits.
+	/// The current map run's last stage/checkpoint splits, compared to the run the viewer picked in !options
+	/// (PB, WR, #10 / the rank above, a group's last rank).
 	/// </summary>
-	private List<List<HudElement>> SplitRows(Player p)
+	private List<List<HudElement>> SplitRows(Player p, SplitTarget target)
 	{
 		if (!p.Controller.PawnIsAlive || !p.Timer.IsRunning
 			|| p.Timer.IsStageMode || p.Timer.IsBonusMode
@@ -744,9 +745,9 @@ public class PlayerHud
 			return [];
 
 		string label = SurfTimer.CurrentMap.Stages > 0 ? "Stage" : "CP";
-		var pbSplits = p.Stats.PB[p.Timer.Style].Checkpoints;
+		var (header, targetSplits) = ResolveSplitTarget(p, target);
 
-		var rows = new List<List<HudElement>> { new() { new("", "Splits", SpectatorColor, Label: true) } };
+		var rows = new List<List<HudElement>> { new() { new("", header, SpectatorColor, Label: true) } };
 		foreach (var cp in p.Stats.ThisRun.Checkpoints.OrderByDescending(cp => cp.Key).Take(MaxSplitLines).OrderBy(cp => cp.Key))
 		{
 			var row = new List<HudElement>
@@ -754,9 +755,9 @@ public class PlayerHud
 				new($"{label} {cp.Key}", FormatTime(cp.Value.RunTime), ""),
 			};
 
-			if (pbSplits != null && pbSplits.TryGetValue(cp.Key, out var pbSplit) && pbSplit.RunTime > 0)
+			if (targetSplits != null && targetSplits.TryGetValue(cp.Key, out var targetSplit) && targetSplit.RunTime > 0)
 			{
-				int diff = cp.Value.RunTime - pbSplit.RunTime;
+				int diff = cp.Value.RunTime - targetSplit.RunTime;
 				row.Add(new("", $"{(diff <= 0 ? "-" : "+")}{FormatTime(Math.Abs(diff))}",
 					diff <= 0 ? TimerColorActive : SlowerColor, Size: HudSize.Small));
 			}
@@ -765,6 +766,51 @@ public class PlayerHud
 		}
 
 		return rows;
+	}
+
+	/// <summary>
+	/// The splits panel's header and the splits of the run it compares against - null splits = no diffs
+	/// (no such run, or its splits are still loading).
+	/// </summary>
+	private static (string Header, Dictionary<int, CheckpointEntity>? Splits) ResolveSplitTarget(Player p, SplitTarget target)
+	{
+		var map = SurfTimer.CurrentMap;
+		int style = p.Timer.Style;
+		var wr = map.WR.GetValueOrDefault(style);
+		var wrSplits = wr != null && wr.RunTime > 0 ? wr.Checkpoints : null;
+		var pb = p.Stats.PB.GetValueOrDefault(style);
+
+		if (target == SplitTarget.Wr)
+			return ("Splits vs WR", wrSplits);
+		if (target is not (SplitTarget.Top10 or >= SplitTarget.G1 and <= SplitTarget.G5))
+			return ("Splits vs PB", pb?.Checkpoints);
+
+		int completions = map.MapCompletions.GetValueOrDefault(style);
+		int rank;
+		string name;
+		if (target == SplitTarget.Top10)
+		{
+			int pbRank = pb != null && pb.ID != -1 && pb.RunTime > 0 ? pb.Rank : 0;
+			if (pbRank == 1)
+				return ("Splits vs WR", wrSplits);
+			rank = pbRank is >= 2 and <= 10 ? pbRank - 1 : Math.Min(10, completions);
+			name = rank > 0 ? $"#{rank}" : "#10";
+		}
+		else
+		{
+			int group = target - SplitTarget.G1 + 1;
+			if (completions < 11)
+				return ($"Splits vs G{group} · none yet", null);
+			rank = Math.Min(PointsCalculator.GroupLastRank(completions, group), completions);
+			name = $"G{group} · #{rank}";
+		}
+
+		string header = $"Splits vs {name}";
+		if (rank < 1)
+			return (header, null);
+		if (rank == 1)
+			return (header, wrSplits); // Already in memory
+		return (header, map.SplitTargets.Get(map.CourseId(0, 0), style, rank)?.Splits);
 	}
 
 	/// <summary>

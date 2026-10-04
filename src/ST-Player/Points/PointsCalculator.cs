@@ -77,24 +77,39 @@ internal static class PointsCalculator
 		if (rank <= 10)
 			return (0, (int)Math.Ceiling(Top10Factors[rank - 2] * wrPoints), 0);
 
-		// Groups start after the top 10; every group spans at least 5 ranks
-		int bottom = 11;
 		double groupPoints = wrPoints * 0.25;
-		foreach (double share in GroupShares)
+		for (int group = 1; group <= GroupShares.Length; group++)
 		{
-			int top = (int)Math.Ceiling(completions * share + 11.0);
-			if (top - bottom < 4)
-				top = bottom + 4;
-
-			if (rank <= top)
+			if (rank <= GroupLastRank(completions, group))
 				return (0, 0, (int)Math.Round(groupPoints, MidpointRounding.AwayFromZero));
-
-			bottom = top + 1;
 			groupPoints /= 1.5;
 		}
 
 		return (0, 0, 0);
 	}
+
+	internal const int GroupCount = 5;
+
+	/// <summary>
+	/// The last (slowest) rank of group 1-5 for a course with this many completions. Groups start after the
+	/// top 10 and every group spans at least 5 ranks, so a group can reach past the last completion.
+	/// </summary>
+	internal static int GroupLastRank(int completions, int group)
+	{
+		int bottom = 11;
+		int top = 10;
+		for (int g = 1; g <= Math.Clamp(group, 1, GroupShares.Length); g++)
+		{
+			top = (int)Math.Ceiling(completions * GroupShares[g - 1] + 11.0);
+			if (top - bottom < 4)
+				top = bottom + 4;
+			bottom = top + 1;
+		}
+		return top;
+	}
+
+	/// <summary>The first rank of group 1-5</summary>
+	internal static int GroupFirstRank(int completions, int group) => group <= 1 ? 11 : GroupLastRank(completions, group - 1) + 1;
 
 	/// <summary>
 	/// Bonus points by rank - the same for every bonus, tier and completion count.
