@@ -173,12 +173,41 @@ public class CurrentRun : RunStatsEntity
 				await pb.LoadCheckpoints();
 		}
 
+		// A new / faster time pushes everyone slower down - the other online players' PB ranks (HUD "rank/N")
+		if (result.Improved)
+			await RefreshOtherRanksAsync(player, recType, number, style);
+
 		await PointsService.RecalculateMapAsync(map.ID, style);
 
 		stopwatch.Stop();
 		_logger.LogInformation("[{Class}] {Method} -> Finished SaveMapTime for '{Name}' (time {ID}) in {Elapsed}ms",
 			nameof(CurrentRun), methodName, player.Profile.Name, result.TimeId, stopwatch.ElapsedMilliseconds
 		);
+	}
+
+	/// <summary>
+	/// Reloads the ranks of the other online players' PBs on one course and style.
+	/// </summary>
+	private static async Task RefreshOtherRanksAsync(Player saver, short type, short number, int style)
+	{
+		var others = SurfTimer.OnlinePlayers
+			.Where(p => !ReferenceEquals(p, saver))
+			.Select(p => p.Stats.PbFor(type, number, style))
+			.OfType<PersonalBest>()
+			.Where(pb => pb.ID > 0)
+			.ToList();
+		if (others.Count == 0)
+			return;
+
+		var rows = (await TimeRepository.GetTimesAsync(others.Select(pb => pb.ID).Distinct().ToList())).ToDictionary(r => r.Id);
+		foreach (var pb in others)
+		{
+			if (rows.TryGetValue(pb.ID, out var row))
+			{
+				pb.Rank = (int)row.Rank;
+				pb.TotalCount = (int)row.TotalCount;
+			}
+		}
 	}
 
 	/// <summary>
