@@ -23,7 +23,10 @@ public partial class SurfTimer
 
 		var rows = new List<HudMenuItem>
 		{
-			PanelContext.Info("SurfTimer", ModuleVersion, $"up {AdminFormat.Duration((long)uptime.TotalSeconds)}"),
+			PanelContext.Info("SurfTimer", BuildInfo.Commit != null ? $"{ModuleVersion} · {BuildInfo.Commit}" : ModuleVersion,
+				BuildInfo.BuildDate != null
+					? $"built {BuildInfo.BuildDate} UTC · up {AdminFormat.Duration((long)uptime.TotalSeconds)}"
+					: $"up {AdminFormat.Duration((long)uptime.TotalSeconds)}"),
 			PanelContext.Info("Players", $"{humans} / {Server.MaxPlayers}", $"tick {tickRate}"),
 			PanelContext.Info("Memory", AdminFormat.Bytes(GC.GetTotalMemory(false)), "managed heap"),
 			ctx.Nav("Change map", CurrentMap?.Name ?? "", "recent maps, workshop id", AdminChangeMapPage),

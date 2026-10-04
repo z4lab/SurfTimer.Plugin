@@ -30,6 +30,20 @@
 		<EmbeddedResource Include="ST-Data\Migrations\*.sql" LogicalName="Migrations.%(Filename)%(Extension)" />
 	</ItemGroup>
 
+	<!-- Build info for !admin (BuildInfo.cs): the commit is already in the informational version (SourceLink,
+	     "1.0.0+<sha>"), this adds the build time and whether there were uncommitted changes -->
+	<Target Name="AddBuildInfo" BeforeTargets="GetAssemblyAttributes">
+		<Exec Command="git status --porcelain --untracked-files=no" WorkingDirectory="$(MSBuildProjectDirectory)"
+			ConsoleToMSBuild="true" StandardOutputImportance="low" StandardErrorImportance="low" IgnoreExitCode="true" ContinueOnError="true">
+			<Output TaskParameter="ConsoleOutput" PropertyName="_StGitStatus" />
+			<Output TaskParameter="ExitCode" PropertyName="_StGitExitCode" />
+		</Exec>
+		<ItemGroup>
+			<AssemblyMetadata Include="BuildDate" Value="$([System.DateTime]::UtcNow.ToString('yyyy-MM-dd HH:mm'))" />
+			<AssemblyMetadata Include="GitDirty" Value="true" Condition="'$(_StGitExitCode)' == '0' And '$(_StGitStatus)' != ''" />
+		</ItemGroup>
+	</Target>
+
 	<!-- After Build, keep only the necessary files -->
 	<Target Name="KeepOnlySelectedDlls" AfterTargets="Build">
 		<ItemGroup>
