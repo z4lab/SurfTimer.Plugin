@@ -72,6 +72,9 @@ public partial class SurfTimer
 		UpdatePermanentReplayBot();
 	}
 
+	/// <summary>Called when the map WR replay changed (Map.SetReplayData) - main thread</summary>
+	internal static void RefreshPermanentReplayBot() => _instance?.UpdatePermanentReplayBot();
+
 	/// <summary>
 	/// Keeps the permanent map WR bot in line with the setting and the current map WR: spawns it,
 	/// switches it to a new WR, or removes it (turned off / no WR).
@@ -125,10 +128,12 @@ public partial class SurfTimer
 			return;
 		}
 
-		// A new map WR - the bot switches to it right away
-		if (permanent.Controller != null && permanent.MapTimeID != wr!.MapTimeID)
+		// A new map WR - the bot switches to it right away. The holder beating their own WR keeps the time's
+		// id (the PB row is updated), only its replay changes - so the replay id is compared too
+		if (permanent.Controller != null && (permanent.MapTimeID != wr!.MapTimeID || permanent.ReplayId != wr.ReplayId))
 		{
-			_logger.LogInformation("[Replay] Permanent map bot: new map WR ({Player}, time {TimeId})", wr.RecordPlayerName, wr.MapTimeID);
+			_logger.LogInformation("[Replay] Permanent map bot: new map WR ({Player}, time {TimeId}, replay {ReplayId})",
+				wr.RecordPlayerName, wr.MapTimeID, wr.ReplayId);
 			permanent.LoadContentFrom(wr);
 			permanent.LoadReplayData(-1);
 			if (permanent.Controller.PawnIsAlive)

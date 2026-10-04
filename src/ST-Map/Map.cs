@@ -557,6 +557,10 @@ public class Map : MapEntity
 		template.CheckpointEnterSituations = checkpointEnter;
 		template.CheckpointExitSituations = checkpointExit;
 
+		// A new map WR replay - the permanent map bot switches to it right away, not on its next upkeep
+		if (type == 0)
+			Server.NextFrame(SurfTimer.RefreshPermanentReplayBot);
+
 #if DEBUG
 		_logger.LogDebug("[{ClassName}] {MethodName} -> WR replay of type {Type} {Number} (style {Style}): time {TimeId}, replay {ReplayId}, {Frames} frames",
 			nameof(Map), methodName, type, number, style, template.MapTimeID, replayId, frames.Count);
