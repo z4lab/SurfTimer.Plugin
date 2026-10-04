@@ -371,7 +371,7 @@ public class PlayerHud
 		SendCenter(subject, replay);
 		SendSlot(CustomHud.Top, options.HudTop ? TopRows(subject, replay) : []);
 		// Left: the run's splits - or, spectating the best segments bot, every segment WR it chains
-		var leftRows = subject != null ? SplitRows(subject, options.HudSplitTarget)
+		var leftRows = subject != null ? SplitRowsKept(subject, options)
 			: replay?.Type == ReplayManager.BestSegmentsType ? BestSegmentRows(replay)
 			: [];
 		SendSlot(CustomHud.Left, options.HudSplits ? leftRows : []);
@@ -731,6 +731,38 @@ public class PlayerHud
 		};
 
 		return [row, records];
+	}
+
+	// The splits panel as last shown during a map run, and whose run it was (!options - Keep last splits)
+	private List<List<HudElement>>? _keptSplitRows;
+	private Player? _keptSplitSubject;
+
+	/// <summary>
+	/// The live splits while a map run has some. Once the run ends (fail, reset, finish) the last ones stay -
+	/// marked "Last run" - until that player starts their next run, unless the viewer turned that off.
+	/// </summary>
+	private List<List<HudElement>> SplitRowsKept(Player subject, PlayerOptions options)
+	{
+		var live = SplitRows(subject, options.HudSplitTarget);
+		if (live.Count > 0)
+		{
+			_keptSplitRows = live;
+			_keptSplitSubject = subject;
+			return live;
+		}
+
+		// A new run (map, stage or bonus) started, or another player is shown
+		if (subject.Timer.IsRunning || !ReferenceEquals(_keptSplitSubject, subject) || !options.HudSplitsKeep || _keptSplitRows == null)
+		{
+			_keptSplitRows = null;
+			_keptSplitSubject = null;
+			return [];
+		}
+
+		var kept = new List<List<HudElement>>(_keptSplitRows);
+		if (kept.Count > 0 && kept[0].Count > 0)
+			kept[0] = [kept[0][0] with { Body = "Last run · " + kept[0][0].Body.Replace("Splits ", "") }];
+		return kept;
 	}
 
 	/// <summary>

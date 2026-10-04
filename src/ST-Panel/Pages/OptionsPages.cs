@@ -197,6 +197,9 @@ public partial class SurfTimer
 		rows.Add(ctx.Nav("Custom layout", preset ?? "custom", "fields, order and rows", OptionsHudFieldsPage));
 		rows.Add(ctx.Toggle("Top bar", options.HudTop, "rank, PB and WR", on => options.HudTop = on));
 		rows.Add(ctx.Nav("Splits panel", SplitTargetLabel(options.HudSplitTarget), "left side - compare against", OptionsSplitTargetPage));
+		if (options.HudSplits)
+			rows.Add(ctx.Toggle("Keep last splits", options.HudSplitsKeep, "after a fail / reset, until your next run starts",
+				on => options.HudSplitsKeep = on));
 		rows.Add(ctx.Toggle("Spectator list", options.HudSpectators, "right side", on => options.HudSpectators = on));
 		return rows;
 	});

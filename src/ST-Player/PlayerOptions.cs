@@ -40,6 +40,7 @@ internal sealed class PlayerOptions
 	internal const string KeyHudTop = "hud_top";
 	internal const string KeyHudSplits = "hud_splits"; // Old on / off switch - only read to migrate to KeyHudSplitTarget
 	internal const string KeyHudSplitTarget = "hud_splits_target";
+	internal const string KeyHudSplitsKeep = "hud_splits_keep";
 	internal const string KeyHudSpectators = "hud_spectators";
 	internal const string KeyHudFields = "hud_fields";
 	internal const string KeyTrailMine = "trail_mine";
@@ -72,7 +73,7 @@ internal sealed class PlayerOptions
 
 	private bool _hideLegs, _hidePlayers, _hideBots;
 	private bool _chatSplits, _chatOthersPb, _chatOthersRecords, _chatConnects;
-	private bool _hudTop, _hudSpectators;
+	private bool _hudTop, _hudSpectators, _hudSplitsKeep;
 	private SplitTarget _hudSplitTarget = SplitTarget.Pb;
 	private string _hudFields = DefaultHudFields;
 	private bool _trailMine, _trailsOthers, _trailsOwn, _trailsSpectate, _trailsBots;
@@ -99,6 +100,7 @@ internal sealed class PlayerOptions
 				? parsed
 				: Bool(KeyHudSplits, true) ? SplitTarget.Pb : SplitTarget.Off;
 		_hudSpectators = Bool(KeyHudSpectators, true);
+		_hudSplitsKeep = Bool(KeyHudSplitsKeep, true);
 		_trailMine = Bool(KeyTrailMine, true);
 		_trailsOthers = Bool(KeyTrailsOthers, true);
 		_trailsOwn = Bool(KeyTrailsOwn, true);
@@ -172,6 +174,9 @@ internal sealed class PlayerOptions
 			_profile.SetSetting(KeyHudSplitTarget, value.ToString().ToLowerInvariant());
 		}
 	}
+
+	/// <summary>The splits panel keeps the last run's splits (after a fail / reset / finish) until the next run starts</summary>
+	internal bool HudSplitsKeep { get => _hudSplitsKeep; set { _hudSplitsKeep = value; Save(KeyHudSplitsKeep, value); } }
 
 	internal bool HudSpectators { get => _hudSpectators; set { _hudSpectators = value; Save(KeyHudSpectators, value); } }
 
