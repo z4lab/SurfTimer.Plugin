@@ -14,6 +14,23 @@ public partial class SurfTimer
 	private readonly HashSet<uint> _heldWeapons = new();
 
 	/// <summary>
+	/// Removes every weapon a bot carries (every 16 ticks) - respawns after a round restart, map equips or
+	/// a console give would otherwise leave replay bots armed. Bots without weapons cost a handle check.
+	/// </summary>
+	private static void StripBots()
+	{
+		foreach (var controller in Utilities.GetPlayers())
+		{
+			if (!controller.IsValid || !controller.IsBot || !controller.PawnIsAlive)
+				continue;
+
+			var weapons = controller.PlayerPawn.Value?.WeaponServices?.MyWeapons;
+			if (weapons != null && weapons.Any(handle => handle.Value != null && handle.Value.IsValid))
+				controller.RemoveWeapons();
+		}
+	}
+
+	/// <summary>
 	/// Weapons get a player pawn as parent when picked up / given and lose it when dropped. A held weapon
 	/// that lost its parent is checked again next frame - still without an owner, it's on the ground and
 	/// removed.

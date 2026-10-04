@@ -31,8 +31,19 @@ public partial class SurfTimer
 		}
 
 		// No map during a map change / the replay nav reload
-		if (CurrentMap == null || CurrentMap.ReplayManager.IsControllerConnectedToReplayPlayer(controller))
+		if (CurrentMap == null)
 			return HookResult.Continue;
+
+		// A replay bot respawned (round restart) - playback puts it back in place, the spawn loadout goes
+		if (CurrentMap.ReplayManager.IsControllerConnectedToReplayPlayer(controller))
+		{
+			AddTimer(0.1f, () =>
+			{
+				if (controller.IsValid && controller.PawnIsAlive)
+					controller.RemoveWeapons();
+			});
+			return HookResult.Continue;
+		}
 
 		_logger.LogTrace("OnPlayerSpawn -> Player {Name} spawned.",
 			controller.PlayerName

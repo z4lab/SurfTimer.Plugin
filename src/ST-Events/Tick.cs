@@ -120,6 +120,19 @@ public partial class SurfTimer
 			LogTickError(ex, "trails");
 		}
 
+		// Bots never carry weapons (round restarts / respawns hand out the default loadout) - Weapons.cs
+		if (Server.TickCount % 16 == 0)
+		{
+			try
+			{
+				StripBots();
+			}
+			catch (Exception ex)
+			{
+				LogTickError(ex, "bot weapons");
+			}
+		}
+
 		// Once per second: unwatched bots, stuck slots, the permanent map bot (ReplayUpkeep.cs)
 		if (Server.TickCount % 64 == 0)
 		{
