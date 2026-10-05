@@ -57,6 +57,16 @@ public partial class SurfTimer
 				ctx.Session.Status = on ? "Replay bots are hidden" : "Replay bots are visible";
 			}),
 			ctx.Nav("Trails", "", "which trails you see, your trail color", OptionsTrailsPage),
+			ctx.Act("Show zones", options.ZonesShow switch
+			{
+				ZoneDisplay.StartEnd => "start & end",
+				ZoneDisplay.All => "all",
+				_ => "off",
+			}, "zone outlines - off / start & end / all", () =>
+			{
+				options.ZonesShow = (ZoneDisplay)(((int)options.ZonesShow + 1) % 3);
+				ctx.Session.Status = options.ZonesShow == ZoneDisplay.Off ? "Zones hidden" : "Zones shown";
+			}),
 		];
 	});
 

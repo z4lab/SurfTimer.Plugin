@@ -208,6 +208,25 @@ public partial class SurfTimer
 #endif
 	}
 
+	/// <summary>Stop zone: a running timer stops (the run is abandoned)</summary>
+	private static void StartTouchHandleStopZone(Player player)
+	{
+		if (!player.Timer.IsRunning)
+			return;
+
+		player.Timer.Reset();
+		player.Stats.ThisRun.Checkpoints.Clear();
+		player.HUD.Notify("Timer stopped");
+	}
+
+	/// <summary>Teleport-back zone: back to the start of the stage / bonus the player is in, like !rs</summary>
+	private void StartTouchHandleTeleportBackZone(Player player)
+	{
+		if (player.ReplayRecorder.IsSaving)
+			return; // As !rs - the finished run is still being saved
+		ResetToCurrentStart(player);
+	}
+
 	private static void StartTouchHandleMapStartZone(Player player, ZoneInfo zone, [CallerMemberName] string methodName = "")
 	{
 		// We shouldn't start timer and reset data until MapTime has been saved - mostly concerns the Replays and trimming the correct parts

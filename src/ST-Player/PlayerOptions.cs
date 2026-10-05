@@ -10,6 +10,16 @@ internal enum HudFieldKind
 	Sync,
 }
 
+/// <summary>Which zone outlines a player sees (!options - Visibility)</summary>
+internal enum ZoneDisplay
+{
+	Off,
+	/// <summary>Map / stage / bonus starts and ends</summary>
+	StartEnd,
+	/// <summary>Every zone, checkpoints and special zones too</summary>
+	All,
+}
+
 /// <summary>What the HUD splits panel compares the run against (!options - HUD)</summary>
 internal enum SplitTarget
 {
@@ -49,6 +59,7 @@ internal sealed class PlayerOptions
 	internal const string KeyTrailsSpectate = "trails_spectate";
 	internal const string KeyTrailsBots = "trails_bots";
 	internal const string KeyTrailColor = "trail_color";
+	internal const string KeyZonesShow = "zones_show";
 
 	/// <summary>Bottom HUD: rows split by '|', fields by ','</summary>
 	internal const string DefaultHudFields = "timer,speed|prespeed,keys,sync";
@@ -78,6 +89,7 @@ internal sealed class PlayerOptions
 	private string _hudFields = DefaultHudFields;
 	private bool _trailMine, _trailsOthers, _trailsOwn, _trailsSpectate, _trailsBots;
 	private string _trailColor = "";
+	private ZoneDisplay _zonesShow = ZoneDisplay.Off;
 
 	internal PlayerOptions(PlayerProfile profile)
 	{
@@ -106,6 +118,8 @@ internal sealed class PlayerOptions
 		_trailsOwn = Bool(KeyTrailsOwn, true);
 		_trailsSpectate = Bool(KeyTrailsSpectate, true);
 		_trailsBots = Bool(KeyTrailsBots, true);
+		_zonesShow = _profile.Settings.TryGetValue(KeyZonesShow, out var zones)
+			&& Enum.TryParse(zones, ignoreCase: true, out ZoneDisplay display) && Enum.IsDefined(display) ? display : ZoneDisplay.Off;
 		_trailColor = _profile.Settings.TryGetValue(KeyTrailColor, out var trailColor) && TrailColors.IsValidCustom(trailColor) ? trailColor : "";
 
 		// A stored layout the HUD can't show falls back to the default
@@ -179,6 +193,17 @@ internal sealed class PlayerOptions
 	internal bool HudSplitsKeep { get => _hudSplitsKeep; set { _hudSplitsKeep = value; Save(KeyHudSplitsKeep, value); } }
 
 	internal bool HudSpectators { get => _hudSpectators; set { _hudSpectators = value; Save(KeyHudSpectators, value); } }
+
+	/// <summary>Zone outlines this player sees (drawn with beams - ZoneDrawing.cs)</summary>
+	internal ZoneDisplay ZonesShow
+	{
+		get => _zonesShow;
+		set
+		{
+			_zonesShow = value;
+			_profile.SetSetting(KeyZonesShow, value.ToString().ToLowerInvariant());
+		}
+	}
 
 	// ---- Trails ----
 

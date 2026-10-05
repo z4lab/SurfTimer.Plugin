@@ -74,27 +74,33 @@ public partial class SurfTimer : BasePlugin
 			Server.NextWorldUpdateAsync(async () => // NextWorldUpdate runs even during server hibernation
 			{
 				_logger.LogInformation($"[CS2 Surf] {Config.PluginName} {ModuleVersion} - loading map {mapName}");
-				CurrentMap = new Map(mapName, LoadStagesAsCheckpoints(mapName));
+				var (stagesAsCheckpoints, zones) = LoadMapBootstrap(mapName);
+				CurrentMap = new Map(mapName, stagesAsCheckpoints, zones);
 				await CurrentMap.InitializeAsync();
 			});
 		}
 	}
 
 	/// <summary>
-	/// The map's stages_as_checkpoints setting - needed before its zones are read, so it's loaded right
-	/// away (one small query; same as player connects, on the main thread). Off when it can't be read.
+	/// What's needed before the map's zones are read: its stages_as_checkpoints setting and its stored zones
+	/// (empty = import them from the map). Loaded right away - two small queries on the main thread, as on
+	/// player connects. Without the database: stages, and zones from the map.
 	/// </summary>
-	private bool LoadStagesAsCheckpoints(string mapName)
+	private (bool StagesAsCheckpoints, List<ZoneDefinition> Zones) LoadMapBootstrap(string mapName)
 	{
 		try
 		{
-			string? value = Task.Run(() => MapRepository.GetSettingByNameAsync(mapName, Map.SettingStagesAsCheckpoints)).GetAwaiter().GetResult();
-			return value is "1" or "true";
+			return Task.Run(async () =>
+			{
+				string? value = await MapRepository.GetSettingByNameAsync(mapName, Map.SettingStagesAsCheckpoints);
+				var zones = await ZoneRepository.GetByMapNameAsync(mapName);
+				return (value is "1" or "true", zones);
+			}).GetAwaiter().GetResult();
 		}
 		catch (Exception ex)
 		{
-			_logger.LogError(ex, "[{Prefix}] Reading the zone mode of {Map} failed - loading it with stages", Config.PluginName, mapName);
-			return false;
+			_logger.LogError(ex, "[{Prefix}] Reading the zones of {Map} failed - using the map's own zones", Config.PluginName, mapName);
+			return (false, new List<ZoneDefinition>());
 		}
 	}
 
@@ -118,6 +124,8 @@ public partial class SurfTimer : BasePlugin
 		ChatPrompt.ForgetAll();
 		ClearHeldWeapons();
 		ForgetTrails();
+		_zoneEditor = null; // The editor's draft goes with the map (unsaved changes are lost)
+		ForgetZoneOutlines();
 
 		// Clear/reset stuff here
 		CurrentMap = null!;
@@ -133,11 +141,6 @@ public partial class SurfTimer : BasePlugin
 		ConVarHelper.RemoveCheatFlagFromConVar("bot_stop");
 		ConVarHelper.RemoveCheatFlagFromConVar("bot_freeze");
 		ConVarHelper.RemoveCheatFlagFromConVar("bot_zombie");
-
-		// Round restarts re-create the map's triggers without firing EndTouch for the old ones, so any
-		// "inside zone" state would otherwise stay stuck (e.g. anti-prehop applying outside start zones)
-		foreach (var player in playerList.Values)
-			player.TouchingTriggers.Clear();
 
 		ApplyServerSettings("round start");
 		return HookResult.Continue;
@@ -254,7 +257,6 @@ public partial class SurfTimer : BasePlugin
 			Server.NextFrame(() => CustomHud.RemoveMapMessageEntity(handle.Value));
 		});
 
-		HookEntityOutput("trigger_multiple", "OnStartTouch", OnTriggerStartTouch);
-		HookEntityOutput("trigger_multiple", "OnEndTouch", OnTriggerEndTouch);
+		// Zones aren't the map's triggers any more - they're checked every tick (ZoneTracker.cs)
 	}
 }

@@ -34,7 +34,7 @@ public partial class SurfTimer
 		rows.Add(ctx.Ask("Workshop id", map.WorkshopId?.ToString() ?? "none", "type in chat",
 			LocalizationService.LocalizerNonNull["prompt_workshop_id"], text => AdminSetWorkshopId(ctx, text)));
 		rows.Add(ctx.Nav("Map settings", $"{map.Settings.Count} set", "", AdminMapSettingsPage));
-		rows.Add(ctx.Nav("Zones", map.Zones.Values.Sum(z => z.Count).ToString(), "triggers", AdminZonesPage));
+		rows.Add(ctx.Nav("Zones", map.ZoneDefinitions.Count.ToString(), "stored zones, editor", AdminZonesPage));
 		rows.Add(ctx.Danger("Reset map records", "times, replays, history", () =>
 			AdminWipeConfirm("Reset map records", new TimeRepository.WipeScope(MapId: map.ID), $"map {map.Name}")));
 		return rows;
@@ -478,34 +478,7 @@ public partial class SurfTimer
 		];
 	});
 
-	// ---- Zones ----
-
-	private PanelPage AdminZonesPage() => new("Zones", ctx =>
-	{
-		var map = CurrentMap;
-		var rows = new List<HudMenuItem>
-		{
-			PanelContext.Info("Layout", map.Stages > 0 ? "staged" : "linear", map.StagedLinear ? "staged linear" : ""),
-			PanelContext.Info("Stages / bonuses", $"{map.Stages} / {map.Bonuses}", $"{map.TotalCheckpoints} checkpoints"),
-		};
-
-		rows.AddRange(map.Zones.OrderBy(z => z.Key.Type).ThenBy(z => z.Key.Number).Select(z =>
-		{
-			string label = z.Key.Type switch
-			{
-				ZoneType.MapStart => "Map start",
-				ZoneType.MapEnd => "Map end",
-				ZoneType.StageStart => $"Stage {z.Key.Number} start",
-				ZoneType.Checkpoint => $"Checkpoint {z.Key.Number}",
-				ZoneType.BonusStart => $"Bonus {z.Key.Number} start",
-				ZoneType.BonusEnd => $"Bonus {z.Key.Number} end",
-				_ => z.Value.FirstOrDefault()?.Name ?? "Zone",
-			};
-			string names = string.Join(", ", z.Value.Select(t => t.Name).Distinct());
-			return PanelContext.Info(label, z.Value.Count == 1 ? "1 trigger" : $"{z.Value.Count} triggers", names);
-		}));
-		return rows;
-	});
+	// ---- Zones: ZonePages.cs ----
 
 	// ---- Wiping records (map / course / time / player) ----
 

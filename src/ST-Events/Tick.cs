@@ -30,6 +30,9 @@ public partial class SurfTimer
 			// replay playback) - it's logged instead.
 			try
 			{
+				// Zones entered / left since the last tick, before the timer counts it (ZoneTracker.cs)
+				TickZones(player);
+
 				// Spectators/dead players have no live PlayerPawn - the timer, recorder and speed cap
 				// all read it.
 				if (player.Controller.PawnIsAlive)
@@ -118,6 +121,19 @@ public partial class SurfTimer
 		catch (Exception ex)
 		{
 			LogTickError(ex, "trails");
+		}
+
+		// Zone outlines (ZoneDrawing.cs) - built while someone wants them, redrawn after round restarts
+		if (Server.TickCount % 32 == 0)
+		{
+			try
+			{
+				TickZoneOutlines();
+			}
+			catch (Exception ex)
+			{
+				LogTickError(ex, "zone outlines");
+			}
 		}
 
 		// Bots never carry weapons (round restarts / respawns hand out the default loadout) - Weapons.cs

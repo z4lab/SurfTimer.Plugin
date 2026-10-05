@@ -1,38 +1,44 @@
-using CounterStrikeSharp.API.Core;
 using System.Text.RegularExpressions;
 
 namespace SurfTimer;
 
-internal enum ZoneType
+/// <summary>
+/// What a zone does. The values are stored in the database (zones.zone_type) - never renumber them.
+/// </summary>
+internal enum ZoneType : byte
 {
-	MapEnd,
-	MapStart,
-	StageStart,
-	Checkpoint,
-	BonusStart,
-	BonusEnd,
-	Unknown
+	MapEnd = 0,
+	MapStart = 1,
+	StageStart = 2,
+	Checkpoint = 3,
+	BonusStart = 4,
+	BonusEnd = 5,
+	/// <summary>Touching it stops the timer</summary>
+	Stop = 6,
+	/// <summary>Touching it sends the player back like !rs</summary>
+	TeleportBack = 7,
+	/// <summary>Horizontal speed is capped to the zone's value while inside</summary>
+	SpeedCap = 8,
+	Unknown = 255,
 }
 
 /// <summary>
-/// One zone trigger. Several can share Type+Number; Teleport is where players are placed when sent there.
+/// One active zone box (see ZoneDefinition for the stored form). Several can share Type+Number; Teleport
+/// is where players are placed when sent there. Mins / Maxs are world-space corners.
 /// </summary>
-internal sealed record ZoneInfo(uint TriggerIndex, string Name, ZoneType Type, short Number, VectorT Teleport, QAngleT? Angles)
+internal sealed record ZoneInfo(int ZoneId, string Name, ZoneType Type, short Number, VectorT Teleport, QAngleT? Angles,
+	VectorT Mins, VectorT Maxs, float? Value = null)
 {
-	/// <summary>
-	/// Classifies a touched trigger by its name (Teleport is just its origin - only the map's zone
-	/// registry resolves real teleport targets).
-	/// </summary>
-	public static bool TryFromTrigger(CBaseTrigger trigger, out ZoneInfo zone)
-	{
-		zone = null!;
-		string? name = trigger.Entity?.Name;
-		if (!ZoneName.TryParse(name, out var type, out var number) || !ZoneName.Remap(ref type, ref number))
-			return false;
+	/// <summary>Whether a box (e.g. a player's hull) overlaps this zone</summary>
+	internal bool Overlaps(in VectorT mins, in VectorT maxs) =>
+		mins.X <= Maxs.X && maxs.X >= Mins.X
+		&& mins.Y <= Maxs.Y && maxs.Y >= Mins.Y
+		&& mins.Z <= Maxs.Z && maxs.Z >= Mins.Z;
 
-		zone = new ZoneInfo(trigger.Index, name!, type, number, trigger.AbsOrigin!.ToVector_t(), null);
-		return true;
-	}
+	internal bool Contains(in VectorT point) =>
+		point.X >= Mins.X && point.X <= Maxs.X
+		&& point.Y >= Mins.Y && point.Y <= Maxs.Y
+		&& point.Z >= Mins.Z && point.Z <= Maxs.Z;
 }
 
 /// <summary>

@@ -40,9 +40,9 @@ public class Player
 	// Anti-prehop/bhop state (map start zone + every stage start zone). Deliberately not on
 	// PlayerTimer - Timer.Reset() fires on every start-zone entry, which would wrongly clear this;
 	// this state must only clear when velocity actually drops below the cap.
-	// Zone triggers the player is currently inside, by entity index. Several at once, so overlapping/
-	// duplicate triggers and late EndTouch events (e.g. !r out of a stage start) are handled.
-	internal Dictionary<uint, ZoneInfo> TouchingTriggers { get; } = new();
+	// Zone boxes the player is currently inside, by ZoneInfo.ZoneId (ZoneTracker.cs). Several at once, so
+	// overlapping / duplicate boxes of one zone are handled.
+	internal Dictionary<int, ZoneInfo> TouchingTriggers { get; } = new();
 
 	// !startpos - where resets into a start zone put the player, per start zone (map start = (MapStart, 1)).
 	// In memory only: a Player lives for one map / connection.

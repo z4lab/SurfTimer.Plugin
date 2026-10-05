@@ -1,69 +1,18 @@
-using CounterStrikeSharp.API.Core;
-using Microsoft.Extensions.Logging;
-
 namespace SurfTimer;
 
 public partial class SurfTimer
 {
 	/// <summary>
-	/// The player behind a trigger touch - null for anything that isn't a player pawn with a controller
-	/// (props, projectiles, or a bot's pawn while the bot is being kicked).
+	/// An alive player's hull started overlapping a zone box (ZoneTracker.cs) - what a trigger's StartTouch
+	/// used to do. Every box counts, including a second box of the same zone.
 	/// </summary>
-	private static CCSPlayerController? ControllerOfActivator(CEntityInstance? activator)
+	private void HandleZoneEnter(Player player, ZoneInfo zone)
 	{
-		if (activator == null || !activator.IsValid || activator.DesignerName != "player")
-			return null;
-
-		var controller = new CCSPlayerPawn(activator.Handle).Controller.Value;
-		return controller != null && controller.IsValid ? new CCSPlayerController(controller.Handle) : null;
-	}
-
-	/// <summary>
-	/// Handler for trigger start touch hook - CBaseTrigger_StartTouchFunc
-	/// </summary>
-	internal HookResult OnTriggerStartTouch(CEntityIOOutput output, string name, CEntityInstance activator, CEntityInstance caller, CVariant value, float delay)
-	{
-		CBaseTrigger trigger = new CBaseTrigger(caller.Handle);
-		CCSPlayerController? client = ControllerOfActivator(activator);
-
-		if (client == null || !client.IsValid || !client.PawnIsAlive || !playerList.ContainsKey((int)client.UserId!)) // !playerList.ContainsKey((int)client.UserId!) make sure to not check for user_id that doesnt exists
-		{
-			return HookResult.Continue;
-		}
-		// To-do: Sometimes this triggers before `OnPlayerConnect` and `playerList` does not contain the player how is this possible :thonk:
-		if (!playerList.ContainsKey(client.UserId ?? 0))
-		{
-			_logger.LogCritical("[{ClassName}] OnTriggerStartTouch -> Player playerList does NOT contain client.UserId, this shouldn't happen. Player: {PlayerName} ({UserId})",
-				nameof(SurfTimer), client.PlayerName, client.UserId
-			);
-
-			Exception exception = new($"[{nameof(SurfTimer)}] OnTriggerStartTouch -> Init -> Player playerList does NOT contain client.UserId, this shouldn't happen. Player: {client.PlayerName} ({client.UserId})");
-			throw exception;
-		}
-		// Implement Trigger Start Touch Here
-		Player player = playerList[client.UserId ?? 0];
+		player.TouchingTriggers[zone.ZoneId] = zone;
 
 #if DEBUG
-		player.Controller.PrintToChat($"CS2 Surf DEBUG >> CBaseTrigger_StartTouchFunc -> {trigger.DesignerName} -> {trigger.Entity!.Name}");
+		player.Controller.PrintToChat($"CS2 Surf DEBUG >> ZoneEnter -> {zone.Type} {zone.Number} ({zone.Name})");
 #endif
-
-		if (DB == null)
-		{
-			_logger.LogCritical("[{ClassName}] OnTriggerStartTouch -> DB object is null, this shouldn't happen.",
-				nameof(SurfTimer)
-			);
-
-			Exception exception = new Exception($"[{nameof(SurfTimer)}] OnTriggerStartTouch -> DB object is null, this shouldn't happen.");
-			throw exception;
-		}
-
-		// Classified by name on every touch, not looked up by entity index: round restarts re-create the
-		// map's trigger entities with new indexes, which would leave an index-keyed lookup stale.
-		if (!ZoneInfo.TryFromTrigger(trigger, out ZoneInfo zone))
-			return HookResult.Continue; // Not a timer zone (filters, teleports, ...)
-
-		// Every entry counts, including a second trigger of the same zone
-		player.TouchingTriggers[zone.TriggerIndex] = zone;
 
 		switch (zone.Type)
 		{
@@ -85,8 +34,12 @@ public partial class SurfTimer
 			case ZoneType.BonusEnd:
 				StartTouchHandleBonusEndZone(player, zone);
 				break;
+			case ZoneType.Stop:
+				StartTouchHandleStopZone(player);
+				break;
+			case ZoneType.TeleportBack:
+				StartTouchHandleTeleportBackZone(player);
+				break;
 		}
-		return HookResult.Continue;
 	}
 }
-

@@ -60,9 +60,27 @@ public class Map : MapEntity
 	/// </summary>
 	public List<int> ConnectedMapTimes { get; set; } = new List<int>();
 
-	// Zone registry for teleport targets and counts - a role+number (e.g. BonusEnd 1) can have several
-	// triggers. Not used to dispatch touches: round restarts re-create trigger entities with new indexes.
+	// Active zones by role+number (teleport targets, counts) - a role+number (e.g. BonusEnd 1) can have
+	// several boxes. Rebuilt by ActivateZones; ZoneTracker checks players against ActiveZones every tick.
 	internal Dictionary<(ZoneType Type, short Number), List<ZoneInfo>> Zones { get; } = new();
+
+	/// <summary>Every active zone box - what the tick-based detection checks (ZoneTracker.cs)</summary>
+	internal List<ZoneInfo> ActiveZones { get; } = new();
+
+	/// <summary>Active zones by ZoneInfo.ZoneId</summary>
+	internal Dictionary<int, ZoneInfo> ActiveZoneById { get; } = new();
+
+	/// <summary>
+	/// The map's zones as stored (raw - before the stages-as-checkpoints remap). From the database, or
+	/// imported from the map's triggers on its first load (then written to the database in LoadMapInfo).
+	/// </summary>
+	internal List<ZoneDefinition> ZoneDefinitions { get; private set; } = new();
+
+	/// <summary>Whether ZoneDefinitions are stored in the database (false until a first import is written)</summary>
+	internal bool ZonesFromDatabase { get; private set; }
+
+	// Imported from the map this load - written to the database once the map's id is known
+	private bool _exportZones;
 
 	public ReplayManager ReplayManager { get; set; } = null!;
 
@@ -70,7 +88,8 @@ public class Map : MapEntity
 
 	// Constructor
 	/// <param name="stagesAsCheckpoints">The map's stages_as_checkpoints setting - read before the zones load</param>
-	internal Map(string name, bool stagesAsCheckpoints = false)
+	/// <param name="storedZones">The map's zones from the database - empty imports them from the map's triggers</param>
+	internal Map(string name, bool stagesAsCheckpoints, List<ZoneDefinition> storedZones)
 	{
 		// Resolve the logger instance from the DI container
 		_logger = SurfTimer.ServiceProvider.GetRequiredService<ILogger<Map>>();
@@ -82,8 +101,14 @@ public class Map : MapEntity
 		this.StagesAsCheckpoints = stagesAsCheckpoints;
 		ZoneName.StagesAsCheckpoints = stagesAsCheckpoints;
 
-		// Load zones
-		MapLoadZones();
+		// Zones: stored ones, else the map's own triggers (exported to the database in LoadMapInfo)
+		ZonesFromDatabase = storedZones.Count > 0;
+		_exportZones = !ZonesFromDatabase;
+		ZoneDefinitions = ZonesFromDatabase ? storedZones : ZoneImport.FromTriggers();
+		_logger.LogInformation("[{ClassName}] -> {Count} zones {Source}", nameof(Map), ZoneDefinitions.Count,
+			ZonesFromDatabase ? "loaded from the database" : "imported from the map's triggers");
+		ActivateZones(ZoneDefinitions, initial: true);
+		KillServerCommandEnts();
 		_logger.LogInformation("[{ClassName}] -> Zones have been loaded. | Bonuses: {Bonuses} | Stages: {Stages} | Checkpoints: {Checkpoints}",
 			nameof(Map), this.Bonuses, this.Stages, this.TotalCheckpoints
 		);
@@ -151,90 +176,112 @@ public class Map : MapEntity
 		await LoadMapInfo();
 	}
 
+	// Counts of the zones this map loaded with - records, courses and replays are sized by them, so zones
+	// added later (zone editor) with higher numbers stay inactive until the map loads again
+	private short _loadedStages, _loadedBonuses, _loadedCheckpoints;
+
 	/// <summary>
-	/// Registers every zone trigger in the map. A role+number can have several triggers (e.g. two
-	/// bonus1_end, one per side of a course) - each keeps its own teleport target. Counts are the
-	/// highest number found, not the number of triggers, so duplicates don't inflate them.
+	/// Makes zone definitions the map's active zones (stages-as-checkpoints remap applied). The first
+	/// activation sets the map's stage / bonus / checkpoint counts - counts are the highest number found, not
+	/// the number of boxes, so duplicates don't inflate them. Later activations (zone editor) keep the counts:
+	/// numbered zones beyond them are left inactive.
 	/// </summary>
-	internal void MapLoadZones([CallerMemberName] string methodName = "")
+	internal void ActivateZones(IReadOnlyList<ZoneDefinition> definitions, bool initial = false)
 	{
-		var triggers = Utilities.FindAllEntitiesByDesignerName<CBaseTrigger>("trigger_multiple");
-		var destinations = Utilities.FindAllEntitiesByDesignerName<CBaseEntity>("info_teleport_destination").ToList();
+		this.Zones.Clear();
+		this.ActiveZones.Clear();
+		this.ActiveZoneById.Clear();
 
-		foreach (CBaseTrigger trigger in triggers)
+		short stageZones = 0;
+		foreach (var definition in definitions)
 		{
-			string? name = trigger.Entity?.Name;
-			if (!ZoneName.TryParse(name, out ZoneType type, out short number))
-				continue;
-
+			var type = definition.Type;
+			short number = definition.Number;
 			if (type == ZoneType.StageStart)
-				this.StageZoneCount = Math.Max(this.StageZoneCount, number);
-
-			// Teleport targets by the map's own names (spawn_s2_start), then the zone mode
-			var (teleport, angles) = FindTeleportTarget(trigger, type, number, destinations);
+				stageZones = Math.Max(stageZones, number);
 			if (!ZoneName.Remap(ref type, ref number))
 				continue;
-			var zone = new ZoneInfo(trigger.Index, name!, type, number, teleport, angles);
+			if (!initial && !IsWithinLoadedCounts(type, number))
+				continue;
 
+			string name = definition.Name.Length > 0 ? definition.Name : definition.Label;
+			var zone = new ZoneInfo(definition.Key, name, type, number, definition.TeleportOrCenter, definition.TeleportAngles,
+				definition.Mins, definition.Maxs, definition.Value);
 			if (!this.Zones.TryGetValue((type, number), out var list))
 				this.Zones[(type, number)] = list = new List<ZoneInfo>();
 			list.Add(zone);
+			this.ActiveZones.Add(zone);
+			this.ActiveZoneById[zone.ZoneId] = zone;
 		}
+
+		if (!initial)
+			return;
 
 		short HighestNumber(ZoneType type) =>
 			this.Zones.Keys.Where(k => k.Type == type).Select(k => k.Number).DefaultIfEmpty((short)0).Max();
 
+		this.StageZoneCount = stageZones;
 		this.Stages = HighestNumber(ZoneType.StageStart); // Map start is stage 1, so the highest sN_start is the stage count
 		this.Bonuses = HighestNumber(ZoneType.BonusStart);
 		this.TotalCheckpoints = this.Stages > 0
 			? this.Stages - 1 // Stages are counted as Checkpoints on Staged maps during MAP runs
 			: HighestNumber(ZoneType.Checkpoint);
 
-		_logger.LogInformation("[{ClassName}] {MethodName} -> Registered {Triggers} zone triggers in {Roles} zones",
-			nameof(Map), methodName, this.Zones.Values.Sum(z => z.Count), this.Zones.Count
-		);
+		_loadedStages = (short)this.Stages;
+		_loadedBonuses = (short)this.Bonuses;
+		_loadedCheckpoints = HighestNumber(ZoneType.Checkpoint);
 
-		KillServerCommandEnts();
+		_logger.LogInformation("[{ClassName}] ActivateZones -> {Boxes} zone boxes in {Roles} zones",
+			nameof(Map), this.ActiveZones.Count, this.Zones.Count);
+	}
+
+	/// <summary>A (remapped) zone the map's loaded counts cover - unnumbered zones always are</summary>
+	internal bool IsWithinLoadedCounts(ZoneType type, short number) => type switch
+	{
+		ZoneType.StageStart => number <= _loadedStages,
+		ZoneType.BonusStart or ZoneType.BonusEnd => number <= _loadedBonuses,
+		ZoneType.Checkpoint => number <= _loadedCheckpoints,
+		_ => true,
+	};
+
+	/// <summary>
+	/// Whether zone definitions would give the map other stage / bonus / checkpoint counts than it loaded
+	/// with (zone editor - then a map restart applies them).
+	/// </summary>
+	internal bool ChangesCounts(IEnumerable<ZoneDefinition> definitions)
+	{
+		short stages = 0, bonuses = 0, checkpoints = 0;
+		foreach (var definition in definitions)
+		{
+			var type = definition.Type;
+			short number = definition.Number;
+			if (!ZoneName.Remap(ref type, ref number))
+				continue;
+			switch (type)
+			{
+				case ZoneType.StageStart: stages = Math.Max(stages, number); break;
+				case ZoneType.BonusStart: bonuses = Math.Max(bonuses, number); break;
+				case ZoneType.Checkpoint: checkpoints = Math.Max(checkpoints, number); break;
+			}
+		}
+		return stages != _loadedStages || bonuses != _loadedBonuses || checkpoints != _loadedCheckpoints;
 	}
 
 	/// <summary>
-	/// Where to put a player teleporting into this trigger: an info_teleport_destination inside it,
-	/// else the matching named spawn (spawn_map_start, spawn_s2_start, ...) closest to it, else its origin.
+	/// Replaces the stored zone definitions (zone editor save / reload from map) and activates them.
 	/// </summary>
-	private static (VectorT Position, QAngleT? Angles) FindTeleportTarget(CBaseTrigger trigger, ZoneType type, short number, List<CBaseEntity> destinations)
+	internal void SetZoneDefinitions(List<ZoneDefinition> definitions)
 	{
-		VectorT origin = trigger.AbsOrigin!.ToVector_t();
-
-		var inside = destinations.FirstOrDefault(d => d.AbsOrigin != null && IsInsideTrigger(trigger, d.AbsOrigin.ToVector_t()));
-		var chosen = inside ?? destinations
-			.Where(d => d.AbsOrigin != null
-				&& ZoneName.TryParseSpawn(d.Entity?.Name, out var spawnType, out var spawnNumber)
-				&& spawnType == type && spawnNumber == number)
-			.OrderBy(d => (d.AbsOrigin!.ToVector_t() - origin).Length())
-			.FirstOrDefault();
-
-		if (chosen == null)
-			return (origin, null);
-
-		return (chosen.AbsOrigin!.ToVector_t(),
-			new QAngleT(chosen.AbsRotation!.X, chosen.AbsRotation!.Y, chosen.AbsRotation!.Z));
-	}
-
-	internal static bool IsInsideTrigger(CBaseTrigger trigger, VectorT point)
-	{
-		var origin = trigger.AbsOrigin!;
-		var mins = trigger.Collision.Mins;
-		var maxs = trigger.Collision.Maxs;
-		return point.X >= origin.X + mins.X && point.X <= origin.X + maxs.X
-			&& point.Y >= origin.Y + mins.Y && point.Y <= origin.Y + maxs.Y
-			&& point.Z >= origin.Z + mins.Z && point.Z <= origin.Z + maxs.Z;
+		ZoneDefinitions = definitions;
+		ZonesFromDatabase = true;
+		ActivateZones(definitions);
 	}
 
 	internal bool HasZone(ZoneType type, short number) => this.Zones.ContainsKey((type, number));
 
 	/// <summary>
-	/// The trigger of a role+number closest to `from` (by teleport target). Without a position
-	/// (dead/spectating) the lowest trigger index is used so the choice is still deterministic.
+	/// The box of a role+number closest to `from` (by teleport target). Without a position
+	/// (dead/spectating) the lowest zone id is used so the choice is still deterministic.
 	/// </summary>
 	internal ZoneInfo? FindNearestZone(ZoneType type, short number, VectorT? from)
 	{
@@ -242,7 +289,7 @@ public class Map : MapEntity
 			return null;
 
 		if (from == null)
-			return list.MinBy(z => z.TriggerIndex);
+			return list.MinBy(z => z.ZoneId);
 
 		VectorT position = from.Value;
 		return list.MinBy(z => (z.Teleport - position).Length());
@@ -345,6 +392,19 @@ public class Map : MapEntity
 
 		this.Settings = await MapRepository.GetSettingsAsync(this.ID);
 		ApplySettings();
+
+		// First load of this map: its trigger zones become its stored zones
+		if (_exportZones)
+		{
+			_exportZones = false;
+			if (ZoneDefinitions.Count > 0)
+			{
+				await ZoneRepository.ReplaceAsync(this.ID, ZoneDefinitions);
+				ZonesFromDatabase = true;
+				_logger.LogInformation("[{ClassName}] {MethodName} -> Imported {Count} zones of '{Map}' from the map into the database",
+					nameof(Map), methodName, ZoneDefinitions.Count, this.Name);
+			}
+		}
 
 		_logger.LogInformation("[{ClassName}] {MethodName} -> Map '{Map}' (ID {ID}) with {Courses} courses, tier {Tier}, ranked {Ranked}",
 			nameof(Map), methodName, this.Name, this.ID, _courses.Count, this.Tier, this.Ranked);

@@ -72,7 +72,8 @@ public partial class SurfTimer
 	private void OnCheckTransmit(CCheckTransmitInfoList infoList)
 	{
 		bool hidePawns = _anyoneHiding && _transmitTargets.Count > 0;
-		if (!hidePawns && !_anyoneFilteringTrails)
+		bool zoneBeams = ZoneBeamsExist;
+		if (!hidePawns && !_anyoneFilteringTrails && !zoneBeams)
 			return;
 
 		foreach ((CCheckTransmitInfo info, CCSPlayerController? viewer) in infoList)
@@ -85,6 +86,10 @@ public partial class SurfTimer
 			// Trails the viewer doesn't want (see Trails.cs)
 			if (_anyoneFilteringTrails && (options.FiltersTrails || options.HidePlayers || options.HideBots))
 				FilterTrailTransmit(info, viewer, options);
+
+			// Zone outlines the viewer doesn't get (see ZoneDrawing.cs)
+			if (zoneBeams)
+				FilterZoneTransmit(info, player);
 
 			if (!hidePawns || (!options.HidePlayers && !options.HideBots))
 				continue;

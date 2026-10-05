@@ -109,7 +109,15 @@ public partial class SurfTimer
 			return;
 		}
 
+		ResetToCurrentStart(oPlayer);
+	}
 
+	/// <summary>
+	/// Back to the start of the stage / bonus the player is in, else the map start (!rs, teleport-back zones).
+	/// </summary>
+	private void ResetToCurrentStart(Player oPlayer)
+	{
+		var player = oPlayer.Controller;
 		bool teleported = oPlayer.Timer.IsBonusMode
 			? oPlayer.Timer.Bonus != 0 && TeleportToZone(player, ZoneType.BonusStart, oPlayer.Timer.Bonus)
 			: oPlayer.Timer.Stage > 1 && TeleportToZone(player, ZoneType.StageStart, oPlayer.Timer.Stage);
