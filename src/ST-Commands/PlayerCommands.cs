@@ -75,8 +75,12 @@ public partial class SurfTimer
 		Server.NextFrame(() =>
 		{
 			var target = player.PlayerPawn.Value;
-			if (target != null && target.IsValid)
-				Extensions.Teleport(target, position, angles, new VectorT(0, 0, 0));
+			if (target == null || !target.IsValid)
+				return;
+			if (angles is QAngleT view)
+				target.TeleportWithView(position, view, new VectorT(0, 0, 0)); // Keeps the pawn level
+			else
+				Extensions.Teleport(target, position, null, new VectorT(0, 0, 0));
 		});
 		return true;
 	}

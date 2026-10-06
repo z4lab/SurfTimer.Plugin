@@ -76,6 +76,46 @@ unsafe static class Extensions
 			(nint)pAng, (nint)pVel);
 	}
 
+	/// <summary>
+	/// Teleports a player with a view that may look up / down. Teleport angles rotate the whole pawn, and a
+	/// pitched pawn tilts the player's body and view model - so the pawn's own rotation is levelled again
+	/// (yaw only) right after, which leaves the camera on the given view.
+	/// </summary>
+	public static void TeleportWithView(this CBasePlayerPawn pawn, VectorT position, QAngleT view, VectorT velocity)
+	{
+		Teleport(pawn, position, new QAngleT(view.X, view.Y, 0), velocity);
+		LevelPawnRotation(pawn, view.Y);
+		Server.NextFrame(() => LevelPawnRotation(pawn, view.Y));
+	}
+
+	private static void LevelPawnRotation(CBasePlayerPawn pawn, float yaw)
+	{
+		if (!pawn.IsValid)
+			return;
+
+		var node = pawn.CBodyComponent?.SceneNode;
+		if (node == null)
+			return;
+
+		node.Rotation.X = 0;
+		node.Rotation.Y = yaw;
+		node.Rotation.Z = 0;
+		node.AbsRotation.X = 0;
+		node.AbsRotation.Y = yaw;
+		node.AbsRotation.Z = 0;
+		// The scene node's rotation is networked inside the pawn's body component (CBodyComponent /
+		// m_skeletonInstance.m_angRotation) - mark the component, not a scene node offset on the pawn itself
+		// (that offset doesn't resolve on CCSPlayerPawn and floods the console with "Couldn't resolve offset")
+		try
+		{
+			Utilities.SetStateChanged(pawn, "CBaseEntity", "m_CBodyComponent");
+		}
+		catch
+		{
+			// A CSS build that can't resolve the field - the server-side value is set either way
+		}
+	}
+
 	public static (VectorT fwd, VectorT right, VectorT up) AngleVectors(this QAngle vec) => vec.ToQAngle_t().AngleVectors();
 	public static void AngleVectors(this QAngle vec, out VectorT fwd, out VectorT right, out VectorT up) => vec.ToQAngle_t().AngleVectors(out fwd, out right, out up);
 

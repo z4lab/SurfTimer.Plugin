@@ -97,7 +97,7 @@ internal sealed class Saveloc
 	/// <summary>Puts a pawn into this state (teleport, crouch, move type, gravity)</summary>
 	internal void ApplyPawn(CCSPlayerPawn pawn)
 	{
-		Extensions.Teleport(pawn, Position, Angles, Velocity);
+		pawn.TeleportWithView(Position, Angles, Velocity); // Full view, pawn kept level
 
 		pawn.MoveType = MoveType;
 		pawn.ActualMoveType = MoveType;
