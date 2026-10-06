@@ -1,5 +1,6 @@
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
+using CounterStrikeSharp.API.Core.Attributes.Registration;
 using CounterStrikeSharp.API.Modules.Utils;
 using Microsoft.Extensions.Logging;
 
@@ -29,6 +30,21 @@ internal sealed class ZoneEditorSession(Player editor, List<ZoneDefinition> draf
 	/// <summary>"Set corner 1 here" - the point corner 2 spans the zone to</summary>
 	internal VectorT? Corner1 { get; set; }
 
+	/// <summary>Aim mode: shots set the selected zone's corners where they hit (1, 2, 1, ...)</summary>
+	internal bool AimMode { get; set; }
+
+	/// <summary>Aim mode: the corner the next shot sets (0 = corner 1, 1 = corner 2)</summary>
+	internal int AimCorner { get; set; }
+
+	/// <summary>Aim mode: the tick of the last corner set - one per shot (penetration fires several impacts)</summary>
+	internal int LastAimTick { get; set; }
+
+	/// <summary>Where the editor was last tick - a bigger jump than noclip flies is a map teleport, undone</summary>
+	internal VectorT? LastPosition { get; set; }
+
+	/// <summary>Until this tick the editor's own teleports (menu) aren't undone</summary>
+	internal int OwnTeleportUntilTick { get; set; }
+
 	internal ZoneDefinition? Selected => SelectedKey is int key ? Draft.FirstOrDefault(z => z.Key == key) : null;
 }
 
@@ -48,8 +64,9 @@ public partial class SurfTimer
 	}
 
 	/// <summary>
-	/// Puts an admin into the zone editor: timer stopped, moved to spectator (free roam), the map's zones
-	/// copied into a draft and drawn for them. Returns an error when someone else is editing.
+	/// Puts an admin into the zone editor: timer stopped, alive in noclip (map teleports undone, zones don't
+	/// fire for them), the map's zones copied into a draft and drawn for them. Returns an error when someone
+	/// else is editing.
 	/// </summary>
 	internal string? EnterZoneEditor(Player player)
 	{
@@ -68,26 +85,113 @@ public partial class SurfTimer
 		player.Timer.Reset();
 		player.Stats.ThisRun.Checkpoints.Clear();
 		player.ReplayRecorder.Stop();
-		if (controller.Team != CsTeam.Spectator)
-			controller.ChangeTeam(CsTeam.Spectator);
-		AddTimer(0.2f, () => SetFreeRoam(controller));
+		player.TouchingTriggers.Clear();
+
+		// Alive in noclip - from spectator / dead the admin joins their team first (TickZoneEditor sets noclip)
+		if (controller.Team is not (CsTeam.Terrorist or CsTeam.CounterTerrorist))
+			controller.ChangeTeam(team);
+		if (!controller.PawnIsAlive)
+			AddTimer(0.2f, () =>
+			{
+				if (controller.IsValid && !controller.PawnIsAlive)
+					controller.Respawn();
+			});
 
 		RedrawEditorOutlines();
 		_logger.LogInformation("[Zones] {Player} entered the zone editor on {Map}", controller.PlayerName, map.Name);
 		return null;
 	}
 
-	/// <summary>Spectator free-cam (also switchable with the spectator keys)</summary>
-	private static void SetFreeRoam(CCSPlayerController controller)
-	{
-		var observer = controller.IsValid ? controller.ObserverPawn.Value : null;
-		var services = observer?.ObserverServices;
-		if (observer == null || !observer.IsValid || services == null)
-			return;
+	// More than noclip flies in one tick (sv_noclipspeed 5 = ~1250 u/s = ~20 units per tick)
+	private const float EditorTeleportJump = 200f;
 
-		services.ObserverMode = (byte)ObserverMode_t.OBS_MODE_ROAMING;
-		services.ObserverTarget.Raw = uint.MaxValue;
-		Utilities.SetStateChanged(observer, "CBasePlayerPawn", "m_pObserverServices");
+	/// <summary>
+	/// Every tick while someone edits: keeps them in noclip (maps reset move types) and undoes teleports the
+	/// map does to them (trigger_teleport) - a jump further than noclip can fly that the menu didn't make.
+	/// </summary>
+	private void TickZoneEditor()
+	{
+		var editor = ActiveZoneEditor;
+		var controller = editor?.Editor.Controller;
+		var pawn = controller != null && controller.PawnIsAlive ? controller.PlayerPawn.Value : null;
+		if (editor == null || pawn == null || !pawn.IsValid || pawn.AbsOrigin == null)
+		{
+			if (editor != null)
+				editor.LastPosition = null;
+			return;
+		}
+
+		if (pawn.MoveType != MoveType_t.MOVETYPE_NOCLIP)
+			SetMoveType(pawn, MoveType_t.MOVETYPE_NOCLIP);
+
+		var position = pawn.AbsOrigin.ToVector_t();
+		if (editor.LastPosition is VectorT last && Server.TickCount > editor.OwnTeleportUntilTick
+			&& (position - last).Length() > EditorTeleportJump)
+		{
+			Extensions.Teleport(pawn, last, null, new VectorT(0, 0, 0));
+			return; // LastPosition stays where the editor was
+		}
+		editor.LastPosition = position;
+	}
+
+	private static void SetMoveType(CBasePlayerPawn pawn, MoveType_t moveType)
+	{
+		pawn.MoveType = moveType;
+		pawn.ActualMoveType = moveType;
+		Utilities.SetStateChanged(pawn, "CBaseEntity", "m_MoveType");
+	}
+
+	/// <summary>A teleport the editor asked for - not undone as a map teleport</summary>
+	private static void EditorTeleport(ZoneEditorSession editor, VectorT position, QAngleT? angles)
+	{
+		var pawn = editor.Editor.Controller.PlayerPawn.Value;
+		if (pawn == null || !pawn.IsValid)
+			return;
+		editor.OwnTeleportUntilTick = Server.TickCount + 4;
+		editor.LastPosition = position;
+		if (angles is QAngleT view)
+			pawn.TeleportWithView(position, view, new VectorT(0, 0, 0));
+		else
+			Extensions.Teleport(pawn, position, null, new VectorT(0, 0, 0));
+	}
+
+	/// <summary>
+	/// Aim mode: a shot of the editor sets the selected zone's next corner where the bullet hit (bullet_impact,
+	/// the first impact of a shot - penetration fires more).
+	/// </summary>
+	[GameEventHandler]
+	public HookResult OnEditorBulletImpact(EventBulletImpact @event, GameEventInfo info)
+	{
+		var editor = ActiveZoneEditor;
+		var shooter = @event.Userid;
+		if (editor == null || !editor.AimMode || shooter == null || !shooter.IsValid
+			|| shooter.UserId != editor.Editor.Controller.UserId || editor.LastAimTick == Server.TickCount)
+			return HookResult.Continue;
+
+		var zone = editor.Selected;
+		if (zone == null)
+		{
+			shooter.PrintToChat($"{Config.PluginPrefix} Select a zone in the editor first - shots set its corners");
+			return HookResult.Continue;
+		}
+
+		editor.LastAimTick = Server.TickCount;
+		var point = new VectorT(@event.X, @event.Y, @event.Z);
+		if (editor.AimCorner == 0)
+		{
+			editor.Corner1 = point;
+			zone.SetCorners(point, FarthestCorner(zone, point));
+		}
+		else
+		{
+			zone.SetCorners(editor.Corner1 ?? FarthestCorner(zone, point), point);
+		}
+		shooter.PrintToChat($"{Config.PluginPrefix} {zone.Label}: corner {editor.AimCorner + 1} at {point.X:0} {point.Y:0} {point.Z:0}");
+		editor.AimCorner = 1 - editor.AimCorner;
+		ZoneDraftChanged(zone);
+		if (editor.Editor.Admin is { } session)
+			PanelRefresh(session);
+		return HookResult.Continue;
 	}
 
 	/// <summary>
@@ -114,7 +218,10 @@ public partial class SurfTimer
 		if (!restorePlayer || !controller.IsValid)
 			return;
 
-		controller.ChangeTeam(editor.PreviousTeam);
+		if (controller.PlayerPawn.Value is { IsValid: true } pawn)
+			SetMoveType(pawn, MoveType_t.MOVETYPE_WALK);
+		if (controller.Team != editor.PreviousTeam)
+			controller.ChangeTeam(editor.PreviousTeam);
 		AddTimer(0.2f, () =>
 		{
 			if (!controller.IsValid)
@@ -170,31 +277,31 @@ public partial class SurfTimer
 			RedrawEditorOutline(zone);
 	}
 
-	/// <summary>Where the editor's spectator camera is (free roam) and where it looks</summary>
+	/// <summary>Where the editor stands (feet) and looks</summary>
 	private static (VectorT Position, QAngleT Angles)? EditorCamera(Player editor)
 	{
-		var observer = editor.Controller.ObserverPawn.Value;
-		if (observer == null || !observer.IsValid || observer.AbsOrigin == null)
+		var pawn = editor.Controller.PawnIsAlive ? editor.Controller.PlayerPawn.Value : null;
+		if (pawn == null || !pawn.IsValid || pawn.AbsOrigin == null)
 			return null;
 
-		var angles = observer.V_angle;
-		return (observer.AbsOrigin.ToVector_t(), new QAngleT(angles.X, angles.Y, 0));
+		var angles = pawn.EyeAngles;
+		return (pawn.AbsOrigin.ToVector_t(), new QAngleT(angles.X, angles.Y, 0));
 	}
 
-	/// <summary>Moves the editor's camera to a zone (its teleport point, else above its center)</summary>
-	private static void MoveEditorCamera(Player editor, ZoneDefinition zone)
+	/// <summary>Moves the editor to a zone (its teleport point, else in front of and above its center)</summary>
+	private void MoveEditorCamera(Player editor, ZoneDefinition zone)
 	{
-		var observer = editor.Controller.ObserverPawn.Value;
-		if (observer == null || !observer.IsValid)
+		var session = _zoneEditor;
+		if (session == null)
 			return;
 
 		var size = zone.Size;
 		var center = zone.Center;
 		var position = zone.Teleport is VectorT teleport
-			? new Vector(teleport.X, teleport.Y, teleport.Z + 64)
-			: new Vector(center.X, center.Y - MathF.Max(size.Y, 128), center.Z + MathF.Max(size.Z, 64));
-		var angles = zone.TeleportAngles is QAngleT a ? new QAngle(a.X, a.Y, 0) : new QAngle(20, 90, 0);
-		observer.Teleport(position, angles, new Vector(0, 0, 0));
+			? teleport
+			: new VectorT(center.X, center.Y - MathF.Max(size.Y, 128), center.Z + MathF.Max(size.Z, 64));
+		var angles = zone.TeleportAngles is QAngleT a ? new QAngleT(a.X, a.Y, 0) : new QAngleT(20, 90, 0);
+		EditorTeleport(session, position, angles);
 	}
 
 	/// <summary>

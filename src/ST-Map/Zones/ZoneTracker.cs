@@ -17,7 +17,8 @@ public partial class SurfTimer
 		var map = CurrentMap;
 		var controller = player.Controller;
 		var pawn = controller.PlayerPawn.Value;
-		if (map == null || !controller.PawnIsAlive || pawn == null || !pawn.IsValid || pawn.AbsOrigin == null)
+		bool editing = _zoneEditor != null && ReferenceEquals(_zoneEditor.Editor, player);
+		if (editing || map == null || !controller.PawnIsAlive || pawn == null || !pawn.IsValid || pawn.AbsOrigin == null)
 		{
 			// Dead / spectating: forgotten without exit handlers (as a trigger's EndTouch did for dead players)
 			player.TouchingTriggers.Clear();

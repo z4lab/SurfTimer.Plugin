@@ -124,6 +124,16 @@ public partial class SurfTimer
 			LogTickError(ex, "trails");
 		}
 
+		// The zone editor's noclip and undone map teleports (ZoneEditor.cs)
+		try
+		{
+			TickZoneEditor();
+		}
+		catch (Exception ex)
+		{
+			LogTickError(ex, "zone editor");
+		}
+
 		// Zone outlines (ZoneDrawing.cs) - built while someone wants them, redrawn after round restarts
 		if (Server.TickCount % 32 == 0)
 		{

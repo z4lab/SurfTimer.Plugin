@@ -110,11 +110,19 @@ public partial class SurfTimer
 		var rows = new List<HudMenuItem>
 		{
 			ctx.Act("Step", $"{editor.Step:0} units", "1 / 4 / 16 / 64", () => editor.StepIndex = (editor.StepIndex + 1) % ZoneEditorSession.Steps.Length),
-			ctx.Nav("Add zone", "", "a 64³ box at your camera", () => ZoneTypePage((type, number) =>
+			ctx.Toggle("Aim mode", editor.AimMode, "shots set the selected zone's corners (1, 2, 1, ...)", on =>
+			{
+				editor.AimMode = on;
+				editor.AimCorner = 0;
+				if (on && editor.Editor.Controller.PawnIsAlive)
+					GivePistolItem(editor.Editor.Controller, DefaultPistol(editor.Editor.Controller.Team));
+				ctx.Session.Status = on ? "Aim mode: shoot corner 1, then corner 2 of the selected zone" : "Aim mode off";
+			}),
+			ctx.Nav("Add zone", "", "a 64³ box where you are", () => ZoneTypePage((type, number) =>
 			{
 				var camera = EditorCamera(editor.Editor);
 				if (camera == null)
-					return "Your spectator camera isn't ready - try again";
+					return "You aren't alive yet - try again";
 				var zone = new ZoneDefinition
 				{
 					Type = type,
@@ -284,7 +292,7 @@ public partial class SurfTimer
 		{
 			PanelContext.Info(zone.Label, ZoneSize(zone), $"center {center.X:0} {center.Y:0} {center.Z:0}{(IsZoneActiveInMap(zone) ? "" : " · inactive until a map restart")}"),
 			ctx.Act("Step", $"{step:0} units", "", () => editor.StepIndex = (editor.StepIndex + 1) % ZoneEditorSession.Steps.Length),
-			ctx.Act("Teleport camera here", "", "", () => MoveEditorCamera(editor.Editor, zone)),
+			ctx.Act("Teleport here", "", "", () => MoveEditorCamera(editor.Editor, zone)),
 
 			Edit("Move +X", "east", z => Move(z, step, 0, 0)),
 			Edit("Move -X", "west", z => Move(z, -step, 0, 0)),
@@ -301,7 +309,7 @@ public partial class SurfTimer
 			Edit("Height -", "top, the floor stays", z => Grow(z, 0, 0, -step, centered: false)),
 			ctx.Nav("Faces", "", "grow / shrink one side", () => ZoneFacesPage(key)),
 
-			ctx.Act("Set corner 1 here", editor.Corner1 != null ? "set" : "", "your camera position", () =>
+			ctx.Act("Set corner 1 here", editor.Corner1 != null ? "set" : "", editor.AimMode ? "or shoot it (aim mode)" : "your position", () =>
 			{
 				var camera = EditorCamera(editor.Editor);
 				if (camera == null)
@@ -320,7 +328,7 @@ public partial class SurfTimer
 				zone.SetCorners(editor.Corner1 ?? FarthestCorner(zone, point), point);
 				ZoneDraftChanged(zone);
 			}),
-			ctx.Act("Set teleport here", zone.Teleport != null ? "set" : "center", "camera position and view", () =>
+			ctx.Act("Set teleport here", zone.Teleport != null ? "set" : "center", "your position and view", () =>
 			{
 				var camera = EditorCamera(editor.Editor);
 				if (camera == null)
