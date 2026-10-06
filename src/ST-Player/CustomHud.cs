@@ -119,7 +119,7 @@ internal static class CustomHud
 	/// </summary>
 	internal static string SpeedColorClass(float velocity, float minSpeed = 240f, float maxSpeed = 4000f)
 	{
-		float t = (Math.Clamp(velocity, minSpeed, maxSpeed) - minSpeed) / (maxSpeed - minSpeed);
+		float t = (Math.Clamp(Math.Abs(velocity), minSpeed, maxSpeed) - minSpeed) / (maxSpeed - minSpeed); // Z speeds are signed
 		return $"spd-{(int)Math.Round(t * 8)}";
 	}
 

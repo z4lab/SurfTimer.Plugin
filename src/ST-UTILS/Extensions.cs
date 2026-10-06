@@ -138,6 +138,7 @@ unsafe static class Extensions
 	/// <returns>HEX value as string</returns>
 	public static string GetSpeedColorGradient(float velocity, float minSpeed = 240f, float maxSpeed = 4000f)
 	{
+		velocity = Math.Abs(velocity); // Z speeds are signed
 		// Key colors (HEX -> RGB)
 		(int R, int G, int B)[] gradient = new (int, int, int)[]
 		{
@@ -174,6 +175,30 @@ unsafe static class Extensions
 	/// </summary>
 	/// <param name="controller">Controller to calculate velocity for</param>
 	/// <returns>float velocity</returns>
+	/// <summary>A velocity's speed on the chosen axes - XY horizontal, XYZ 3D, Z vertical (signed)</summary>
+	internal static float Speed(VectorT velocity, SpeedAxes axes) => axes switch
+	{
+		SpeedAxes.XYZ => MathF.Sqrt(velocity.X * velocity.X + velocity.Y * velocity.Y + velocity.Z * velocity.Z),
+		SpeedAxes.Z => velocity.Z,
+		_ => MathF.Sqrt(velocity.X * velocity.X + velocity.Y * velocity.Y),
+	};
+
+	internal static float Speed(float x, float y, float z, SpeedAxes axes) => Speed(new VectorT(x, y, z), axes);
+
+	/// <summary>A player's / bot's current speed on the chosen axes</summary>
+	internal static float SpeedOf(CCSPlayerController controller, SpeedAxes axes)
+	{
+		var vel = controller.PlayerPawn?.Value?.AbsVelocity;
+		return vel == null ? 0f : Speed(vel.X, vel.Y, vel.Z, axes);
+	}
+
+	internal static string SpeedLabel(SpeedAxes axes) => axes switch
+	{
+		SpeedAxes.XYZ => "XYZ",
+		SpeedAxes.Z => "Z",
+		_ => "XY",
+	};
+
 	public static float GetVelocityFromController(CCSPlayerController controller)
 	{
 		var pawn = controller.PlayerPawn?.Value;

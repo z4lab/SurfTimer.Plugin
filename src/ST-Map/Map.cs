@@ -339,6 +339,9 @@ public class Map : MapEntity
 
 	internal ulong? WorkshopId { get; set; }
 
+	/// <summary>Savelocs of this map session - server-wide ids from 1, gone with the map</summary>
+	internal SavelocSession Savelocs { get; } = new();
+
 	/// <summary>Splits of map runs at a rank (#10, group cutoffs) for the HUD splits panel</summary>
 	internal SplitTargets SplitTargets { get; } = new();
 

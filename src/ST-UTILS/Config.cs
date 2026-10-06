@@ -110,6 +110,7 @@ public static class Config
 		ReplayPoolCap = Math.Clamp(TimerSettings.GetInt("replay_pool_cap", 5), 1, 10);
 		ReplayPermanentMapBot = TimerSettings.GetBool("replay_permanent_map_bot", false);
 		IdleThresholdSeconds = Math.Max(0, TimerSettings.GetInt("idle_threshold_seconds", 60));
+		SavelocLimit = Math.Max(1, TimerSettings.GetInt("saveloc_limit", 10000));
 		ClanTagsEnabled = TimerSettings.GetBool("clan_tags_enabled", true);
 		CountryClanTag = TimerSettings.GetBool("country_clan_tag", true);
 	}
@@ -129,6 +130,9 @@ public static class Config
 	/// Seconds without movement, input or looking around after which a player's replay recording is
 	/// stopped and freed (0 = off). The timer keeps running.
 	/// </summary>
+	/// <summary>Savelocs per map session (all players) - new ones are refused beyond it</summary>
+	public static int SavelocLimit { get; private set; } = Math.Max(1, TimerSettings.GetInt("saveloc_limit", 10000));
+
 	public static int IdleThresholdSeconds { get; private set; } = Math.Max(0, TimerSettings.GetInt("idle_threshold_seconds", 60));
 
 	/// <summary>

@@ -110,12 +110,15 @@ public class PlayerHud
 	/// with the classic HUD.
 	/// </summary>
 	/// <param name="context">"Stage 2", "Checkpoint 3", ... or empty</param>
-	internal void NotifyPrespeed(string context, float velocity)
+	internal void NotifyPrespeed(string context, VectorT velocity)
 	{
 		_player.LastPrespeed = velocity;
 
 		if (!CustomHud.IsActive)
-			_player.Controller.PrintToCenter($"{(context != "" ? context + " - " : "")}Prespeed: {velocity:0} u/s");
+		{
+			var axes = _player.Options.SpeedAxes;
+			_player.Controller.PrintToCenter($"{(context != "" ? context + " - " : "")}Prespeed {Extensions.SpeedLabel(axes)}: {Extensions.Speed(velocity, axes):0} u/s");
+		}
 	}
 
 	/// <summary>
@@ -146,8 +149,8 @@ public class PlayerHud
 		return new HudElement("", prefix + FormatTime(p.Timer.Ticks), TimerColorOf(p), Size: HudSize.XLarge);
 	}
 
-	private static HudElement SpeedElement(float velocity) =>
-		new("Speed", velocity.ToString("0"), Extensions.GetSpeedColorGradient(velocity), " u/s",
+	private static HudElement SpeedElement(float velocity, SpeedAxes axes) =>
+		new($"Speed {Extensions.SpeedLabel(axes)}", velocity.ToString("0"), Extensions.GetSpeedColorGradient(velocity), " u/s",
 			Size: HudSize.Large, ColorClass: CustomHud.SpeedColorClass(velocity));
 
 	// The HUD runs every tick, so a bonus/stage index that's unset (0) or has no data must fall back to
@@ -256,7 +259,7 @@ public class PlayerHud
 			return
 			[
 				[TimerElement(_player)],
-				[SpeedElement(Extensions.GetVelocityFromController(_player.Controller))],
+				[SpeedElement(Extensions.SpeedOf(_player.Controller, _player.Options.SpeedAxes), _player.Options.SpeedAxes)],
 				[PbElement(_player), RankElement(_player)],
 				[WrElement(_player)],
 			];
@@ -288,7 +291,8 @@ public class PlayerHud
 		if (replayType == "")
 			return []; // Invalid type
 
-		float velocity = Extensions.GetVelocityFromController(specReplay.Controller!);
+		var axes = _player.Options.SpeedAxes;
+		float velocity = Extensions.SpeedOf(specReplay.Controller!, axes);
 		string timerColor = ReplayTimerColor(specReplay);
 
 		return
@@ -296,7 +300,7 @@ public class PlayerHud
 			[new HudElement("", replayType, SpectatorColor, Label: true)],
 			[new HudElement("", specReplay.RecordPlayerName ?? "", RankColorWr)],
 			[new HudElement("", $"{FormatTime(specReplay.ReplayCurrentRunTime)} / {FormatTime(specReplay.RecordRunTime)}", timerColor, Size: HudSize.Large)],
-			[SpeedElement(velocity)],
+			[SpeedElement(velocity, axes)],
 			[new HudElement("Cycle", $"{specReplay.RepeatCount}", SpectatorColor, Size: HudSize.Small)],
 		];
 	}
@@ -479,13 +483,16 @@ public class PlayerHud
 		float? prespeedSpeed;
 		PlayerButtons? buttons;
 		float? syncPercent;
+		// Speeds on the viewer's axes (!options - HUD), also for whoever they spectate
+		var axes = _player.Options.SpeedAxes;
 		if (subject != null)
 		{
 			ticks = subject.Timer.Ticks;
 			timerColor = TimerColorOf(subject);
-			velocity = Extensions.GetVelocityFromController(subject.Controller);
+			velocity = Extensions.SpeedOf(subject.Controller, axes);
 			// Prespeed: live while in a start zone, then the exit speed
-			prespeedSpeed = subject.IsTouchingAnyStartZone ? velocity : subject.LastPrespeed;
+			prespeedSpeed = subject.IsTouchingAnyStartZone ? velocity
+				: subject.LastPrespeed is VectorT exit ? Extensions.Speed(exit, axes) : null;
 			buttons = subject.Controller.Buttons;
 			syncPercent = subject.SyncPercent;
 		}
@@ -493,8 +500,8 @@ public class PlayerHud
 		{
 			ticks = replay!.ReplayCurrentRunTime;
 			timerColor = ReplayTimerColor(replay);
-			velocity = Extensions.GetVelocityFromController(replay.Controller!);
-			prespeedSpeed = replay.Prespeed(velocity);
+			velocity = Extensions.SpeedOf(replay.Controller!, axes);
+			prespeedSpeed = replay.Prespeed(velocity, axes);
 			// Replays recorded before buttons were stored: keys stay released, sync N/A
 			buttons = replay.CurrentButtons();
 			syncPercent = replay.CurrentSync();
@@ -502,7 +509,7 @@ public class PlayerHud
 
 		var timer = new HudField("Timer",
 			[new FieldSegment(FormatTime(ticks, PlayerTimer.TimeFormatStyle.Full), CustomHud.ColorClass(timerColor), Mono: true)], Wide: true);
-		var speed = new HudField("Speed",
+		var speed = new HudField($"Speed {Extensions.SpeedLabel(axes)}",
 			[new FieldSegment(velocity.ToString("0", CultureInfo.InvariantCulture), CustomHud.SpeedColorClass(velocity), Mono: true)]);
 
 		var prespeed = new HudField("Prespeed",
@@ -1110,7 +1117,8 @@ public class PlayerHud
 		int style = _player.Timer.Style;
 		int playerCurrentCheckpoint = _player.Timer.Checkpoint;
 		int currentTime = _player.Timer.Ticks;
-		float currentSpeed = Extensions.GetVelocityFromController(_player.Controller!);
+		var axes = _player.Options.SpeedAxes;
+		float currentSpeed = Extensions.SpeedOf(_player.Controller!, axes);
 
 		// Default values for the PB and WR differences in case no calculations can be made
 		string strPbDifference =
@@ -1124,12 +1132,7 @@ public class PlayerHud
 		if (pbCheckpoint != null)
 		{
 			pbTime = pbCheckpoint.RunTime;
-			pbSpeed = (float)
-				Math.Sqrt(
-					pbCheckpoint.StartVelX * pbCheckpoint.StartVelX
-						+ pbCheckpoint.StartVelY * pbCheckpoint.StartVelY
-						+ pbCheckpoint.StartVelZ * pbCheckpoint.StartVelZ
-				);
+			pbSpeed = Extensions.Speed(pbCheckpoint.StartVelX, pbCheckpoint.StartVelY, pbCheckpoint.StartVelZ, axes);
 		}
 		else
 		{
@@ -1188,12 +1191,7 @@ public class PlayerHud
 			if (wrCheckpoint != null)
 			{
 				wrTime = wrCheckpoint.RunTime;
-				wrSpeed = (float)
-					Math.Sqrt(
-						wrCheckpoint.StartVelX * wrCheckpoint.StartVelX
-							+ wrCheckpoint.StartVelY * wrCheckpoint.StartVelY
-							+ wrCheckpoint.StartVelZ * wrCheckpoint.StartVelZ
-					);
+				wrSpeed = Extensions.Speed(wrCheckpoint.StartVelX, wrCheckpoint.StartVelY, wrCheckpoint.StartVelZ, axes);
 				// Reset the string
 				strWrDifference = string.Empty;
 
@@ -1260,7 +1258,8 @@ public class PlayerHud
 			return;
 
 		int style = _player.Timer.Style;
-		float exitSpeed = exitVelocity.velMag();
+		var axes = _player.Options.SpeedAxes;
+		float exitSpeed = Extensions.Speed(exitVelocity, axes);
 
 		string strPbDifference =
 			$"{ChatColors.Grey}N/A{ChatColors.Default} ({ChatColors.Grey}N/A{ChatColors.Default})";
@@ -1271,8 +1270,7 @@ public class PlayerHud
 		if (stagePb.ID != -1)
 		{
 			int pbTime = stagePb.RunTime;
-			float pbSpeed = (float)
-				Math.Sqrt(stagePb.EndVelX * stagePb.EndVelX + stagePb.EndVelY * stagePb.EndVelY + stagePb.EndVelZ * stagePb.EndVelZ);
+			float pbSpeed = Extensions.Speed(stagePb.EndVelX, stagePb.EndVelY, stagePb.EndVelZ, axes);
 
 			strPbDifference = string.Empty;
 			if (pbTime - stageRunTime < 0.0)
@@ -1292,8 +1290,7 @@ public class PlayerHud
 		if (stageWr.ID != -1)
 		{
 			int wrTime = stageWr.RunTime;
-			float wrSpeed = (float)
-				Math.Sqrt(stageWr.EndVelX * stageWr.EndVelX + stageWr.EndVelY * stageWr.EndVelY + stageWr.EndVelZ * stageWr.EndVelZ);
+			float wrSpeed = Extensions.Speed(stageWr.EndVelX, stageWr.EndVelY, stageWr.EndVelZ, axes);
 
 			strWrDifference = string.Empty;
 			if (wrTime - stageRunTime < 0.0)
@@ -1330,7 +1327,8 @@ public class PlayerHud
 			return;
 
 		int style = _player.Timer.Style;
-		float exitSpeed = exitVelocity.velMag();
+		var axes = _player.Options.SpeedAxes;
+		float exitSpeed = Extensions.Speed(exitVelocity, axes);
 
 		// Runs inside zone touch handlers - an unknown segment must not throw and abort the handler
 		if (!HasEntry(_player.Stats.CheckpointPB, checkpoint, style) || !HasEntry(SurfTimer.CurrentMap.CheckpointWR, checkpoint, style))
@@ -1345,8 +1343,7 @@ public class PlayerHud
 		if (checkpointPb.ID != -1)
 		{
 			int pbTime = checkpointPb.RunTime;
-			float pbSpeed = (float)
-				Math.Sqrt(checkpointPb.EndVelX * checkpointPb.EndVelX + checkpointPb.EndVelY * checkpointPb.EndVelY + checkpointPb.EndVelZ * checkpointPb.EndVelZ);
+			float pbSpeed = Extensions.Speed(checkpointPb.EndVelX, checkpointPb.EndVelY, checkpointPb.EndVelZ, axes);
 
 			strPbDifference = string.Empty;
 			if (pbTime - checkpointRunTime < 0.0)
@@ -1366,8 +1363,7 @@ public class PlayerHud
 		if (checkpointWr.ID != -1)
 		{
 			int wrTime = checkpointWr.RunTime;
-			float wrSpeed = (float)
-				Math.Sqrt(checkpointWr.EndVelX * checkpointWr.EndVelX + checkpointWr.EndVelY * checkpointWr.EndVelY + checkpointWr.EndVelZ * checkpointWr.EndVelZ);
+			float wrSpeed = Extensions.Speed(checkpointWr.EndVelX, checkpointWr.EndVelY, checkpointWr.EndVelZ, axes);
 
 			strWrDifference = string.Empty;
 			if (wrTime - checkpointRunTime < 0.0)

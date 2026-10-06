@@ -243,13 +243,13 @@ public class ReplayPlayer
 	/// Prespeed like for players: the bot's live speed before the run starts, then the speed it left
 	/// the start zone with (from the recorded positions, so old replays work too).
 	/// </summary>
-	internal float Prespeed(float liveVelocity)
+	internal float Prespeed(float liveVelocity, SpeedAxes axes)
 	{
 		if (this.PlayedFrameIndex <= this.RunStartFrame || this.RunStartFrame + 1 >= this.Frames.Count)
 			return liveVelocity;
 
 		var delta = this.Frames[this.RunStartFrame + 1].GetPos() - this.Frames[this.RunStartFrame].GetPos();
-		return delta.Length() * 64;
+		return Extensions.Speed(delta * 64, axes);
 	}
 
 	/// <summary>

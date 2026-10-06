@@ -67,18 +67,23 @@ public partial class SurfTimer
 			return;
 
 		foreach (var player in playerList.Values)
-		{
-			player.TouchingTriggers.Clear();
-			var controller = player.Controller;
-			var pawn = controller.IsValid && controller.PawnIsAlive ? controller.PlayerPawn.Value : null;
-			if (pawn == null || !pawn.IsValid || !HullOf(pawn, out var mins, out var maxs))
-				continue;
+			ResyncZoneTouches(player);
+	}
 
-			foreach (var zone in map.ActiveZones)
-			{
-				if (zone.Overlaps(mins, maxs))
-					player.TouchingTriggers[zone.ZoneId] = zone;
-			}
+	/// <summary>One player's "inside" state recomputed without handlers (e.g. after loading a saveloc)</summary>
+	internal void ResyncZoneTouches(Player player)
+	{
+		var map = CurrentMap;
+		player.TouchingTriggers.Clear();
+		var controller = player.Controller;
+		var pawn = map != null && controller.IsValid && controller.PawnIsAlive ? controller.PlayerPawn.Value : null;
+		if (pawn == null || !pawn.IsValid || !HullOf(pawn, out var mins, out var maxs))
+			return;
+
+		foreach (var zone in map!.ActiveZones)
+		{
+			if (zone.Overlaps(mins, maxs))
+				player.TouchingTriggers[zone.ZoneId] = zone;
 		}
 	}
 

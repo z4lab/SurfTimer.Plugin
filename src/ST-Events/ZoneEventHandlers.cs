@@ -602,7 +602,7 @@ public partial class SurfTimer
 		}
 
 		// Prespeed display
-		player.HUD.NotifyPrespeed(CurrentMap.Stages > 0 ? "Stage 1" : "", velocity.velMag());
+		player.HUD.NotifyPrespeed(CurrentMap.Stages > 0 ? "Stage 1" : "", velocity);
 		player.Stats.ThisRun.StartVelX = velocity.X; // Start pre speed for the Map run
 		player.Stats.ThisRun.StartVelY = velocity.Y; // Start pre speed for the Map run
 		player.Stats.ThisRun.StartVelZ = velocity.Z; // Start pre speed for the Map run
@@ -642,7 +642,7 @@ public partial class SurfTimer
 		player.Timer.StageEntryVelX = velocity.X;
 		player.Timer.StageEntryVelY = velocity.Y;
 		player.Timer.StageEntryVelZ = velocity.Z;
-		player.HUD.NotifyPrespeed($"Stage {stage}", velocity.velMag());
+		player.HUD.NotifyPrespeed($"Stage {stage}", velocity);
 
 		// Start the Stage timer
 		if (player.Timer.IsStageMode && player.Timer.Stage == stage)
@@ -713,7 +713,7 @@ public partial class SurfTimer
 			currentCheckpoint.EndTouch = player.Timer.Ticks;
 
 			// Show Prespeed for stages - will be enabled/disabled by the user?
-			player.HUD.NotifyPrespeed($"Checkpoint {zone.Number}", velocity.velMag());
+			player.HUD.NotifyPrespeed($"Checkpoint {zone.Number}", velocity);
 		}
 	}
 
@@ -755,7 +755,7 @@ public partial class SurfTimer
 #endif
 
 		// Prespeed display
-		player.HUD.NotifyPrespeed("", velocity.velMag());
+		player.HUD.NotifyPrespeed("", velocity);
 		player.Stats.ThisRun.StartVelX = velocity.X; // Start pre speed for the Bonus run
 		player.Stats.ThisRun.StartVelY = velocity.Y; // Start pre speed for the Bonus run
 		player.Stats.ThisRun.StartVelZ = velocity.Z; // Start pre speed for the Bonus run

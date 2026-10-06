@@ -11,6 +11,7 @@
 	"start_speed_cap": 260,
 	"start_exit_speed_limit": 600,
 	"replay_pool_cap": 5,
+	"saveloc_limit": 10000,
 	"replay_permanent_map_bot": false,
 	"idle_threshold_seconds": 60,
 	"clan_tags_enabled": true,

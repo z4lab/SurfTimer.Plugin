@@ -10,6 +10,17 @@ internal enum HudFieldKind
 	Sync,
 }
 
+/// <summary>Which velocity axes speeds are shown with (!options - HUD)</summary>
+internal enum SpeedAxes
+{
+	/// <summary>Horizontal</summary>
+	XY,
+	/// <summary>3D</summary>
+	XYZ,
+	/// <summary>Vertical, signed (negative = falling)</summary>
+	Z,
+}
+
 /// <summary>Which zone outlines a player sees (!options - Visibility)</summary>
 internal enum ZoneDisplay
 {
@@ -60,6 +71,7 @@ internal sealed class PlayerOptions
 	internal const string KeyTrailsBots = "trails_bots";
 	internal const string KeyTrailColor = "trail_color";
 	internal const string KeyZonesShow = "zones_show";
+	internal const string KeySpeedAxes = "speed_axes";
 
 	/// <summary>Bottom HUD: rows split by '|', fields by ','</summary>
 	internal const string DefaultHudFields = "timer,speed|prespeed,keys,sync";
@@ -90,6 +102,7 @@ internal sealed class PlayerOptions
 	private bool _trailMine, _trailsOthers, _trailsOwn, _trailsSpectate, _trailsBots;
 	private string _trailColor = "";
 	private ZoneDisplay _zonesShow = ZoneDisplay.Off;
+	private SpeedAxes _speedAxes = SpeedAxes.XY;
 
 	internal PlayerOptions(PlayerProfile profile)
 	{
@@ -118,6 +131,8 @@ internal sealed class PlayerOptions
 		_trailsOwn = Bool(KeyTrailsOwn, true);
 		_trailsSpectate = Bool(KeyTrailsSpectate, true);
 		_trailsBots = Bool(KeyTrailsBots, true);
+		_speedAxes = _profile.Settings.TryGetValue(KeySpeedAxes, out var axes)
+			&& Enum.TryParse(axes, ignoreCase: true, out SpeedAxes parsedAxes) && Enum.IsDefined(parsedAxes) ? parsedAxes : SpeedAxes.XY;
 		_zonesShow = _profile.Settings.TryGetValue(KeyZonesShow, out var zones)
 			&& Enum.TryParse(zones, ignoreCase: true, out ZoneDisplay display) && Enum.IsDefined(display) ? display : ZoneDisplay.Off;
 		_trailColor = _profile.Settings.TryGetValue(KeyTrailColor, out var trailColor) && TrailColors.IsValidCustom(trailColor) ? trailColor : "";
@@ -193,6 +208,17 @@ internal sealed class PlayerOptions
 	internal bool HudSplitsKeep { get => _hudSplitsKeep; set { _hudSplitsKeep = value; Save(KeyHudSplitsKeep, value); } }
 
 	internal bool HudSpectators { get => _hudSpectators; set { _hudSpectators = value; Save(KeyHudSpectators, value); } }
+
+	/// <summary>Axes the HUD, prespeed and split speeds are shown with</summary>
+	internal SpeedAxes SpeedAxes
+	{
+		get => _speedAxes;
+		set
+		{
+			_speedAxes = value;
+			_profile.SetSetting(KeySpeedAxes, value.ToString().ToLowerInvariant());
+		}
+	}
 
 	/// <summary>Zone outlines this player sees (drawn with beams - ZoneDrawing.cs)</summary>
 	internal ZoneDisplay ZonesShow

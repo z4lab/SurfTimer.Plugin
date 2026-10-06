@@ -16,8 +16,6 @@ public class Player
 	public PlayerStats Stats { get; set; }
 	public PlayerHud HUD { get; set; }
 	public ReplayRecorder ReplayRecorder { get; set; }
-	public List<SavelocFrame> SavedLocations { get; set; }
-	public int CurrentSavedLocation { get; set; }
 
 	// Player information
 	public PlayerProfile Profile { get; set; }
@@ -65,7 +63,7 @@ public class Player
 		zone.Type is ZoneType.MapStart or ZoneType.StageStart or ZoneType.BonusStart);
 
 	// Speed when last leaving a start zone (HUD prespeed field) - null until the first exit
-	internal float? LastPrespeed { get; set; }
+	internal VectorT? LastPrespeed { get; set; }
 
 	// Strafe sync of the current run: air ticks turning in the direction of the held strafe key
 	internal int SyncGoodTicks { get; private set; }
@@ -86,6 +84,19 @@ public class Player
 		{
 			int total = this.SyncTotalTicks - _segmentSyncTotal;
 			return total > 0 ? 100f * (this.SyncGoodTicks - _segmentSyncGood) / total : 0f;
+		}
+	}
+
+	/// <summary>The sync counters (run and current segment) - savelocs take and restore them</summary>
+	internal (int Good, int Total, int SegmentGood, int SegmentTotal) SyncState
+	{
+		get => (this.SyncGoodTicks, this.SyncTotalTicks, _segmentSyncGood, _segmentSyncTotal);
+		set
+		{
+			this.SyncGoodTicks = value.Good;
+			this.SyncTotalTicks = value.Total;
+			_segmentSyncGood = value.SegmentGood;
+			_segmentSyncTotal = value.SegmentTotal;
 		}
 	}
 
@@ -129,8 +140,6 @@ public class Player
 		this.Timer = new PlayerTimer();
 		this.Stats = new PlayerStats();
 		this.ReplayRecorder = new ReplayRecorder();
-		this.SavedLocations = new List<SavelocFrame>();
-		CurrentSavedLocation = 0;
 
 		this.HUD = new PlayerHud(this);
 	}

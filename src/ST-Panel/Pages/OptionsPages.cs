@@ -205,6 +205,16 @@ public partial class SurfTimer
 		}
 
 		rows.Add(ctx.Nav("Custom layout", preset ?? "custom", "fields, order and rows", OptionsHudFieldsPage));
+		rows.Add(ctx.Act("Speed", Extensions.SpeedLabel(options.SpeedAxes), "XY horizontal · XYZ 3D · Z vertical", () =>
+		{
+			options.SpeedAxes = (SpeedAxes)(((int)options.SpeedAxes + 1) % 3);
+			ctx.Session.Status = options.SpeedAxes switch
+			{
+				SpeedAxes.XYZ => "Speed shows XYZ (3D)",
+				SpeedAxes.Z => "Speed shows Z (vertical, negative = falling)",
+				_ => "Speed shows XY (horizontal)",
+			};
+		}));
 		rows.Add(ctx.Toggle("Top bar", options.HudTop, "rank, PB and WR", on => options.HudTop = on));
 		rows.Add(ctx.Nav("Splits panel", SplitTargetLabel(options.HudSplitTarget), "left side - compare against", OptionsSplitTargetPage));
 		if (options.HudSplits)
