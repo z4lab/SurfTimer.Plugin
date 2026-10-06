@@ -1,6 +1,7 @@
 {
 	"prefix": "[{blue}Surf{bluegrey}Timer{default}]",
 	"player_connected": "{green}{0}{default} has connected from {lime}{1}{default}.",
+	"map_practice_finish": "{grey}(Practice){default} Finished in {green}{0}{default} · PB {1} · WR {2}",
 	"saveloc_saved": "{0} saved {green}#{1}{default} · {2} · {green}!tele {1}",
 	"saveloc_no_locations": "{red}No savelocs yet - use {green}!saveloc{red}.",
 	"saveloc_unknown": "{red}No saveloc #{0} on this map.",

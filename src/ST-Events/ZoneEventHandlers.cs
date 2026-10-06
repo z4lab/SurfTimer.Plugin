@@ -67,14 +67,21 @@ public partial class SurfTimer
 		// MAP END ZONE - Map RUN
 		if (player.Timer.IsRunning && !player.Timer.IsStageMode)
 		{
-			player.Timer.Stop();
+			player.Timer.Stop(); // The final time stays on the HUD
 			player.CountAttempt(0, 0, finished: true);
 			bool saveMapTime = false;
 			string PracticeString = "";
-			if (player.Timer.IsPracticeMode)
-				PracticeString = $"({ChatColors.Grey}Practice{ChatColors.Default}) ";
 
-			if (player.Timer.Ticks < CurrentMap.WR[pStyle].RunTime) // Player beat the Map WR
+			// Practice (savelocs): the finish shows like a real one, to the player only - nothing is saved
+			// or announced, whatever the time
+			if (player.Timer.IsPracticeMode)
+			{
+				player.Controller.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["map_practice_finish",
+					PlayerHud.FormatTime(player.Timer.Ticks),
+					PracticeDiff(player.Timer.Ticks, player.Stats.PB[pStyle].RunTime),
+					PracticeDiff(player.Timer.Ticks, CurrentMap.WR[pStyle].RunTime)]}");
+			}
+			else if (player.Timer.Ticks < CurrentMap.WR[pStyle].RunTime) // Player beat the Map WR
 			{
 				saveMapTime = true;
 				int timeImprove = CurrentMap.WR[pStyle].RunTime - player.Timer.Ticks;
@@ -176,10 +183,13 @@ public partial class SurfTimer
 		// MAP END ZONE - Stage RUN
 		else if (player.Timer.IsStageMode)
 		{
-			player.Timer.Stop();
+			player.Timer.Stop(); // The final time stays on the HUD
 			player.CountAttempt(2, (short)CurrentMap.Stages, finished: true);
 
-			if (!player.Timer.IsPracticeMode)
+			// Practice: the last stage's time is shown, nothing saved
+			if (player.Timer.IsPracticeMode)
+				player.HUD.DisplayStageMessage(CurrentMap.Stages, player.Timer.Ticks, velocity);
+			else
 			{
 				float lastStageEntryVelX = player.Timer.StageEntryVelX;
 				float lastStageEntryVelY = player.Timer.StageEntryVelY;
@@ -206,6 +216,17 @@ public partial class SurfTimer
 #if DEBUG
 		player.Controller.PrintToChat($"CS2 Surf DEBUG >> CBaseTrigger_{ChatColors.Lime}StartTouchFunc{ChatColors.Default} -> {ChatColors.Red}Map Stop Zone");
 #endif
+	}
+
+	/// <summary>"-0:01.234" (green, faster) / "+0:01.234" (red, slower) against a time - "-" when there is none</summary>
+	private static string PracticeDiff(int ticks, int against)
+	{
+		if (against <= 0)
+			return $"{ChatColors.Grey}-{ChatColors.Default}";
+		int diff = ticks - against;
+		return diff <= 0
+			? $"{ChatColors.Green}-{PlayerHud.FormatTime(-diff)}{ChatColors.Default}"
+			: $"{ChatColors.Red}+{PlayerHud.FormatTime(diff)}{ChatColors.Default}";
 	}
 
 	/// <summary>Stop zone: a running timer stops (the run is abandoned)</summary>
@@ -284,6 +305,10 @@ public partial class SurfTimer
 						endVelX: velocity.X, endVelY: velocity.Y, endVelZ: velocity.Z, sync: segmentSync));
 
 				player.HUD.DisplayStageMessage((short)(stage - 1), stage_run_time, velocity);
+			}
+			else if (stage > 1 && !failed_stage && player.Timer.IsRunning && player.Timer.IsPracticeMode)
+			{
+				player.HUD.DisplayStageMessage((short)(stage - 1), player.Timer.Ticks, velocity); // Practice: shown, not saved
 			}
 			player.Timer.Reset();
 			player.Timer.IsStageMode = true;

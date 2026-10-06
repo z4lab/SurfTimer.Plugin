@@ -94,6 +94,41 @@ internal sealed class Saveloc
 		};
 	}
 
+	/// <summary>
+	/// A saveloc at one frame of a replay: the recorded position / view / speed / crouch and - for map, stage
+	/// and bonus replays - the run as it was at that frame (time, stage / checkpoint, the record's splits so
+	/// far). Null for a frame outside the replay.
+	/// </summary>
+	internal static Saveloc? FromReplayFrame(int id, Player owner, ReplayPlayer replay, int frame,
+		Dictionary<int, CheckpointEntity>? splits, string sourceName)
+	{
+		var frames = replay.Frames;
+		if (frame < 0 || frame >= frames.Count)
+			return null;
+
+		var (start, _) = replay.GetRunWindow();
+		var current = frames[frame];
+		var position = current.GetPos();
+		var next = frames[Math.Min(frame + 1, frames.Count - 1)].GetPos();
+		var angles = current.GetAng();
+
+		return new Saveloc
+		{
+			Id = id,
+			OwnerSteamId = owner.Controller.SteamID,
+			OwnerName = owner.Controller.PlayerName,
+			Source = SavelocSource.Replay,
+			SourceName = sourceName,
+			Position = position,
+			Angles = new QAngleT(angles.X, angles.Y, 0),
+			Velocity = (next - position) * 64,
+			Ducked = (current.Flags & (uint)PlayerFlags.FL_DUCKING) != 0,
+			DuckAmount = (current.Flags & (uint)PlayerFlags.FL_DUCKING) != 0 ? 1f : 0f,
+			CourseBonus = replay.Type == 1 ? (short)replay.Stage : (short)0,
+			Run = SavelocRun.FromReplay(replay, frame, start, splits),
+		};
+	}
+
 	/// <summary>Puts a pawn into this state (teleport, crouch, move type, gravity)</summary>
 	internal void ApplyPawn(CCSPlayerPawn pawn)
 	{
@@ -159,6 +194,53 @@ internal sealed class SavelocRun
 			Splits = run.Checkpoints.Values.Select(Copy).ToList(),
 			Sync = player.SyncState,
 			LastPrespeed = player.LastPrespeed,
+		};
+	}
+
+	/// <summary>
+	/// The run of a replay at one frame - map (type 0), bonus (1) or stage (2) replays; checkpoint segments
+	/// and the best segments compilation give null (no run to continue). Map runs get the record's splits up
+	/// to that frame and the stage / checkpoint they belong to, as the zone handlers set them during a run.
+	/// </summary>
+	internal static SavelocRun? FromReplay(ReplayPlayer replay, int frame, int runStart, Dictionary<int, CheckpointEntity>? splits)
+	{
+		if (replay.Type is not (0 or 1 or 2))
+			return null;
+
+		var frames = replay.Frames;
+		int ticks = Math.Max(0, frame - runStart);
+		var startVelocity = runStart + 1 < frames.Count
+			? (frames[runStart + 1].GetPos() - frames[runStart].GetPos()) * 64
+			: new VectorT(0, 0, 0);
+
+		var passed = replay.Type == 0 && splits != null
+			? splits.Values.Where(s => s.RunTime > 0 && s.RunTime <= ticks).OrderBy(s => s.CP).Select(Copy).ToList()
+			: new List<CheckpointEntity>();
+		short checkpoint = passed.Count > 0 ? passed[^1].CP : (short)0;
+		bool staged = SurfTimer.CurrentMap != null && SurfTimer.CurrentMap.Stages > 0;
+
+		return new SavelocRun
+		{
+			Ticks = ticks,
+			Style = (short)replay.Style,
+			IsStageMode = replay.Type == 2,
+			IsBonusMode = replay.Type == 1,
+			Stage = replay.Type switch
+			{
+				2 => (short)replay.Stage,
+				0 when staged => (short)(checkpoint + 1), // Stage N is entered as checkpoint N-1 of a map run
+				_ => 0,
+			},
+			Checkpoint = replay.Type == 0 ? checkpoint : (short)0,
+			Bonus = replay.Type == 1 ? (short)replay.Stage : (short)0,
+			StageEntryVelocity = startVelocity,
+			CheckpointEntryVelocity = startVelocity,
+			// The segment being run started at the last split (its zone exit sets it again when left)
+			RunTime = passed.Count > 0 ? passed[^1].RunTime : 0,
+			StartVelocity = startVelocity,
+			Splits = passed,
+			Sync = (0, 0, 0, 0),
+			LastPrespeed = startVelocity,
 		};
 	}
 
@@ -228,6 +310,22 @@ internal sealed class SavelocSession
 	}
 
 	internal int TakeId() => _nextId++;
+
+	/// <summary>Replaces a player's set with these savelocs (an import), cursor on the first</summary>
+	internal void ReplaceSet(ulong steamId, List<Saveloc> savelocs)
+	{
+		var ids = savelocs.Select(s => s.Id).ToList();
+		foreach (var saveloc in savelocs)
+		{
+			saveloc.Path = new List<int>(ids);
+			All[saveloc.Id] = saveloc;
+		}
+
+		var set = SetOf(steamId);
+		set.Ids.Clear();
+		set.Ids.AddRange(ids);
+		set.Cursor = ids.Count > 0 ? 0 : -1;
+	}
 
 	/// <summary>Adds a new saveloc to its owner's set (the set's ids after the cursor are dropped from it)</summary>
 	internal void Add(Saveloc saveloc)

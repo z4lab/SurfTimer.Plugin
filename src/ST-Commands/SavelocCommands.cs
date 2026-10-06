@@ -3,6 +3,7 @@ using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Core.Attributes.Registration;
 using CounterStrikeSharp.API.Modules.Commands;
 using CounterStrikeSharp.API.Modules.Utils;
+using Microsoft.Extensions.Logging;
 
 namespace SurfTimer;
 
@@ -93,8 +94,8 @@ public partial class SurfTimer
 			var slot = map.ReplayManager?.Pool.Find(s => s.Controller != null && s.Controller.IsValid && s.Controller.PlayerPawn.Raw == targetPawn.EntityHandle.Raw);
 			if (slot != null)
 			{
-				saveloc = Saveloc.Capture(session.NextId, p, targetPawn, null, SavelocSource.Replay, slot.RecordPlayerName,
-					slot.Type == 1 ? (short)slot.Stage : (short)0);
+				SaveReplayLocation(p, slot);
+				return;
 			}
 			else if (targetController != null && playerList.TryGetValue(new CCSPlayerController(targetController.Handle).UserId ?? 0, out var watched))
 			{
@@ -109,7 +110,14 @@ public partial class SurfTimer
 		}
 
 		session.TakeId();
-		session.Add(saveloc);
+		AnnounceSaveloc(p, saveloc);
+	}
+
+	/// <summary>Adds a new saveloc to the owner's set and tells them and their spectators</summary>
+	private void AnnounceSaveloc(Player p, Saveloc saveloc)
+	{
+		var controller = p.Controller;
+		CurrentMap!.Savelocs.Add(saveloc);
 
 		string message = $"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["saveloc_saved", controller.PlayerName, saveloc.Id, saveloc.Describe()]}";
 		controller.PrintToChat(message);
@@ -117,6 +125,66 @@ public partial class SurfTimer
 		{
 			if (!ReferenceEquals(spectator, p) && spectator.Controller.IsValid && spectator.IsSpectating(controller))
 				spectator.Controller.PrintToChat(message);
+		}
+	}
+
+	/// <summary>
+	/// A saveloc of the replay bot being spectated, with the bot's run so far: time, stage / checkpoint and the
+	/// record's splits up to the frame shown. Map WR splits are in memory; a PB replay's load first.
+	/// </summary>
+	private void SaveReplayLocation(Player p, ReplayPlayer slot)
+	{
+		var map = CurrentMap!;
+		int frame = slot.PlayedFrameIndex;
+		var template = new ReplayPlayer
+		{
+			Type = slot.Type,
+			Stage = slot.Stage,
+			Style = slot.Style,
+			Frames = slot.Frames,
+		};
+		string holder = slot.RecordPlayerName ?? "?";
+
+		void Create(Dictionary<int, CheckpointEntity>? splits)
+		{
+			if (CurrentMap != map || !p.Controller.IsValid)
+				return;
+			var saveloc = Saveloc.FromReplayFrame(map.Savelocs.NextId, p, template, frame, splits, holder);
+			if (saveloc == null)
+			{
+				p.Controller.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["saveloc_nothing"]}");
+				return;
+			}
+			map.Savelocs.TakeId();
+			AnnounceSaveloc(p, saveloc);
+		}
+
+		// Map runs carry splits - the loaded map WR's, or the PB's from the database
+		var wr = map.WR.GetValueOrDefault(slot.Style);
+		if (slot.Type != 0 || slot.MapTimeID <= 0)
+		{
+			Create(null);
+		}
+		else if (wr != null && wr.ID == slot.MapTimeID)
+		{
+			Create(wr.Checkpoints);
+		}
+		else
+		{
+			int timeId = slot.MapTimeID;
+			Task.Run(async () =>
+			{
+				Dictionary<int, CheckpointEntity>? splits = null;
+				try
+				{
+					splits = await TimeRepository.GetSplitsAsync(timeId);
+				}
+				catch (Exception ex)
+				{
+					_logger.LogWarning(ex, "[Saveloc] Loading the splits of time {TimeId} failed - saved without splits", timeId);
+				}
+				Server.NextFrame(() => Create(splits));
+			});
 		}
 	}
 
