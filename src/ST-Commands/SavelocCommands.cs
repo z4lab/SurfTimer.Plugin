@@ -85,7 +85,14 @@ public partial class SurfTimer
 		Saveloc? saveloc = null;
 		if (controller.PawnIsAlive && controller.PlayerPawn.Value is { } pawn)
 		{
-			saveloc = Saveloc.Capture(session.NextId, p, pawn, p, p.Timer.IsRunning ? SavelocSource.Run : SavelocSource.Unrun, null, p.CourseBonus);
+			var startZone = ResettingStartZone(p);
+			if (startZone != null && !IsStandingStill(pawn))
+			{
+				controller.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["saveloc_start_not_still"]}");
+				return;
+			}
+			saveloc = Saveloc.Capture(session.NextId, p, pawn, p, p.Timer.IsRunning ? SavelocSource.Run : SavelocSource.Unrun, null, p.CourseBonus,
+				startZone);
 		}
 		else if (ObservedPawn(controller) is { } target)
 		{
@@ -99,7 +106,14 @@ public partial class SurfTimer
 			}
 			else if (targetController != null && playerList.TryGetValue(new CCSPlayerController(targetController.Handle).UserId ?? 0, out var watched))
 			{
-				saveloc = Saveloc.Capture(session.NextId, p, targetPawn, watched, SavelocSource.Player, watched.Controller.PlayerName, watched.CourseBonus);
+				var startZone = ResettingStartZone(watched);
+				if (startZone != null && !IsStandingStill(targetPawn))
+				{
+					controller.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["saveloc_start_not_still"]}");
+					return;
+				}
+				saveloc = Saveloc.Capture(session.NextId, p, targetPawn, watched, SavelocSource.Player, watched.Controller.PlayerName, watched.CourseBonus,
+					startZone);
 			}
 		}
 
@@ -145,11 +159,19 @@ public partial class SurfTimer
 		};
 		string holder = slot.RecordPlayerName ?? "?";
 
+		// In a start zone that starts the bot's kind of run: only when the recorded player stood still there
+		var startZone = ReplayStartZone(slot, frame);
+		if (startZone != null && !ReplayFrameIsStill(slot.Frames, frame))
+		{
+			p.Controller.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["saveloc_start_not_still"]}");
+			return;
+		}
+
 		void Create(Dictionary<int, CheckpointEntity>? splits)
 		{
 			if (CurrentMap != map || !p.Controller.IsValid)
 				return;
-			var saveloc = Saveloc.FromReplayFrame(map.Savelocs.NextId, p, template, frame, splits, holder);
+			var saveloc = Saveloc.FromReplayFrame(map.Savelocs.NextId, p, template, frame, splits, holder, startZone);
 			if (saveloc == null)
 			{
 				p.Controller.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["saveloc_nothing"]}");
@@ -161,7 +183,7 @@ public partial class SurfTimer
 
 		// Map runs carry splits - the loaded map WR's, or the PB's from the database
 		var wr = map.WR.GetValueOrDefault(slot.Style);
-		if (slot.Type != 0 || slot.MapTimeID <= 0)
+		if (startZone != null || slot.Type != 0 || slot.MapTimeID <= 0)
 		{
 			Create(null);
 		}
@@ -290,6 +312,10 @@ public partial class SurfTimer
 		ResyncZoneTouches(p);
 		Server.NextFrame(() => ResyncZoneTouches(p));
 
+		// Saved standing in a start zone: entered like walking in, so leaving starts that zone's run
+		if (saveloc.StartZone is var (type, number))
+			EnterStartZoneFromSaveloc(p, type, number);
+
 		// One message per burst: loads within SavelocMessageQuietSeconds of the previous one stay silent
 		int now = Server.TickCount;
 		bool quiet = now - p.LastSavelocLoadTick < SavelocMessageQuietSeconds * 64;
@@ -299,4 +325,81 @@ public partial class SurfTimer
 	}
 
 	private const int SavelocMessageQuietSeconds = 5;
+	private const float SavelocStillSpeed = 5f;
+
+	/// <summary>
+	/// The start zone a player stands in where a run starts when leaving it - map start, bonus start, or a
+	/// stage start in stage mode (passing a stage start during a map run isn't one). Null otherwise.
+	/// </summary>
+	private static (ZoneType Type, short Number)? ResettingStartZone(Player player)
+	{
+		foreach (var zone in player.TouchingTriggers.Values)
+		{
+			if (zone.Type is ZoneType.MapStart or ZoneType.BonusStart
+				|| (zone.Type == ZoneType.StageStart && player.Timer.IsStageMode && player.Timer.Stage == zone.Number))
+				return (zone.Type, zone.Number);
+		}
+		return null;
+	}
+
+	/// <summary>Like !startpos: on the ground, not crouched, (almost) not moving</summary>
+	private static bool IsStandingStill(CCSPlayerPawn pawn)
+	{
+		bool onGround = (pawn.Flags & (uint)PlayerFlags.FL_ONGROUND) != 0;
+		bool crouched = (pawn.Flags & (uint)PlayerFlags.FL_DUCKING) != 0;
+		return onGround && !crouched && pawn.AbsVelocity.ToVector_t().velMag() <= SavelocStillSpeed;
+	}
+
+	/// <summary>The run-starting start zone a replay frame is in (map / bonus start, a stage replay's own stage start)</summary>
+	private static (ZoneType Type, short Number)? ReplayStartZone(ReplayPlayer slot, int frame)
+	{
+		var map = CurrentMap;
+		if (map == null || frame < 0 || frame >= slot.Frames.Count)
+			return null;
+
+		var position = slot.Frames[frame].GetPos();
+		foreach (var zone in map.ActiveZones)
+		{
+			bool starts = zone.Type switch
+			{
+				ZoneType.MapStart => slot.Type is 0 or 2,
+				ZoneType.BonusStart => slot.Type == 1 && zone.Number == slot.Stage,
+				ZoneType.StageStart => slot.Type == 2 && zone.Number == slot.Stage,
+				_ => false,
+			};
+			if (starts && zone.Contains(position))
+				return (zone.Type, zone.Number);
+		}
+		return null;
+	}
+
+	/// <summary>A recorded frame on the ground, not crouched and (almost) not moving</summary>
+	private static bool ReplayFrameIsStill(List<ReplayFrame> frames, int frame)
+	{
+		var current = frames[frame];
+		var next = frames[Math.Min(frame + 1, frames.Count - 1)].GetPos();
+		float speed = ((next - current.GetPos()) * 64).velMag();
+		return (current.Flags & (uint)PlayerFlags.FL_ONGROUND) != 0 && (current.Flags & (uint)PlayerFlags.FL_DUCKING) == 0
+			&& speed <= SavelocStillSpeed;
+	}
+
+	/// <summary>
+	/// A start zone saveloc was loaded: the player enters that zone like walking in (timer reset, the run's
+	/// mode set), so leaving it starts that run - map, bonus N, or stage N in stage mode.
+	/// </summary>
+	private void EnterStartZoneFromSaveloc(Player p, ZoneType type, short number)
+	{
+		var map = CurrentMap;
+		var zone = map?.FindNearestZone(type, number, p.Controller.PlayerPawn.Value?.AbsOrigin?.ToVector_t());
+		if (zone == null)
+			return;
+
+		if (type == ZoneType.StageStart)
+		{
+			p.Timer.IsStageMode = true; // The stage start handler resets into a stage-mode run of this stage
+			p.Timer.Stage = number;
+		}
+		p.TouchingTriggers.Remove(zone.ZoneId);
+		HandleZoneEnter(p, zone);
+	}
 }

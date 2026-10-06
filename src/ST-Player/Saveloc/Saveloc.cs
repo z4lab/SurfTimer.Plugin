@@ -43,6 +43,13 @@ internal sealed class Saveloc
 	/// <summary>The course it was saved on (0 = map, N = bonus N) - loading it locks the player to that course</summary>
 	internal short CourseBonus { get; init; }
 
+	/// <summary>
+	/// Saved standing in a start zone that starts a run (map start, bonus start, a stage start in stage
+	/// mode): loading it puts the player into that zone like entering it, so leaving starts that run.
+	/// Such savelocs carry no run state.
+	/// </summary>
+	internal (ZoneType Type, short Number)? StartZone { get; init; }
+
 	/// <summary>Run state - null for an unrun saveloc</summary>
 	internal SavelocRun? Run { get; init; }
 
@@ -65,7 +72,8 @@ internal sealed class Saveloc
 	/// <summary>
 	/// A pawn's state. run = the run to copy (the player's own or a spectated player's), null for unrun.
 	/// </summary>
-	internal static Saveloc? Capture(int id, Player owner, CCSPlayerPawn pawn, Player? run, SavelocSource source, string? sourceName, short courseBonus)
+	internal static Saveloc? Capture(int id, Player owner, CCSPlayerPawn pawn, Player? run, SavelocSource source, string? sourceName, short courseBonus,
+		(ZoneType Type, short Number)? startZone = null)
 	{
 		if (!pawn.IsValid || pawn.AbsOrigin == null)
 			return null;
@@ -90,7 +98,8 @@ internal sealed class Saveloc
 			MoveType = pawn.MoveType == MoveType_t.MOVETYPE_LADDER ? MoveType_t.MOVETYPE_LADDER : MoveType_t.MOVETYPE_WALK,
 			GravityScale = pawn.GravityScale,
 			CourseBonus = courseBonus,
-			Run = run != null && run.Timer.IsRunning ? SavelocRun.Capture(run) : null,
+			StartZone = startZone,
+			Run = startZone == null && run != null && run.Timer.IsRunning ? SavelocRun.Capture(run) : null,
 		};
 	}
 
@@ -100,7 +109,7 @@ internal sealed class Saveloc
 	/// far). Null for a frame outside the replay.
 	/// </summary>
 	internal static Saveloc? FromReplayFrame(int id, Player owner, ReplayPlayer replay, int frame,
-		Dictionary<int, CheckpointEntity>? splits, string sourceName)
+		Dictionary<int, CheckpointEntity>? splits, string sourceName, (ZoneType Type, short Number)? startZone = null)
 	{
 		var frames = replay.Frames;
 		if (frame < 0 || frame >= frames.Count)
@@ -125,7 +134,8 @@ internal sealed class Saveloc
 			Ducked = (current.Flags & (uint)PlayerFlags.FL_DUCKING) != 0,
 			DuckAmount = (current.Flags & (uint)PlayerFlags.FL_DUCKING) != 0 ? 1f : 0f,
 			CourseBonus = replay.Type == 1 ? (short)replay.Stage : (short)0,
-			Run = SavelocRun.FromReplay(replay, frame, start, splits),
+			StartZone = startZone,
+			Run = startZone == null ? SavelocRun.FromReplay(replay, frame, start, splits) : null,
 		};
 	}
 
