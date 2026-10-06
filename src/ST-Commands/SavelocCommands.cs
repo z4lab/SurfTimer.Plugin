@@ -13,8 +13,6 @@ namespace SurfTimer;
 /// </summary>
 public partial class SurfTimer
 {
-	private const int SavelocRespawnPolls = 30; // 0.1 s each
-
 	[ConsoleCommand("css_saveloc", "Save your location (or the spectated player's / bot's) as a #id")]
 	[ConsoleCommand("css_sl", "Save your location (or the spectated player's / bot's) as a #id")]
 	[CommandHelper(whoCanExecute: CommandUsage.CLIENT_ONLY)]
@@ -86,7 +84,7 @@ public partial class SurfTimer
 		Saveloc? saveloc = null;
 		if (controller.PawnIsAlive && controller.PlayerPawn.Value is { } pawn)
 		{
-			saveloc = Saveloc.Capture(session.NextId, p, pawn, p, p.Timer.IsRunning ? SavelocSource.Run : SavelocSource.Unrun, null);
+			saveloc = Saveloc.Capture(session.NextId, p, pawn, p, p.Timer.IsRunning ? SavelocSource.Run : SavelocSource.Unrun, null, p.CourseBonus);
 		}
 		else if (ObservedPawn(controller) is { } target)
 		{
@@ -95,11 +93,12 @@ public partial class SurfTimer
 			var slot = map.ReplayManager?.Pool.Find(s => s.Controller != null && s.Controller.IsValid && s.Controller.PlayerPawn.Raw == targetPawn.EntityHandle.Raw);
 			if (slot != null)
 			{
-				saveloc = Saveloc.Capture(session.NextId, p, targetPawn, null, SavelocSource.Replay, slot.RecordPlayerName);
+				saveloc = Saveloc.Capture(session.NextId, p, targetPawn, null, SavelocSource.Replay, slot.RecordPlayerName,
+					slot.Type == 1 ? (short)slot.Stage : (short)0);
 			}
 			else if (targetController != null && playerList.TryGetValue(new CCSPlayerController(targetController.Handle).UserId ?? 0, out var watched))
 			{
-				saveloc = Saveloc.Capture(session.NextId, p, targetPawn, watched, SavelocSource.Player, watched.Controller.PlayerName);
+				saveloc = Saveloc.Capture(session.NextId, p, targetPawn, watched, SavelocSource.Player, watched.Controller.PlayerName, watched.CourseBonus);
 			}
 		}
 
@@ -137,6 +136,8 @@ public partial class SurfTimer
 
 	internal void TeleToId(Player p, int id)
 	{
+		if (!CanLoadSaveloc(p))
+			return; // Before the set / cursor changes
 		var session = CurrentMap?.Savelocs;
 		if (session == null || !session.Select(p.Controller.SteamID, id))
 		{
@@ -148,6 +149,8 @@ public partial class SurfTimer
 
 	internal void TeleStep(Player p, int direction)
 	{
+		if (!CanLoadSaveloc(p))
+			return; // Before the set / cursor changes
 		var session = CurrentMap?.Savelocs;
 		var set = session?.SetOf(p.Controller.SteamID);
 		if (session == null || set == null || set.Ids.Count == 0)
@@ -167,10 +170,16 @@ public partial class SurfTimer
 		TeleToCurrent(p);
 	}
 
-	/// <summary>
-	/// Puts the player into a saveloc. From spectator / dead they rejoin their team (or CT) and respawn
-	/// first - the saveloc is applied once the pawn is alive.
-	/// </summary>
+	/// <summary>Spectators / dead players can't load savelocs (they can still save them)</summary>
+	private static bool CanLoadSaveloc(Player p)
+	{
+		if (p.Controller.PawnIsAlive)
+			return true;
+		p.Controller.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["saveloc_spectating"]}");
+		return false;
+	}
+
+	/// <summary>Puts an alive player into a saveloc - refused while spectating or dead</summary>
 	private void LoadSaveloc(Player p, Saveloc saveloc)
 	{
 		var controller = p.Controller;
@@ -180,37 +189,11 @@ public partial class SurfTimer
 			return;
 		}
 
-		if (controller.PawnIsAlive)
-		{
-			ApplySaveloc(p, saveloc);
+		// Spectators can save locations (of who they watch) but must join a team before loading one
+		if (!CanLoadSaveloc(p))
 			return;
-		}
 
-		if (controller.Team is not (CsTeam.Terrorist or CsTeam.CounterTerrorist))
-			controller.ChangeTeam(CsTeam.CounterTerrorist);
-		AddTimer(0.1f, () =>
-		{
-			if (controller.IsValid && !controller.PawnIsAlive)
-				controller.Respawn();
-		});
-		WaitAliveThenApply(p, saveloc, SavelocRespawnPolls);
-	}
-
-	private void WaitAliveThenApply(Player p, Saveloc saveloc, int pollsLeft)
-	{
-		AddTimer(0.1f, () =>
-		{
-			var controller = p.Controller;
-			if (!controller.IsValid)
-				return;
-
-			if (controller.PawnIsAlive && controller.PlayerPawn.Value is { IsValid: true })
-				ApplySaveloc(p, saveloc);
-			else if (pollsLeft > 0)
-				WaitAliveThenApply(p, saveloc, pollsLeft - 1);
-			else
-				controller.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["saveloc_respawn_failed"]}");
-		});
+		ApplySaveloc(p, saveloc);
 	}
 
 	private void ApplySaveloc(Player p, Saveloc saveloc)
@@ -220,6 +203,7 @@ public partial class SurfTimer
 		if (pawn == null || !pawn.IsValid)
 			return;
 
+		p.CourseBonus = saveloc.CourseBonus; // Locked to the saveloc's course
 		if (saveloc.Run != null)
 		{
 			saveloc.Run.Apply(p);
@@ -238,9 +222,13 @@ public partial class SurfTimer
 		ResyncZoneTouches(p);
 		Server.NextFrame(() => ResyncZoneTouches(p));
 
-		var set = CurrentMap!.Savelocs.SetOf(controller.SteamID);
-		controller.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["saveloc_teleported",
-			saveloc.Id, saveloc.Describe(), set.Cursor + 1, set.Ids.Count]}");
-		controller.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull[saveloc.Run != null ? "saveloc_practice" : "saveloc_unrun"]}");
+		// One message per burst: loads within SavelocMessageQuietSeconds of the previous one stay silent
+		int now = Server.TickCount;
+		bool quiet = now - p.LastSavelocLoadTick < SavelocMessageQuietSeconds * 64;
+		p.LastSavelocLoadTick = now;
+		if (!quiet && p.Options.ChatSaveloc)
+			controller.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["saveloc_teleported", saveloc.Id, saveloc.Describe()]}");
 	}
+
+	private const int SavelocMessageQuietSeconds = 5;
 }

@@ -18,18 +18,46 @@ public partial class SurfTimer
 		if (player == null || !playerList.TryGetValue(player.UserId ?? 0, out var admin))
 			return;
 
-		var sections = AdminSections().Where(s => AdminPermissions.Has(player, s.Flag)).ToList();
-		if (sections.Count == 0)
+		var session = AdminSessionOf(admin);
+		if (session == null)
 		{
 			player.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["admin_no_access"]}");
 			return;
 		}
 
-		// Keep the previous session (same tab / page) unless the rights changed
+		session.Status = "";
+		PanelReopen(session);
+	}
+
+	/// <summary>
+	/// The player's admin panel session with the sections they may open - the previous one (same tab / page)
+	/// unless their rights changed. Null without any section.
+	/// </summary>
+	private PanelSession? AdminSessionOf(Player admin)
+	{
+		var sections = AdminSections().Where(s => AdminPermissions.Has(admin.Controller, s.Flag)).ToList();
+		if (sections.Count == 0)
+			return null;
+
 		var session = admin.Admin;
 		if (session == null || !session.Sections.Select(s => s.Flag).SequenceEqual(sections.Select(s => s.Flag)))
 			admin.Admin = session = new PanelSession("Admin", admin, sections);
+		return session;
+	}
 
+	/// <summary>Opens the admin panel on Server - Change map (!changemap without a map name)</summary>
+	private void OpenAdminChangeMap(Player admin)
+	{
+		var session = AdminSessionOf(admin);
+		int tab = session?.Sections.FindIndex(s => s.Flag == AdminPermissions.Server) ?? -1;
+		if (session == null || tab < 0)
+		{
+			admin.Controller.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["admin_no_access"]}");
+			return;
+		}
+
+		session.ActiveTab = tab;
+		session.Stacks[tab] = [session.Sections[tab].Root(), AdminChangeMapPage()];
 		session.Status = "";
 		PanelReopen(session);
 	}

@@ -30,20 +30,37 @@ public partial class SurfTimer
 		_zonesLeft.Clear();
 		_zonesEntered.Clear();
 
+		// Course switched while standing in a zone of the old course: forget it silently
+		foreach (var (id, zone) in player.TouchingTriggers)
+		{
+			if (!player.IsOnCourse(zone))
+				_zonesLeft.Add(zone);
+		}
+		foreach (var zone in _zonesLeft)
+			player.TouchingTriggers.Remove(zone.ZoneId);
+		_zonesLeft.Clear();
+
 		foreach (var (id, zone) in player.TouchingTriggers)
 		{
 			if (!map.ActiveZoneById.TryGetValue(id, out var current) || !current.Overlaps(mins, maxs))
 				_zonesLeft.Add(zone);
 		}
 
+		// Only zones of the player's course count (Player.CourseBonus) - others are crossed without effect
 		foreach (var zone in map.ActiveZones)
 		{
-			if (!player.TouchingTriggers.ContainsKey(zone.ZoneId) && zone.Overlaps(mins, maxs))
+			if (!player.TouchingTriggers.ContainsKey(zone.ZoneId) && player.IsOnCourse(zone) && zone.Overlaps(mins, maxs))
 				_zonesEntered.Add(zone);
 		}
 
 		foreach (var zone in _zonesLeft)
-			HandleZoneLeave(player, zone);
+		{
+			// A zone of the course the player just switched away from: forgotten, no exit (no timer start)
+			if (!player.IsOnCourse(zone))
+				player.TouchingTriggers.Remove(zone.ZoneId);
+			else
+				HandleZoneLeave(player, zone);
+		}
 
 		foreach (var zone in _zonesEntered)
 		{
@@ -82,7 +99,7 @@ public partial class SurfTimer
 
 		foreach (var zone in map!.ActiveZones)
 		{
-			if (zone.Overlaps(mins, maxs))
+			if (player.IsOnCourse(zone) && zone.Overlaps(mins, maxs))
 				player.TouchingTriggers[zone.ZoneId] = zone;
 		}
 	}

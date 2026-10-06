@@ -89,6 +89,8 @@ public partial class SurfTimer
 		}
 
 		string name = string.Join(" ", nameParts);
+		if (name.Length > 0 && ResolveMap(name) is { } listed)
+			name = listed; // "summit" -> surf_summit (the server's map list)
 		int style = player.Timer.Style;
 
 		if (name.Length == 0 || (CurrentMap != null && name.Equals(CurrentMap.Name, StringComparison.OrdinalIgnoreCase)))
@@ -116,7 +118,14 @@ public partial class SurfTimer
 					target ??= row != null ? CurrentMapTarget(style) : null; // The name matched the current map
 					if (target == null)
 					{
-						controller.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["map_not_found", name]}");
+						if (IsOnMapList(name))
+						{
+							controller.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["map_not_played", name]}");
+							return;
+						}
+						var suggestions = SuggestMaps(name);
+						controller.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["map_not_found", name]}"
+							+ (suggestions.Count > 0 ? $" {LocalizationService.LocalizerNonNull["map_suggestions", string.Join(", ", suggestions)]}" : ""));
 						return;
 					}
 					ShowMapPanel(stillPlayer, target, tab, number);

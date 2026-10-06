@@ -42,6 +42,7 @@ public partial class SurfTimer
 
 		oPlayer.Timer.Reset();
 		oPlayer.Stats.ThisRun.Checkpoints.Clear();
+		oPlayer.CourseBonus = 0; // Back on the map course
 		TeleportToZone(player, ZoneType.MapStart, 1);
 	}
 
@@ -118,10 +119,15 @@ public partial class SurfTimer
 	private void ResetToCurrentStart(Player oPlayer)
 	{
 		var player = oPlayer.Controller;
-		bool teleported = oPlayer.Timer.IsBonusMode
-			? oPlayer.Timer.Bonus != 0 && TeleportToZone(player, ZoneType.BonusStart, oPlayer.Timer.Bonus)
-			: oPlayer.Timer.Stage > 1 && TeleportToZone(player, ZoneType.StageStart, oPlayer.Timer.Stage);
 
+		// On a bonus course: its start (the course lock keeps the player there)
+		if (oPlayer.CourseBonus > 0)
+		{
+			TeleportToZone(player, ZoneType.BonusStart, oPlayer.CourseBonus);
+			return;
+		}
+
+		bool teleported = oPlayer.Timer.Stage > 1 && TeleportToZone(player, ZoneType.StageStart, oPlayer.Timer.Stage);
 		if (!teleported) // Reset back to map start
 			TeleportToZone(player, ZoneType.MapStart, 1);
 	}
@@ -199,6 +205,7 @@ public partial class SurfTimer
 			playerList[player.UserId ?? 0].Timer.Stage = stage;
 			playerList[player.UserId ?? 0].Timer.IsStageMode = true;
 		}
+		playerList[player.UserId ?? 0].CourseBonus = 0; // Stages are part of the map course
 		TeleportToZone(player, zoneType, stage);
 
 		// To-do: If you run this while you're in the start zone, endtouch for the start zone runs after you've teleported
@@ -341,6 +348,7 @@ public partial class SurfTimer
 			playerList[player.UserId ?? 0].Timer.Reset();
 			playerList[player.UserId ?? 0].Timer.IsBonusMode = true;
 			playerList[player.UserId ?? 0].Timer.Bonus = (short)bonus;
+			playerList[player.UserId ?? 0].CourseBonus = (short)bonus; // Locked to this bonus until !r / !s / !b
 
 			if (player.Team == CsTeam.Spectator || player.Team == CsTeam.None)
 			{

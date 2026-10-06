@@ -94,6 +94,10 @@ internal static class MapRepository
 		SurfTimer.DB.QueryFirstOrDefaultAsync<MapRow>(
 			"SELECT `id`, `name`, `ranked`, `workshop_id`, `created_at`, `last_played_at` FROM `{p}maps` WHERE `name` = @Name", new { Name = name });
 
+	/// <summary>Every map row (the admin change-map page merges them with the server's map list)</summary>
+	internal static Task<List<MapRow>> GetAllMapsAsync() =>
+		SurfTimer.DB.QueryAsync<MapRow>("SELECT `id`, `name`, `ranked`, `workshop_id`, `created_at`, `last_played_at` FROM `{p}maps`");
+
 	internal static Task<List<int>> GetAllIdsAsync() =>
 		SurfTimer.DB.QueryAsync<int>("SELECT `id` FROM `{p}maps`");
 

@@ -42,6 +42,23 @@ public class Player
 	// overlapping / duplicate boxes of one zone are handled.
 	internal Dictionary<int, ZoneInfo> TouchingTriggers { get; } = new();
 
+	/// <summary>
+	/// The course the player is locked to: 0 = the map (map start / end, stages, checkpoints), N = bonus N.
+	/// Zones of other courses don't count at all - crossing them changes nothing - until !r / !s / !b (or a
+	/// saveloc) switches the course. Stop, teleport-back and speed cap zones count on every course.
+	/// </summary>
+	internal short CourseBonus { get; set; }
+
+	/// <summary>Tick of the last saveloc load - "Teleported to #N" is shown once per burst of loads</summary>
+	internal int LastSavelocLoadTick { get; set; } = int.MinValue / 2;
+
+	internal bool IsOnCourse(ZoneInfo zone) => zone.Type switch
+	{
+		ZoneType.MapStart or ZoneType.MapEnd or ZoneType.StageStart or ZoneType.Checkpoint => this.CourseBonus == 0,
+		ZoneType.BonusStart or ZoneType.BonusEnd => this.CourseBonus > 0 && zone.Number == this.CourseBonus,
+		_ => true,
+	};
+
 	// !startpos - where resets into a start zone put the player, per start zone (map start = (MapStart, 1)).
 	// In memory only: a Player lives for one map / connection.
 	internal Dictionary<(ZoneType Type, short Number), (VectorT Position, QAngleT Angles)> StartPositions { get; } = new();

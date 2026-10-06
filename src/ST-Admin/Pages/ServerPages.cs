@@ -82,6 +82,13 @@ public partial class SurfTimer
 		if (!IsValidMapName(mapName))
 			return;
 
+		// A map of the server's workshop addons - loaded by its workshop id, no lookup needed
+		if (WorkshopIdOf(mapName) is ulong listedId)
+		{
+			ChangeToWorkshopMap(listedId, mapName);
+			return;
+		}
+
 		Task.Run(async () =>
 		{
 			ulong? workshopId = null;
@@ -140,6 +147,27 @@ public partial class SurfTimer
 		}, CounterStrikeSharp.API.Modules.Timers.TimerFlags.STOP_ON_MAPCHANGE);
 	}
 
+	/// <summary>
+	/// A typed map name checked against the server's map list: the map it means, or an error with suggestions.
+	/// Without a list every valid name passes.
+	/// </summary>
+	internal string? CheckMapName(string text, out string mapName)
+	{
+		mapName = text;
+		if (MapList.Count == 0)
+			return null;
+
+		var resolved = ResolveMap(text);
+		if (resolved != null)
+		{
+			mapName = resolved;
+			return null;
+		}
+
+		var suggestions = SuggestMaps(text);
+		return LocalizationService.LocalizerNonNull["map_not_on_server", text, suggestions.Count > 0 ? string.Join(", ", suggestions) : "-"];
+	}
+
 	private sealed class MapsData(List<MapRepository.MapRow> maps)
 	{
 		internal List<MapRepository.MapRow> Maps { get; } = maps;
@@ -159,20 +187,62 @@ public partial class SurfTimer
 				}
 				if (!IsValidMapName(text))
 					return "A map name (letters, digits, _ and -) or a workshop id";
-				ctx.Audit("change map", "map", null, text);
-				ChangeLevelTo(text);
+				if (CheckMapName(text, out string mapName) is { } error)
+					return error;
+				ctx.Audit("change map", "map", null, mapName);
+				ChangeLevelTo(mapName);
 				return null;
 			}),
 		};
 
-		var recent = ctx.Load("maps", async () => new MapsData(await MapRepository.GetRecentMapsAsync(60)));
+		// The server's map list (its workshop addons, MapList.cs) - every map it can load, merged with what was played
+		string filter = ctx.Page.State.TryGetValue("filter", out var f) && f is string s ? s : "";
+		rows.Add(ctx.Act("Refresh map list", MapList.Count > 0 ? $"{MapList.Count} maps" : "unknown",
+			MapListUpdatedAt is DateTime updated ? $"read {AdminFormat.Ago(updated)} ago" : "workshop addons", () =>
+			{
+				RefreshMapList();
+				ctx.Session.Status = "Reading the map list…";
+				AddTimer(2f, () => PanelRefresh(ctx.Session));
+			}));
+		if (MapList.Count > 0)
+		{
+			rows.Add(ctx.Ask("Search map", filter.Length > 0 ? filter : "", "filters the list below", "Type part of a map name in chat", text =>
+			{
+				ctx.Page.State["filter"] = text.Trim();
+				return null;
+			}));
+			if (filter.Length > 0)
+				rows.Add(ctx.Act("Clear search", "", "", () => ctx.Page.State.Remove("filter")));
+		}
+
+		var recent = ctx.Load("maps", async () => new MapsData(await MapRepository.GetAllMapsAsync()));
 		if (recent == null)
 		{
 			rows.Add(PanelContext.LoadingRow());
 			return rows;
 		}
 
-		foreach (var map in recent.Maps.Where(m => m.Id != CurrentMap?.ID))
+		if (MapList.Count > 0)
+		{
+			var played = recent.Maps.ToDictionary(m => m.Name, StringComparer.OrdinalIgnoreCase);
+			foreach (var listed in MapList.Where(m => filter.Length == 0 || m.Contains(filter, StringComparison.OrdinalIgnoreCase)))
+			{
+				if (CurrentMap != null && listed.Equals(CurrentMap.Name, StringComparison.OrdinalIgnoreCase))
+					continue;
+				string name = listed;
+				played.TryGetValue(name, out var row);
+				string sub = row != null ? $"played {AdminFormat.Ago(row.LastPlayedAt)} ago{(row.Ranked ? " · ranked" : "")}" : "never played";
+				rows.Add(ctx.Act(name, "", sub, () =>
+				{
+					ctx.Audit("change map", "map", row?.Id, name);
+					ChangeLevelTo(name);
+				}, closes: true));
+			}
+			return rows;
+		}
+
+		// No map list - the maps played before, newest first
+		foreach (var map in recent.Maps.OrderByDescending(m => m.LastPlayedAt).Take(60).Where(m => m.Id != CurrentMap?.ID))
 		{
 			string name = map.Name;
 			ulong? workshopId = map.WorkshopId;

@@ -350,6 +350,7 @@ public partial class SurfTimer
 			ctx.Toggle("Others' PBs", options.ChatOthersPb, "personal bests of other players", on => options.ChatOthersPb = on),
 			ctx.Toggle("Others' records", options.ChatOthersRecords, "WRs of other players", on => options.ChatOthersRecords = on),
 			ctx.Toggle("Connect messages", options.ChatConnects, "players joining", on => options.ChatConnects = on),
+			ctx.Toggle("Saveloc messages", options.ChatSaveloc, "\"Teleported to #N\" when loading a saveloc", on => options.ChatSaveloc = on),
 		];
 	});
 

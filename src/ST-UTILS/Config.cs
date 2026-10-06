@@ -111,6 +111,7 @@ public static class Config
 		ReplayPermanentMapBot = TimerSettings.GetBool("replay_permanent_map_bot", false);
 		IdleThresholdSeconds = Math.Max(0, TimerSettings.GetInt("idle_threshold_seconds", 60));
 		SavelocLimit = Math.Max(1, TimerSettings.GetInt("saveloc_limit", 10000));
+		WorkshopContentPath = TimerSettings.GetString("workshop_content_path", "").Trim();
 		ClanTagsEnabled = TimerSettings.GetBool("clan_tags_enabled", true);
 		CountryClanTag = TimerSettings.GetBool("country_clan_tag", true);
 	}
@@ -131,6 +132,12 @@ public static class Config
 	/// stopped and freed (0 = off). The timer keeps running.
 	/// </summary>
 	/// <summary>Savelocs per map session (all players) - new ones are refused beyond it</summary>
+	/// <summary>
+	/// Where the server downloads workshop items (steamapps/workshop/content/730) - only needed when it isn't
+	/// in one of the usual places under game/bin. Empty = search the usual places (MapList.cs).
+	/// </summary>
+	public static string WorkshopContentPath { get; private set; } = TimerSettings.GetString("workshop_content_path", "").Trim();
+
 	public static int SavelocLimit { get; private set; } = Math.Max(1, TimerSettings.GetInt("saveloc_limit", 10000));
 
 	public static int IdleThresholdSeconds { get; private set; } = Math.Max(0, TimerSettings.GetInt("idle_threshold_seconds", 60));
@@ -233,6 +240,13 @@ public static class Config
 			return ConfigDocument.RootElement.TryGetProperty(key, out var value) && value.ValueKind == JsonValueKind.Number
 				&& value.TryGetInt32(out int number)
 				? number
+				: defaultValue;
+		}
+
+		public static string GetString(string key, string defaultValue)
+		{
+			return ConfigDocument.RootElement.TryGetProperty(key, out var value) && value.ValueKind == JsonValueKind.String
+				? value.GetString()!
 				: defaultValue;
 		}
 

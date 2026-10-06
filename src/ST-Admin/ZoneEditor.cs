@@ -124,7 +124,10 @@ public partial class SurfTimer
 			AddTimer(0.2f, () =>
 			{
 				if (controller.IsValid && controller.PawnIsAlive)
+				{
+					editor.Editor.CourseBonus = 0;
 					TeleportToZone(controller, ZoneType.MapStart, 1);
+				}
 			});
 		});
 	}

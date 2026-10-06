@@ -40,6 +40,9 @@ internal sealed class Saveloc
 	internal MoveType_t MoveType { get; init; } = MoveType_t.MOVETYPE_WALK;
 	internal float GravityScale { get; init; } = 1f;
 
+	/// <summary>The course it was saved on (0 = map, N = bonus N) - loading it locks the player to that course</summary>
+	internal short CourseBonus { get; init; }
+
 	/// <summary>Run state - null for an unrun saveloc</summary>
 	internal SavelocRun? Run { get; init; }
 
@@ -62,7 +65,7 @@ internal sealed class Saveloc
 	/// <summary>
 	/// A pawn's state. run = the run to copy (the player's own or a spectated player's), null for unrun.
 	/// </summary>
-	internal static Saveloc? Capture(int id, Player owner, CCSPlayerPawn pawn, Player? run, SavelocSource source, string? sourceName)
+	internal static Saveloc? Capture(int id, Player owner, CCSPlayerPawn pawn, Player? run, SavelocSource source, string? sourceName, short courseBonus)
 	{
 		if (!pawn.IsValid || pawn.AbsOrigin == null)
 			return null;
@@ -86,6 +89,7 @@ internal sealed class Saveloc
 			DuckAmount = movement?.DuckAmount ?? 0f,
 			MoveType = pawn.MoveType == MoveType_t.MOVETYPE_LADDER ? MoveType_t.MOVETYPE_LADDER : MoveType_t.MOVETYPE_WALK,
 			GravityScale = pawn.GravityScale,
+			CourseBonus = courseBonus,
 			Run = run != null && run.Timer.IsRunning ? SavelocRun.Capture(run) : null,
 		};
 	}

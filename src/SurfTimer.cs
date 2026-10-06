@@ -66,6 +66,9 @@ public partial class SurfTimer : BasePlugin
 		AddTimer(2f, () => ApplyServerSettings("map start"), CounterStrikeSharp.API.Modules.Timers.TimerFlags.STOP_ON_MAPCHANGE);
 		AddTimer(10f, () => ApplyServerSettings("map start, again"), CounterStrikeSharp.API.Modules.Timers.TimerFlags.STOP_ON_MAPCHANGE);
 
+		// The server's map list (MapList.cs) - after the workshop collection is known
+		AddTimer(5f, RefreshMapList, CounterStrikeSharp.API.Modules.Timers.TimerFlags.STOP_ON_MAPCHANGE);
+
 		// Initialise Map Object
 		if ((CurrentMap == null || CurrentMap.Name!.Equals(mapName)) && mapName.Contains("surf_"))
 		{

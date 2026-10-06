@@ -58,6 +58,7 @@ internal sealed class PlayerOptions
 	internal const string KeyChatOthersPb = "chat_others_pb";
 	internal const string KeyChatOthersRecords = "chat_others_records";
 	internal const string KeyChatConnects = "chat_connects";
+	internal const string KeyChatSaveloc = "chat_saveloc";
 	internal const string KeyHudTop = "hud_top";
 	internal const string KeyHudSplits = "hud_splits"; // Old on / off switch - only read to migrate to KeyHudSplitTarget
 	internal const string KeyHudSplitTarget = "hud_splits_target";
@@ -95,7 +96,7 @@ internal sealed class PlayerOptions
 	private readonly PlayerProfile _profile;
 
 	private bool _hideLegs, _hidePlayers, _hideBots;
-	private bool _chatSplits, _chatOthersPb, _chatOthersRecords, _chatConnects;
+	private bool _chatSplits, _chatOthersPb, _chatOthersRecords, _chatConnects, _chatSaveloc;
 	private bool _hudTop, _hudSpectators, _hudSplitsKeep;
 	private SplitTarget _hudSplitTarget = SplitTarget.Pb;
 	private string _hudFields = DefaultHudFields;
@@ -119,6 +120,7 @@ internal sealed class PlayerOptions
 		_chatOthersPb = Bool(KeyChatOthersPb, true);
 		_chatOthersRecords = Bool(KeyChatOthersRecords, true);
 		_chatConnects = Bool(KeyChatConnects, true);
+		_chatSaveloc = Bool(KeyChatSaveloc, true);
 		_hudTop = Bool(KeyHudTop, true);
 		_hudSplitTarget = _profile.Settings.TryGetValue(KeyHudSplitTarget, out var target)
 			&& Enum.TryParse(target, ignoreCase: true, out SplitTarget parsed) && Enum.IsDefined(parsed)
@@ -186,6 +188,9 @@ internal sealed class PlayerOptions
 
 	/// <summary>"X connected" messages</summary>
 	internal bool ChatConnects { get => _chatConnects; set { _chatConnects = value; Save(KeyChatConnects, value); } }
+
+	/// <summary>"Teleported to #N" after loading a saveloc (at most one per burst of loads)</summary>
+	internal bool ChatSaveloc { get => _chatSaveloc; set { _chatSaveloc = value; Save(KeyChatSaveloc, value); } }
 
 	// ---- HUD ----
 
