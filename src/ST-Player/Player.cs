@@ -451,6 +451,47 @@ public class Player
 			recorder.StopAndFree();
 	}
 
+	// A start zone entry while a save still trims the recorder's frames - its recording starts once the
+	// save is done (TickPendingStartRecording)
+	private ZoneType? _pendingStartRecording;
+
+	/// <summary>
+	/// Starts the replay recording of the run that starts from this start zone - right away, or once a
+	/// pending save no longer needs the current frames.
+	/// </summary>
+	internal void BeginStartZoneRecording(ZoneType startZone)
+	{
+		if (this.ReplayRecorder.IsSaving)
+		{
+			_pendingStartRecording = startZone;
+			return;
+		}
+
+		_pendingStartRecording = null;
+		var recorder = this.ReplayRecorder;
+		recorder.Reset();
+		recorder.Start();
+		recorder.CurrentSituation = ReplayFrameSituation.START_ZONE_ENTER;
+		(startZone == ZoneType.BonusStart ? recorder.BonusSituations : recorder.MapSituations).Add(recorder.Frames.Count);
+	}
+
+	/// <summary>
+	/// Every tick (alive): a start zone recording that waited for a save starts now - or, when the player
+	/// already left the zone and runs, that run's recording still holds the old frames and gets no replay.
+	/// </summary>
+	internal void TickPendingStartRecording()
+	{
+		if (_pendingStartRecording is not ZoneType startZone || this.ReplayRecorder.IsSaving)
+			return;
+
+		_pendingStartRecording = null;
+		bool inZone = this.TouchingTriggers.Values.Any(zone => zone.Type == startZone);
+		if (inZone && !this.Timer.IsRunning)
+			BeginStartZoneRecording(startZone);
+		else if (this.Timer.IsRunning)
+			this.ReplayRecorder.DropForRun();
+	}
+
 	private void RestartRecordingInStartZone()
 	{
 		if (!this.IsTouchingAnyStartZone || this.ReplayRecorder.IsSaving)

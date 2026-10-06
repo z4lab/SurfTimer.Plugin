@@ -229,25 +229,17 @@ public partial class SurfTimer
 
 	private static void StartTouchHandleMapStartZone(Player player, ZoneInfo zone, [CallerMemberName] string methodName = "")
 	{
-		// We shouldn't start timer and reset data until MapTime has been saved - mostly concerns the Replays and trimming the correct parts
-		if (!player.ReplayRecorder.IsSaving)
-		{
-			player.ReplayRecorder.Reset(); // Start replay recording
-			player.ReplayRecorder.Start(); // Start replay recording
-			player.ReplayRecorder.CurrentSituation = ReplayFrameSituation.START_ZONE_ENTER;
-			player.ReplayRecorder.MapSituations.Add(player.ReplayRecorder.Frames.Count);
-			player.Timer.Reset();
-			player.Stats.ThisRun.Checkpoints.Clear();
-			player.HUD.Notify($"Map Start ({zone.Name})");
+		// The timer stops right away. The recorder restarts only once a pending save has trimmed its replay
+		// from the current frames (Player.TickPendingStartRecording) - e.g. the map teleported the player
+		// here right after a checkpoint / stage time was saved.
+		player.Timer.Reset();
+		player.Stats.ThisRun.Checkpoints.Clear();
+		player.HUD.Notify($"Map Start ({zone.Name})");
+		player.BeginStartZoneRecording(ZoneType.MapStart);
 
 #if DEBUG
-			player.Controller.PrintToChat($"CS2 Surf DEBUG >> CBaseTrigger_{ChatColors.Lime}StartTouchFunc{ChatColors.Default} -> {ChatColors.Green}Map Start Zone");
+		player.Controller.PrintToChat($"CS2 Surf DEBUG >> CBaseTrigger_{ChatColors.Lime}StartTouchFunc{ChatColors.Default} -> {ChatColors.Green}Map Start Zone");
 #endif
-		}
-		else
-		{
-			player.Controller.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["reset_delay"]}");
-		}
 	}
 
 	private void StartTouchHandleStageStartZone(Player player, ZoneInfo zone, [CallerMemberName] string methodName = "")
@@ -451,27 +443,13 @@ public partial class SurfTimer
 
 	private static void StartTouchHandleBonusStartZone(Player player, ZoneInfo zone, [CallerMemberName] string methodName = "")
 	{
-		// Same as the map start: don't reset the recorder/timer until a pending save has trimmed its replay
-		if (player.ReplayRecorder.IsSaving)
-		{
-			player.Controller.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["reset_delay"]}");
-			return;
-		}
-
+		// Same as the map start: the timer stops now, the recorder restarts once a pending save is done
 		short bonus = zone.Number;
 		player.Timer.Bonus = bonus;
 
 		player.Timer.Reset();
 		player.Timer.IsBonusMode = true;
-
-
-		player.ReplayRecorder.Reset();
-		player.ReplayRecorder.Start(); // Start replay recording
-		player.ReplayRecorder.CurrentSituation = ReplayFrameSituation.START_ZONE_ENTER;
-		player.ReplayRecorder.BonusSituations.Add(player.ReplayRecorder.Frames.Count);
-#if DEBUG
-		Console.WriteLine($"START_ZONE_ENTER: player.ReplayRecorder.BonusSituations.Add({player.ReplayRecorder.Frames.Count})");
-#endif
+		player.BeginStartZoneRecording(ZoneType.BonusStart);
 
 		player.HUD.Notify($"Bonus Start ({zone.Name})");
 
