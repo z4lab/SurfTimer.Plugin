@@ -110,15 +110,22 @@ public partial class SurfTimer
 		var rows = new List<HudMenuItem>
 		{
 			ctx.Act("Step", $"{editor.Step:0} units", "1 / 4 / 16 / 64", () => editor.StepIndex = (editor.StepIndex + 1) % ZoneEditorSession.Steps.Length),
-			ctx.Toggle("Aim mode", editor.AimMode, "shots set the selected zone's corners (1, 2, 1, ...)", on =>
+			ctx.Toggle("Aim mode", editor.AimMode, "shoot to draw shapes / set box corners", on =>
 			{
 				editor.AimMode = on;
 				editor.AimCorner = 0;
+				editor.ReshootPoint = null;
 				if (on && editor.Editor.Controller.PawnIsAlive)
 					GivePistolItem(editor.Editor.Controller, DefaultPistol(editor.Editor.Controller.Team));
-				ctx.Session.Status = on ? "Aim mode: shoot corner 1, then corner 2 of the selected zone" : "Aim mode off";
+				if (!on)
+				{
+					editor.DrawingShape = false;
+					editor.ShapePoints.Clear();
+					RedrawDraftShape();
+				}
+				ctx.Session.Status = on ? "Aim mode: New shape, then shoot its points" : "Aim mode off";
 			}),
-			ctx.Nav("Add zone", "", "a 64³ box where you are", () => ZoneTypePage((type, number) =>
+			ctx.Nav("Add zone", "", "a 64³ box where you are - then draw its shape", () => ZoneTypePage((type, number) =>
 			{
 				var camera = EditorCamera(editor.Editor);
 				if (camera == null)
@@ -143,6 +150,37 @@ public partial class SurfTimer
 			ctx.Act("Save", editor.Changes == 0 ? "saved" : $"{editor.Changes} changes", "write the zones to the database", () =>
 				SaveZoneDraft(ctx, countsChanged => AfterZoneSave(ctx, countsChanged))),
 		};
+
+		if (editor.AimMode)
+		{
+			if (!editor.DrawingShape)
+			{
+				rows.Insert(2, ctx.Act("New shape", "", "shoot the floor points in order", () =>
+				{
+					editor.DrawingShape = true;
+					editor.ShapePoints.Clear();
+					RedrawDraftShape();
+					ctx.Session.Status = "Shoot the shape's points in order - then Finish shape";
+				}));
+			}
+			else
+			{
+				rows.Insert(2, ctx.Act("Finish shape", $"{editor.ShapePoints.Count} points", editor.Selected?.Label ?? "select the zone first", () =>
+					ctx.Session.Status = FinishDrawnShape() ?? "Shape set - use Height + to raise it"));
+				rows.Insert(3, ctx.Act("Undo point", "", "", () =>
+				{
+					if (editor.ShapePoints.Count > 0)
+						editor.ShapePoints.RemoveAt(editor.ShapePoints.Count - 1);
+					RedrawDraftShape();
+				}));
+				rows.Insert(4, ctx.Act("Cancel shape", "", "", () =>
+				{
+					editor.DrawingShape = false;
+					editor.ShapePoints.Clear();
+					RedrawDraftShape();
+				}));
+			}
+		}
 
 		if (editor.Changes > 0)
 		{
@@ -288,46 +326,73 @@ public partial class SurfTimer
 		});
 
 		var center = zone.Center;
+		string shape = zone.Shape switch
+		{
+			ZoneShape.Prism => $"polygon · {zone.Points.Count} points",
+			ZoneShape.Trigger => "map trigger (exact shape)",
+			_ => "box",
+		};
 		var rows = new List<HudMenuItem>
 		{
-			PanelContext.Info(zone.Label, ZoneSize(zone), $"center {center.X:0} {center.Y:0} {center.Z:0}{(IsZoneActiveInMap(zone) ? "" : " · inactive until a map restart")}"),
+			PanelContext.Info(zone.Label, ZoneSize(zone), $"{shape} · center {center.X:0} {center.Y:0} {center.Z:0}{(IsZoneActiveInMap(zone) ? "" : " · inactive until a map restart")}"),
 			ctx.Act("Step", $"{step:0} units", "", () => editor.StepIndex = (editor.StepIndex + 1) % ZoneEditorSession.Steps.Length),
 			ctx.Act("Teleport here", "", "", () => MoveEditorCamera(editor.Editor, zone)),
+		};
 
+		if (zone.Shape == ZoneShape.Trigger)
+			rows.Add(PanelContext.Info("Linked to map trigger", zone.TriggerName ?? "", "editing its shape turns it into a polygon zone"));
+
+		rows.AddRange(
+		[
 			Edit("Move +X", "east", z => Move(z, step, 0, 0)),
 			Edit("Move -X", "west", z => Move(z, -step, 0, 0)),
 			Edit("Move +Y", "north", z => Move(z, 0, step, 0)),
 			Edit("Move -Y", "south", z => Move(z, 0, -step, 0)),
 			Edit("Move up", "+Z", z => Move(z, 0, 0, step)),
 			Edit("Move down", "-Z", z => Move(z, 0, 0, -step)),
+		]);
 
-			Edit("Width +", "X, both sides", z => Grow(z, step, 0, 0, centered: true)),
-			Edit("Width -", "X, both sides", z => Grow(z, -step, 0, 0, centered: true)),
-			Edit("Length +", "Y, both sides", z => Grow(z, 0, step, 0, centered: true)),
-			Edit("Length -", "Y, both sides", z => Grow(z, 0, -step, 0, centered: true)),
-			Edit("Height +", "top, the floor stays", z => Grow(z, 0, 0, step, centered: false)),
-			Edit("Height -", "top, the floor stays", z => Grow(z, 0, 0, -step, centered: false)),
-			ctx.Nav("Faces", "", "grow / shrink one side", () => ZoneFacesPage(key)),
+		if (zone.Shape == ZoneShape.Box)
+		{
+			rows.AddRange(
+			[
+				Edit("Width +", "X, both sides", z => Grow(z, step, 0, 0, centered: true)),
+				Edit("Width -", "X, both sides", z => Grow(z, -step, 0, 0, centered: true)),
+				Edit("Length +", "Y, both sides", z => Grow(z, 0, step, 0, centered: true)),
+				Edit("Length -", "Y, both sides", z => Grow(z, 0, -step, 0, centered: true)),
+				Edit("Height +", "top, the floor stays", z => Grow(z, 0, 0, step, centered: false)),
+				Edit("Height -", "top, the floor stays", z => Grow(z, 0, 0, -step, centered: false)),
+				ctx.Nav("Faces", "", "grow / shrink one side", () => ZoneFacesPage(key)),
+				ctx.Act("Set corner 1 here", editor.Corner1 != null ? "set" : "", editor.AimMode ? "or shoot it (aim mode)" : "your position", () =>
+				{
+					var camera = EditorCamera(editor.Editor);
+					if (camera == null)
+						return;
+					var point = camera.Value.Position;
+					editor.Corner1 = point;
+					zone.SetCorners(point, FarthestCorner(zone, point));
+					ZoneDraftChanged(zone);
+				}),
+				ctx.Act("Set corner 2 here", "", "spans the zone from corner 1", () =>
+				{
+					var camera = EditorCamera(editor.Editor);
+					if (camera == null)
+						return;
+					var point = camera.Value.Position;
+					zone.SetCorners(editor.Corner1 ?? FarthestCorner(zone, point), point);
+					ZoneDraftChanged(zone);
+				}),
+			]);
+		}
+		else
+		{
+			rows.Add(Edit("Height +", "straight up from every point", z => { z.ToPrism(); z.Height += step; z.UpdateBounds(); }));
+			rows.Add(Edit("Height -", "straight up from every point", z => { z.ToPrism(); z.Height = MathF.Max(MinZoneSize, z.Height - step); z.UpdateBounds(); }));
+		}
 
-			ctx.Act("Set corner 1 here", editor.Corner1 != null ? "set" : "", editor.AimMode ? "or shoot it (aim mode)" : "your position", () =>
-			{
-				var camera = EditorCamera(editor.Editor);
-				if (camera == null)
-					return;
-				var point = camera.Value.Position;
-				editor.Corner1 = point;
-				zone.SetCorners(point, FarthestCorner(zone, point));
-				ZoneDraftChanged(zone);
-			}),
-			ctx.Act("Set corner 2 here", "", "spans the zone from corner 1", () =>
-			{
-				var camera = EditorCamera(editor.Editor);
-				if (camera == null)
-					return;
-				var point = camera.Value.Position;
-				zone.SetCorners(editor.Corner1 ?? FarthestCorner(zone, point), point);
-				ZoneDraftChanged(zone);
-			}),
+		rows.Add(ctx.Nav("Points", $"{zone.Footprint.Count}", zone.Shape == ZoneShape.Prism ? "move / insert / delete / re-shoot" : "editing makes it a polygon", () => ZonePointsPage(key)));
+		rows.AddRange(
+		[
 			ctx.Act("Set teleport here", zone.Teleport != null ? "set" : "center", "your position and view", () =>
 			{
 				var camera = EditorCamera(editor.Editor);
@@ -337,7 +402,7 @@ public partial class SurfTimer
 				zone.TeleportAngles = camera.Value.Angles;
 				ZoneDraftChanged(zone);
 			}),
-		};
+		]);
 
 		if (zone.Teleport != null)
 		{
@@ -401,6 +466,105 @@ public partial class SurfTimer
 		return rows;
 	});
 
+	/// <summary>A zone's footprint points - editing any of them makes the zone a polygon (prism)</summary>
+	private PanelPage ZonePointsPage(int key) => new("Points", ctx =>
+	{
+		var editor = EditorOf(ctx);
+		var zone = editor?.Draft.FirstOrDefault(z => z.Key == key);
+		if (editor == null || zone == null)
+			return NotEditing();
+
+		var points = zone.Footprint;
+		var rows = new List<HudMenuItem>();
+		for (int i = 0; i < points.Count; i++)
+		{
+			int index = i;
+			var p = points[i];
+			rows.Add(ctx.Nav($"Point {i + 1}", $"{p.X:0} {p.Y:0} {p.Z:0}", "", () => ZonePointPage(key, index)));
+		}
+		rows.Add(ctx.Act("Add point here", "", "your position, after the last point", () =>
+		{
+			var camera = EditorCamera(editor.Editor);
+			if (camera == null)
+				return;
+			zone.ToPrism();
+			zone.Points.Add(camera.Value.Position);
+			zone.UpdateBounds();
+			ZoneDraftChanged(zone);
+		}));
+		return rows;
+	});
+
+	private PanelPage ZonePointPage(int key, int index) => new($"Point {index + 1}", ctx =>
+	{
+		var editor = EditorOf(ctx);
+		var zone = editor?.Draft.FirstOrDefault(z => z.Key == key);
+		if (editor == null || zone == null)
+			return NotEditing();
+		if (index >= zone.Footprint.Count)
+			return [PanelContext.Info("This point was removed")];
+
+		float step = editor.Step;
+		HudMenuItem Change(string text, string sub, Action<List<VectorT>> change) => ctx.Act(text, "", sub, () =>
+		{
+			zone.ToPrism();
+			if (index >= zone.Points.Count)
+				return;
+			change(zone.Points);
+			zone.UpdateBounds();
+			ZoneDraftChanged(zone);
+		});
+		HudMenuItem Nudge(string text, float x, float y, float z) =>
+			Change(text, $"{step:0} units", points => points[index] += new VectorT(x, y, z));
+
+		var p = zone.Footprint[index];
+		var rows = new List<HudMenuItem>
+		{
+			PanelContext.Info($"Point {index + 1} of {zone.Footprint.Count}", $"{p.X:0} {p.Y:0} {p.Z:0}"),
+			ctx.Act("Step", $"{step:0} units", "", () => editor.StepIndex = (editor.StepIndex + 1) % ZoneEditorSession.Steps.Length),
+			Nudge("+X", step, 0, 0), Nudge("-X", -step, 0, 0),
+			Nudge("+Y", 0, step, 0), Nudge("-Y", 0, -step, 0),
+			Nudge("Up", 0, 0, step), Nudge("Down", 0, 0, -step),
+			ctx.Act("Set to my position", "", "", () =>
+			{
+				var camera = EditorCamera(editor.Editor);
+				if (camera == null)
+					return;
+				zone.ToPrism();
+				zone.Points[index] = camera.Value.Position;
+				zone.UpdateBounds();
+				ZoneDraftChanged(zone);
+			}),
+			ctx.Act("Re-shoot", editor.ReshootPoint == index ? "waiting" : "", "the next shot (aim mode) moves this point", () =>
+			{
+				editor.AimMode = true;
+				editor.DrawingShape = false;
+				editor.ReshootPoint = index;
+				if (editor.Editor.Controller.PawnIsAlive)
+					GivePistolItem(editor.Editor.Controller, DefaultPistol(editor.Editor.Controller.Team));
+				ctx.Session.Status = $"Shoot where point {index + 1} should be";
+			}),
+			Change("Insert point after", "halfway to the next point", points =>
+			{
+				var a = points[index];
+				var b = points[(index + 1) % points.Count];
+				points.Insert(index + 1, new VectorT((a.X + b.X) / 2, (a.Y + b.Y) / 2, (a.Z + b.Z) / 2));
+			}),
+		};
+		if (zone.Footprint.Count > 3)
+		{
+			rows.Add(ctx.Act("Delete point", "", "at least 3 stay", () =>
+			{
+				zone.ToPrism();
+				zone.Points.RemoveAt(index);
+				zone.UpdateBounds();
+				ZoneDraftChanged(zone);
+				PanelBack(ctx.Session, $"Point {index + 1} deleted");
+			}));
+		}
+		return rows;
+	});
+
 	private PanelPage ZoneFacesPage(int key) => new("Faces", ctx =>
 	{
 		var editor = EditorOf(ctx);
@@ -439,11 +603,9 @@ public partial class SurfTimer
 
 	private static void Move(ZoneDefinition zone, float x, float y, float z)
 	{
-		var offset = new VectorT(x, y, z);
-		zone.Mins += offset;
-		zone.Maxs += offset;
-		if (zone.Teleport is VectorT teleport)
-			zone.Teleport = teleport + offset;
+		if (zone.Shape == ZoneShape.Trigger)
+			zone.ToPrism(); // A moved trigger zone isn't the map trigger any more
+		zone.Translate(new VectorT(x, y, z));
 		zone.Source = ZoneSource.Editor;
 	}
 

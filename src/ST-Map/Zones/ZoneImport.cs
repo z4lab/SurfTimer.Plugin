@@ -11,8 +11,8 @@ namespace SurfTimer;
 internal static class ZoneImport
 {
 	/// <summary>
-	/// Every zone trigger of the loaded map as a definition - raw type / number (no stages-as-checkpoints
-	/// remap), bounds = trigger origin + collision mins / maxs.
+	/// Every zone trigger of the loaded map as a trigger-linked definition - raw type / number (no
+	/// stages-as-checkpoints remap), drawn as the trigger's rotated bounds.
 	/// </summary>
 	internal static List<ZoneDefinition> FromTriggers()
 	{
@@ -28,15 +28,27 @@ internal static class ZoneImport
 			var origin = trigger.AbsOrigin;
 			var mins = trigger.Collision.Mins;
 			var maxs = trigger.Collision.Maxs;
+
+			// Linked to the trigger: its touches decide (exact brush shape). The outline / fallback shape is its
+			// bounds turned by the trigger's yaw (collision mins / maxs are entity-local)
+			float yaw = (trigger.AbsRotation?.Y ?? 0) * MathF.PI / 180f;
+			float cos = MathF.Cos(yaw), sin = MathF.Sin(yaw);
+			VectorT Corner(float x, float y) =>
+				new(origin.X + x * cos - y * sin, origin.Y + x * sin + y * cos, origin.Z + mins.Z);
+
 			var zone = new ZoneDefinition
 			{
 				Type = type,
 				Number = number,
 				Name = name!,
 				Source = ZoneSource.Map,
+				Shape = ZoneShape.Trigger,
+				TriggerName = name,
+				TriggerOrigin = origin.ToVector_t(),
+				Points = [Corner(mins.X, mins.Y), Corner(maxs.X, mins.Y), Corner(maxs.X, maxs.Y), Corner(mins.X, maxs.Y)],
+				Height = maxs.Z - mins.Z,
 			};
-			zone.SetCorners(new VectorT(origin.X + mins.X, origin.Y + mins.Y, origin.Z + mins.Z),
-				new VectorT(origin.X + maxs.X, origin.Y + maxs.Y, origin.Z + maxs.Z));
+			zone.UpdateBounds();
 
 			var (teleport, angles) = FindTeleportTarget(zone, origin.ToVector_t(), destinations);
 			zone.Teleport = teleport;

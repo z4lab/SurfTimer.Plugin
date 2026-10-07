@@ -23,22 +23,36 @@ internal enum ZoneType : byte
 }
 
 /// <summary>
-/// One active zone box (see ZoneDefinition for the stored form). Several can share Type+Number; Teleport
-/// is where players are placed when sent there. Mins / Maxs are world-space corners.
+/// One active zone (see ZoneDefinition for the stored form). Several can share Type+Number; Teleport is where
+/// players are placed when sent there. Mins / Maxs are its world-space bounds; prisms and trigger zones carry
+/// their shape in Geometry (for trigger zones: the trigger's rotated bounds - their real touches come from
+/// the trigger's own events).
 /// </summary>
 internal sealed record ZoneInfo(int ZoneId, string Name, ZoneType Type, short Number, VectorT Teleport, QAngleT? Angles,
 	VectorT Mins, VectorT Maxs, float? Value = null)
 {
-	/// <summary>Whether a box (e.g. a player's hull) overlaps this zone</summary>
-	internal bool Overlaps(in VectorT mins, in VectorT maxs) =>
-		mins.X <= Maxs.X && maxs.X >= Mins.X
-		&& mins.Y <= Maxs.Y && maxs.Y >= Mins.Y
-		&& mins.Z <= Maxs.Z && maxs.Z >= Mins.Z;
+	internal ZoneShape Shape { get; init; }
+	internal ZoneGeometry? Geometry { get; init; }
+	internal string? TriggerName { get; init; }
+	internal VectorT? TriggerOrigin { get; init; }
 
-	internal bool Contains(in VectorT point) =>
-		point.X >= Mins.X && point.X <= Maxs.X
-		&& point.Y >= Mins.Y && point.Y <= Maxs.Y
-		&& point.Z >= Mins.Z && point.Z <= Maxs.Z;
+	/// <summary>Detected by its map trigger's touch events, not by the tick overlap test</summary>
+	internal bool IsTriggerLinked => Shape == ZoneShape.Trigger;
+
+	/// <summary>Whether a box (e.g. a player's hull) overlaps this zone - a trigger zone by its rotated bounds</summary>
+	internal bool Overlaps(in VectorT mins, in VectorT maxs)
+	{
+		if (mins.X > Maxs.X || maxs.X < Mins.X || mins.Y > Maxs.Y || maxs.Y < Mins.Y || mins.Z > Maxs.Z || maxs.Z < Mins.Z)
+			return false;
+		return Shape == ZoneShape.Box || Geometry == null || Geometry.Overlaps(mins, maxs);
+	}
+
+	internal bool Contains(in VectorT point)
+	{
+		if (point.X < Mins.X || point.X > Maxs.X || point.Y < Mins.Y || point.Y > Maxs.Y || point.Z < Mins.Z || point.Z > Maxs.Z)
+			return false;
+		return Shape == ZoneShape.Box || Geometry == null || Geometry.Contains(point);
+	}
 }
 
 /// <summary>

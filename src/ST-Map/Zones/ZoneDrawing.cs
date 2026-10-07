@@ -73,7 +73,9 @@ public partial class SurfTimer
 			foreach (var zone in map!.ActiveZones)
 			{
 				bool startEnd = IsStartOrEnd(zone.Type);
-				var outline = DrawOutline(zone.Mins, zone.Maxs, ZoneColor(zone.Type), ZoneBeamWidth);
+				var outline = zone.Geometry != null
+					? DrawOutline(zone.Geometry.Points, zone.Geometry.Height, ZoneColor(zone.Type), ZoneBeamWidth)
+					: DrawOutline(zone.Mins, zone.Maxs, ZoneColor(zone.Type), ZoneBeamWidth);
 				outline.StartEnd = startEnd;
 				_publicOutlines[zone.ZoneId] = outline;
 				foreach (var beam in outline.Beams)
@@ -95,6 +97,7 @@ public partial class SurfTimer
 			return;
 		foreach (var zone in _zoneEditor.Draft)
 			RedrawEditorOutline(zone);
+		RedrawDraftShape();
 	}
 
 	/// <summary>One zone of the editor's draft drawn again (after it changed / got (de)selected)</summary>
@@ -111,7 +114,7 @@ public partial class SurfTimer
 		else if (!IsZoneActiveInMap(zone))
 			color = Color.FromArgb(255, color.R / 3, color.G / 3, color.B / 3); // Inactive until the map loads again
 
-		var outline = DrawOutline(zone.Mins, zone.Maxs, color, selected ? SelectedZoneBeamWidth : ZoneBeamWidth);
+		var outline = DrawOutline(zone.Footprint, zone.ShapeHeight, color, selected ? SelectedZoneBeamWidth : ZoneBeamWidth);
 		_editorOutlines[zone.Key] = outline;
 		foreach (var beam in outline.Beams)
 			_editorBeams.Add(beam.Index);
@@ -141,29 +144,64 @@ public partial class SurfTimer
 		return CurrentMap != null && ZoneName.Remap(ref type, ref number) && CurrentMap.IsWithinLoadedCounts(type, number);
 	}
 
-	private static ZoneOutline DrawOutline(VectorT mins, VectorT maxs, Color color, float width)
+	private static ZoneOutline DrawOutline(VectorT mins, VectorT maxs, Color color, float width) =>
+		DrawOutline(
+		[
+			new VectorT(mins.X, mins.Y, mins.Z), new VectorT(maxs.X, mins.Y, mins.Z),
+			new VectorT(maxs.X, maxs.Y, mins.Z), new VectorT(mins.X, maxs.Y, mins.Z),
+		], maxs.Z - mins.Z, color, width);
+
+	/// <summary>A prism outline: the footprint ring, the same ring Height higher, and a vertical per point</summary>
+	private static ZoneOutline DrawOutline(IReadOnlyList<VectorT> footprint, float height, Color color, float width)
 	{
 		var outline = new ZoneOutline();
-		var c = new Vector[8];
-		for (int i = 0; i < 8; i++)
+		int n = footprint.Count;
+		for (int i = 0; i < n; i++)
 		{
-			c[i] = new Vector((i & 1) == 0 ? mins.X : maxs.X, (i & 2) == 0 ? mins.Y : maxs.Y, (i & 4) == 0 ? mins.Z : maxs.Z);
+			var a = footprint[i];
+			var b = footprint[(i + 1) % n];
+			Add(a, b);
+			Add(Up(a), Up(b));
+			Add(a, Up(a));
 		}
+		return outline;
 
-		// Corner bits: 1 = x, 2 = y, 4 = z - an edge joins corners that differ in one bit
-		int[,] edges =
+		VectorT Up(VectorT p) => new(p.X, p.Y, p.Z + height);
+		void Add(VectorT from, VectorT to) => Add2(new Vector(from.X, from.Y, from.Z), new Vector(to.X, to.Y, to.Z));
+		void Add2(Vector from, Vector to)
 		{
-			{ 0, 1 }, { 2, 3 }, { 4, 5 }, { 6, 7 }, // along x
-			{ 0, 2 }, { 1, 3 }, { 4, 6 }, { 5, 7 }, // along y
-			{ 0, 4 }, { 1, 5 }, { 2, 6 }, { 3, 7 }, // along z
-		};
-		for (int e = 0; e < 12; e++)
-		{
-			var beam = CreateBeam(c[edges[e, 0]], c[edges[e, 1]], color, width);
+			var beam = CreateBeam(from, to, color, width);
 			if (beam != null)
 				outline.Beams.Add(beam);
 		}
-		return outline;
+	}
+
+	// The aim mode's shape being drawn (editor only): its points joined, plus the closing edge to the first point
+	private const int DraftOutlineKey = int.MinValue;
+
+	/// <summary>Draws the editor's draft shape again (after a shot / undo) - removed when it has no points</summary>
+	private void RedrawDraftShape()
+	{
+		RemoveEditorOutline(DraftOutlineKey);
+		var editor = _zoneEditor;
+		if (editor == null || editor.ShapePoints.Count == 0)
+			return;
+
+		var outline = new ZoneOutline();
+		var points = editor.ShapePoints;
+		for (int i = 0; i < points.Count; i++)
+		{
+			var a = points[i];
+			var b = points[(i + 1) % points.Count];
+			if (points.Count == 1)
+				b = new VectorT(a.X, a.Y, a.Z + 16); // A single point: a short marker
+			var beam = CreateBeam(new Vector(a.X, a.Y, a.Z), new Vector(b.X, b.Y, b.Z), Color.White, SelectedZoneBeamWidth);
+			if (beam != null)
+				outline.Beams.Add(beam);
+		}
+		_editorOutlines[DraftOutlineKey] = outline;
+		foreach (var beam in outline.Beams)
+			_editorBeams.Add(beam.Index);
 	}
 
 	private static bool AnyBeamLost(Dictionary<int, ZoneOutline> outlines)

@@ -9,8 +9,22 @@ internal enum ZoneSource : byte
 	Editor = 1,
 }
 
+/// <summary>How a zone's shape is defined (zones.shape - stored, never renumber)</summary>
+internal enum ZoneShape : byte
+{
+	/// <summary>Axis-aligned box (Mins / Maxs)</summary>
+	Box = 0,
+	/// <summary>Polygon footprint (Points, each with its own height) extended straight up by Height</summary>
+	Prism = 1,
+	/// <summary>
+	/// Linked to a map trigger_multiple (TriggerName / TriggerOrigin) - detected by the trigger's own touch
+	/// events, so its exact brush shape counts. Points / Height hold its rotated bounds for drawing.
+	/// </summary>
+	Trigger = 2,
+}
+
 /// <summary>
-/// A zone box as stored in the database (zones) and edited in the zone editor. Type and Number are raw -
+/// A zone as stored in the database (zones) and edited in the zone editor. Type and Number are raw -
 /// as the map names them; the stages-as-checkpoints remap happens when the zones are activated
 /// (Map.ActivateZones). Mins / Maxs are world-space corners, kept ordered (Mins &lt;= Maxs).
 /// </summary>
@@ -38,6 +52,70 @@ internal sealed class ZoneDefinition
 	internal float? Value { get; set; }
 	internal ZoneSource Source { get; set; }
 
+	internal ZoneShape Shape { get; set; }
+
+	/// <summary>Prism / trigger footprint in order (each point with its own Z) - empty for boxes</summary>
+	internal List<VectorT> Points { get; set; } = new();
+
+	/// <summary>Prism / trigger height above every footprint point</summary>
+	internal float Height { get; set; }
+
+	/// <summary>Trigger zones: the map trigger's name and origin (re-created triggers are found by these)</summary>
+	internal string? TriggerName { get; set; }
+	internal VectorT? TriggerOrigin { get; set; }
+
+	internal const float DefaultPrismHeight = 64f;
+
+	/// <summary>The footprint of any shape - a box's four bottom corners</summary>
+	internal List<VectorT> Footprint => Shape == ZoneShape.Box
+		?
+		[
+			new VectorT(Mins.X, Mins.Y, Mins.Z), new VectorT(Maxs.X, Mins.Y, Mins.Z),
+			new VectorT(Maxs.X, Maxs.Y, Mins.Z), new VectorT(Mins.X, Maxs.Y, Mins.Z),
+		]
+		: Points;
+
+	/// <summary>The height of any shape above its footprint</summary>
+	internal float ShapeHeight => Shape == ZoneShape.Box ? Maxs.Z - Mins.Z : Height;
+
+	/// <summary>Bounds (Mins / Maxs) of a prism / trigger from its points and height</summary>
+	internal void UpdateBounds()
+	{
+		if (Shape == ZoneShape.Box || Points.Count == 0)
+			return;
+		Mins = new VectorT(Points.Min(p => p.X), Points.Min(p => p.Y), Points.Min(p => p.Z));
+		Maxs = new VectorT(Points.Max(p => p.X), Points.Max(p => p.Y), Points.Max(p => p.Z) + Height);
+	}
+
+	/// <summary>
+	/// Makes the zone an editable prism with its current footprint and height (a box or a trigger link becomes a
+	/// custom shape - the map trigger isn't used for it any more).
+	/// </summary>
+	internal void ToPrism()
+	{
+		if (Shape == ZoneShape.Prism)
+			return;
+		var footprint = Footprint.ToList();
+		float height = ShapeHeight;
+		Shape = ZoneShape.Prism;
+		Points = footprint;
+		Height = height > 0 ? height : DefaultPrismHeight;
+		TriggerName = null;
+		TriggerOrigin = null;
+		UpdateBounds();
+	}
+
+	/// <summary>Moves the whole zone (and its teleport point)</summary>
+	internal void Translate(VectorT offset)
+	{
+		Mins += offset;
+		Maxs += offset;
+		for (int i = 0; i < Points.Count; i++)
+			Points[i] += offset;
+		if (Teleport is VectorT teleport)
+			Teleport = teleport + offset;
+	}
+
 	internal const float DefaultSpeedCap = 350f;
 
 	/// <summary>Zone types that have a number (stage, checkpoint, bonus)</summary>
@@ -58,7 +136,12 @@ internal sealed class ZoneDefinition
 		Maxs = new VectorT(MathF.Max(a.X, b.X), MathF.Max(a.Y, b.Y), MathF.Max(a.Z, b.Z));
 	}
 
-	internal ZoneDefinition Clone() => (ZoneDefinition)MemberwiseClone();
+	internal ZoneDefinition Clone()
+	{
+		var copy = (ZoneDefinition)MemberwiseClone();
+		copy.Points = new List<VectorT>(Points);
+		return copy;
+	}
 
 	/// <summary>A copy that is a new zone (own key, not saved yet)</summary>
 	internal ZoneDefinition Duplicate()

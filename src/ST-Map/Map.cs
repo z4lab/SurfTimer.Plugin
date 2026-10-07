@@ -70,6 +70,19 @@ public class Map : MapEntity
 	/// <summary>Active zones by ZoneInfo.ZoneId</summary>
 	internal Dictionary<int, ZoneInfo> ActiveZoneById { get; } = new();
 
+	/// <summary>Active trigger-linked zones by trigger name (several triggers may share a name - matched by origin)</summary>
+	internal Dictionary<string, List<ZoneInfo>> TriggerZones { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+	/// <summary>The trigger-linked zone of a map trigger (by name, then the closest origin) - null if none</summary>
+	internal ZoneInfo? TriggerZoneOf(string? name, VectorT origin)
+	{
+		if (name == null || !this.TriggerZones.TryGetValue(name, out var zones) || zones.Count == 0)
+			return null;
+		if (zones.Count == 1)
+			return zones[0];
+		return zones.MinBy(z => z.TriggerOrigin is VectorT o ? (o - origin).Length() : float.MaxValue);
+	}
+
 	/// <summary>
 	/// The map's zones as stored (raw - before the stages-as-checkpoints remap). From the database, or
 	/// imported from the map's triggers on its first load (then written to the database in LoadMapInfo).
@@ -191,6 +204,7 @@ public class Map : MapEntity
 		this.Zones.Clear();
 		this.ActiveZones.Clear();
 		this.ActiveZoneById.Clear();
+		this.TriggerZones.Clear();
 
 		short stageZones = 0;
 		foreach (var definition in definitions)
@@ -205,8 +219,21 @@ public class Map : MapEntity
 				continue;
 
 			string name = definition.Name.Length > 0 ? definition.Name : definition.Label;
+			definition.UpdateBounds();
 			var zone = new ZoneInfo(definition.Key, name, type, number, definition.TeleportOrCenter, definition.TeleportAngles,
-				definition.Mins, definition.Maxs, definition.Value);
+				definition.Mins, definition.Maxs, definition.Value)
+			{
+				Shape = definition.Shape,
+				Geometry = definition.Shape == ZoneShape.Box ? null : ZoneGeometry.Build(definition.Points, definition.Height),
+				TriggerName = definition.TriggerName,
+				TriggerOrigin = definition.TriggerOrigin,
+			};
+			if (zone.IsTriggerLinked && zone.TriggerName != null)
+			{
+				if (!this.TriggerZones.TryGetValue(zone.TriggerName, out var linked))
+					this.TriggerZones[zone.TriggerName] = linked = new List<ZoneInfo>();
+				linked.Add(zone);
+			}
 			if (!this.Zones.TryGetValue((type, number), out var list))
 				this.Zones[(type, number)] = list = new List<ZoneInfo>();
 			list.Add(zone);

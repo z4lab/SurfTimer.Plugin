@@ -145,6 +145,13 @@ public partial class SurfTimer : BasePlugin
 		ConVarHelper.RemoveCheatFlagFromConVar("bot_freeze");
 		ConVarHelper.RemoveCheatFlagFromConVar("bot_zombie");
 
+		// Round restarts re-create the map's triggers without EndTouch - touches of trigger-linked zones start over
+		foreach (var player in playerList.Values)
+		{
+			foreach (var id in player.TouchingTriggers.Where(t => t.Value.IsTriggerLinked).Select(t => t.Key).ToList())
+				player.TouchingTriggers.Remove(id);
+		}
+
 		ApplyServerSettings("round start");
 		return HookResult.Continue;
 	}
@@ -260,6 +267,9 @@ public partial class SurfTimer : BasePlugin
 			Server.NextFrame(() => CustomHud.RemoveMapMessageEntity(handle.Value));
 		});
 
-		// Zones aren't the map's triggers any more - they're checked every tick (ZoneTracker.cs)
+		// Zones are checked every tick (ZoneTracker.cs) - except zones linked to a map trigger, whose own touches
+		// decide (exact brush shape)
+		HookEntityOutput("trigger_multiple", "OnStartTouch", OnZoneTriggerStartTouch);
+		HookEntityOutput("trigger_multiple", "OnEndTouch", OnZoneTriggerEndTouch);
 	}
 }

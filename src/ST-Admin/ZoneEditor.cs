@@ -45,6 +45,15 @@ internal sealed class ZoneEditorSession(Player editor, List<ZoneDefinition> draf
 	/// <summary>Until this tick the editor's own teleports (menu) aren't undone</summary>
 	internal int OwnTeleportUntilTick { get; set; }
 
+	/// <summary>Aim mode: drawing a new shape - every shot adds a point (ShapePoints)</summary>
+	internal bool DrawingShape { get; set; }
+
+	/// <summary>Aim mode: the points of the shape being drawn, in shot order</summary>
+	internal List<VectorT> ShapePoints { get; } = new();
+
+	/// <summary>Aim mode: the next shot replaces this point of the selected zone (index) instead</summary>
+	internal int? ReshootPoint { get; set; }
+
 	internal ZoneDefinition? Selected => SelectedKey is int key ? Draft.FirstOrDefault(z => z.Key == key) : null;
 }
 
@@ -169,25 +178,66 @@ public partial class SurfTimer
 			return HookResult.Continue;
 
 		var zone = editor.Selected;
+		if (zone == null && !editor.DrawingShape)
+		{
+			shooter.PrintToChat($"{Config.PluginPrefix} Select a zone in the editor first (or start a new shape)");
+			return HookResult.Continue;
+		}
 		if (zone == null)
 		{
-			shooter.PrintToChat($"{Config.PluginPrefix} Select a zone in the editor first - shots set its corners");
+			editor.LastAimTick = Server.TickCount;
+			var drawn = new VectorT(@event.X, @event.Y, @event.Z);
+			editor.ShapePoints.Add(drawn);
+			RedrawDraftShape();
+			shooter.PrintToChat($"{Config.PluginPrefix} Point {editor.ShapePoints.Count} at {drawn.X:0} {drawn.Y:0} {drawn.Z:0}");
 			return HookResult.Continue;
 		}
 
 		editor.LastAimTick = Server.TickCount;
 		var point = new VectorT(@event.X, @event.Y, @event.Z);
-		if (editor.AimCorner == 0)
+
+		// Re-shooting one point of the selected zone
+		if (editor.ReshootPoint is int index)
 		{
-			editor.Corner1 = point;
-			zone.SetCorners(point, FarthestCorner(zone, point));
+			editor.ReshootPoint = null;
+			zone.ToPrism();
+			if (index >= 0 && index < zone.Points.Count)
+			{
+				zone.Points[index] = point;
+				zone.UpdateBounds();
+				shooter.PrintToChat($"{Config.PluginPrefix} {zone.Label}: point {index + 1} at {point.X:0} {point.Y:0} {point.Z:0}");
+			}
+		}
+		// Drawing a new shape: every shot is the next point (Finish shape makes it the zone's footprint)
+		else if (editor.DrawingShape)
+		{
+			editor.ShapePoints.Add(point);
+			RedrawDraftShape();
+			shooter.PrintToChat($"{Config.PluginPrefix} Point {editor.ShapePoints.Count} at {point.X:0} {point.Y:0} {point.Z:0}");
+			if (editor.Editor.Admin is { } drawing)
+				PanelRefresh(drawing);
+			return HookResult.Continue;
+		}
+		// Box zones: corners (1, 2, 1, ...)
+		else if (zone.Shape == ZoneShape.Box)
+		{
+			if (editor.AimCorner == 0)
+			{
+				editor.Corner1 = point;
+				zone.SetCorners(point, FarthestCorner(zone, point));
+			}
+			else
+			{
+				zone.SetCorners(editor.Corner1 ?? FarthestCorner(zone, point), point);
+			}
+			shooter.PrintToChat($"{Config.PluginPrefix} {zone.Label}: corner {editor.AimCorner + 1} at {point.X:0} {point.Y:0} {point.Z:0}");
+			editor.AimCorner = 1 - editor.AimCorner;
 		}
 		else
 		{
-			zone.SetCorners(editor.Corner1 ?? FarthestCorner(zone, point), point);
+			shooter.PrintToChat($"{Config.PluginPrefix} Start a new shape (or pick a point to re-shoot) - shots draw its points");
+			return HookResult.Continue;
 		}
-		shooter.PrintToChat($"{Config.PluginPrefix} {zone.Label}: corner {editor.AimCorner + 1} at {point.X:0} {point.Y:0} {point.Z:0}");
-		editor.AimCorner = 1 - editor.AimCorner;
 		ZoneDraftChanged(zone);
 		if (editor.Editor.Admin is { } session)
 			PanelRefresh(session);
@@ -237,6 +287,36 @@ public partial class SurfTimer
 				}
 			});
 		});
+	}
+
+	/// <summary>
+	/// Aim mode: the drawn points become the selected zone's footprint (a prism; height kept, else 64). Returns
+	/// an error when the shape isn't usable.
+	/// </summary>
+	private string? FinishDrawnShape()
+	{
+		var editor = _zoneEditor;
+		var zone = editor?.Selected;
+		if (editor == null || zone == null)
+			return "Select the zone the shape is for first";
+		if (editor.ShapePoints.Count < 3)
+			return "A shape needs at least 3 points";
+		if (!ZoneGeometry.IsSimple(editor.ShapePoints))
+			return "The shape's edges cross each other - undo points or start again";
+
+		float height = zone.ShapeHeight > 1 ? zone.ShapeHeight : ZoneDefinition.DefaultPrismHeight;
+		zone.Shape = ZoneShape.Prism;
+		zone.TriggerName = null;
+		zone.TriggerOrigin = null;
+		zone.Points = new List<VectorT>(editor.ShapePoints);
+		zone.Height = height;
+		zone.UpdateBounds();
+
+		editor.ShapePoints.Clear();
+		editor.DrawingShape = false;
+		RedrawDraftShape();
+		ZoneDraftChanged(zone);
+		return null;
 	}
 
 	/// <summary>A draft change: applied to the map live, the zone drawn again</summary>

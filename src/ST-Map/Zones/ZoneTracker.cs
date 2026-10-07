@@ -43,14 +43,17 @@ public partial class SurfTimer
 
 		foreach (var (id, zone) in player.TouchingTriggers)
 		{
-			if (!map.ActiveZoneById.TryGetValue(id, out var current) || !current.Overlaps(mins, maxs))
+			// Trigger-linked zones are left by their trigger's EndTouch, not by this approximation
+			if (!map.ActiveZoneById.TryGetValue(id, out var current))
+				_zonesLeft.Add(zone);
+			else if (!current.IsTriggerLinked && !current.Overlaps(mins, maxs))
 				_zonesLeft.Add(zone);
 		}
 
 		// Only zones of the player's course count (Player.CourseBonus) - others are crossed without effect
 		foreach (var zone in map.ActiveZones)
 		{
-			if (!player.TouchingTriggers.ContainsKey(zone.ZoneId) && player.IsOnCourse(zone) && zone.Overlaps(mins, maxs))
+			if (!zone.IsTriggerLinked && !player.TouchingTriggers.ContainsKey(zone.ZoneId) && player.IsOnCourse(zone) && zone.Overlaps(mins, maxs))
 				_zonesEntered.Add(zone);
 		}
 
