@@ -543,8 +543,9 @@ public partial class SurfTimer
 		}
 		else // Player did not beat their existing personal best for the bonus
 		{
+			int pbTime = player.Stats.BonusPB[bonus_idx][pStyle].RunTime;
 			player.Controller.PrintToChat($"{Config.PluginPrefix} {PracticeString}{LocalizationService.LocalizerNonNull["bonuspb_missed",
-				bonus_idx, PlayerHud.FormatTime(player.Timer.Ticks)]}"
+				bonus_idx, PlayerHud.FormatTime(player.Timer.Ticks), PlayerHud.FormatTime(player.Timer.Ticks - pbTime), PlayerHud.FormatTime(pbTime)]}"
 			);
 		}
 
