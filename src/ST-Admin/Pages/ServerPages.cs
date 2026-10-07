@@ -29,7 +29,9 @@ public partial class SurfTimer
 					: $"up {AdminFormat.Duration((long)uptime.TotalSeconds)}"),
 			PanelContext.Info("Players", $"{humans} / {Server.MaxPlayers}", $"tick {tickRate}"),
 			PanelContext.Info("Memory", AdminFormat.Bytes(GC.GetTotalMemory(false)), "managed heap"),
-			ctx.Nav("Change map", CurrentMap?.Name ?? "", "recent maps, workshop id", AdminChangeMapPage),
+			AdminPermissions.Has(ctx.Player.Controller, AdminPermissions.ChangeMap)
+				? ctx.Nav("Change map", CurrentMap?.Name ?? "", "recent maps, workshop id", AdminChangeMapPage)
+				: PanelContext.Info("Change map", CurrentMap?.Name ?? "", "needs @css/changemap"),
 			ctx.Nav("Replay bots", $"{playing} / {slots} playing", "", AdminBotsPage),
 			ctx.Nav("Timer settings", "", "saved to timer_settings.json", AdminTimerSettingsPage),
 			ctx.Nav("Chat", ChatSettings.Current.Enabled ? "on" : "off", "format, colors, anti-spam", AdminChatPage),
@@ -175,6 +177,9 @@ public partial class SurfTimer
 
 	private PanelPage AdminChangeMapPage() => new("Change map", ctx =>
 	{
+		if (!AdminPermissions.Has(ctx.Player.Controller, AdminPermissions.ChangeMap))
+			return [PanelContext.Info("No access", "", "changing the map needs @css/changemap")];
+
 		var rows = new List<HudMenuItem>
 		{
 			ctx.Ask("Map name or workshop id", "", "type in chat", LocalizationService.LocalizerNonNull["prompt_change_map"], text =>

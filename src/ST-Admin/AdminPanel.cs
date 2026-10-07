@@ -49,11 +49,19 @@ public partial class SurfTimer
 	/// <summary>Opens the admin panel on Server - Change map (!changemap without a map name)</summary>
 	private void OpenAdminChangeMap(Player admin)
 	{
+		if (!AdminPermissions.Has(admin.Controller, AdminPermissions.ChangeMap))
+		{
+			admin.Controller.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["admin_no_access"]}");
+			return;
+		}
+
 		var session = AdminSessionOf(admin);
 		int tab = session?.Sections.FindIndex(s => s.Flag == AdminPermissions.Server) ?? -1;
 		if (session == null || tab < 0)
 		{
-			admin.Controller.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["admin_no_access"]}");
+			// Map changers without the Server section: a panel with just the map list
+			var mapOnly = new PanelSession("SurfTimer Admin", admin, [new PanelSection("Change map", AdminPermissions.ChangeMap, AdminChangeMapPage)]);
+			PanelReopen(mapOnly);
 			return;
 		}
 

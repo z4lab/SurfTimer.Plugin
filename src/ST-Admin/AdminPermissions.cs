@@ -17,6 +17,9 @@ internal static class AdminPermissions
 	internal const string Database = "@surftimer/database";
 	internal const string Audit = "@surftimer/audit";
 
+	/// <summary>Changing the map (!changemap, Server - Change map) - the generic CounterStrikeSharp flag</summary>
+	internal const string ChangeMap = "@css/changemap";
+
 	internal static readonly IReadOnlyList<string> Sections = [Map, Records, Players, Server, Database, Audit];
 
 	/// <param name="flag">null = no permission needed</param>

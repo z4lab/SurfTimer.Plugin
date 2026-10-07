@@ -13,8 +13,8 @@ public partial class SurfTimer
 	[CommandHelper(usage: "[map name]", whoCanExecute: CommandUsage.CLIENT_AND_SERVER)]
 	public void ChangeMap(CCSPlayerController? player, CommandInfo command)
 	{
-		// Players need the admin panel's Server rights (root has all), the console always may
-		if (player != null && !AdminPermissions.Has(player, AdminPermissions.Server))
+		// Players need @css/changemap (root has all), the console always may
+		if (player != null && !AdminPermissions.Has(player, AdminPermissions.ChangeMap))
 		{
 			player.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["admin_no_access"]}");
 			return;
