@@ -61,3 +61,6 @@ nunit-*.xml
 *.vscode/*
 !.vscode/tasks.json
 *.idea
+
+# Claude
+CLAUDE.md
