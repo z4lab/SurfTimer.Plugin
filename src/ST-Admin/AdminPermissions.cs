@@ -4,7 +4,7 @@ using CounterStrikeSharp.API.Modules.Admin;
 namespace SurfTimer;
 
 /// <summary>
-/// Access rights of the !admin panel: one CounterStrikeSharp permission per section (granted through
+/// Access rights of the !surfadmin panel: one CounterStrikeSharp permission per section (granted through
 /// admins.json / admin groups). @css/root has every section.
 /// </summary>
 internal static class AdminPermissions
@@ -30,7 +30,7 @@ internal static class AdminPermissions
 	}
 
 	/// <summary>
-	/// !admin opens for anyone with at least one section.
+	/// !surfadmin opens for anyone with at least one section.
 	/// </summary>
 	internal static bool CanOpen(CCSPlayerController? controller) => Sections.Any(flag => Has(controller, flag));
 }

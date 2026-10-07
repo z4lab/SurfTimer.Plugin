@@ -70,7 +70,7 @@ public static class Config
 	public static int StartExitSpeedLimit { get; private set; } = TimerSettings.GetInt("start_exit_speed_limit", 600);
 
 	/// <summary>
-	/// Timer settings the !admin panel can change live - written back to timer_settings.json.
+	/// Timer settings the !surfadmin panel can change live - written back to timer_settings.json.
 	/// </summary>
 	internal static readonly IReadOnlyList<string> LiveBoolSettings =
 		["popup_menus", "block_map_chat", "protect_replay_bots", "replay_bot_direct_spawn", "replays_enabled", "replay_permanent_map_bot", "clan_tags_enabled", "country_clan_tag"];

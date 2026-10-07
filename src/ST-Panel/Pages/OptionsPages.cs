@@ -5,7 +5,7 @@ using CounterStrikeSharp.API.Modules.Commands;
 namespace SurfTimer;
 
 /// <summary>
-/// !options - the player's own options, same popup as !admin: visibility, HUD layout, chat messages and
+/// !options - the player's own options, same popup as !surfadmin: visibility, HUD layout, chat messages and
 /// repeat mode. Everything but repeat mode is saved (player_settings).
 /// </summary>
 public partial class SurfTimer

@@ -3,7 +3,7 @@ using System.Diagnostics;
 namespace SurfTimer;
 
 /// <summary>
-/// admin_actions (audit log), database statistics and maintenance for the !admin panel.
+/// admin_actions (audit log), database statistics and maintenance for the !surfadmin panel.
 /// </summary>
 internal static class AdminRepository
 {

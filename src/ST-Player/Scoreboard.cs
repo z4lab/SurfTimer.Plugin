@@ -6,7 +6,7 @@ namespace SurfTimer;
 /// <summary>
 /// Scoreboard score = -server rank, so the scoreboard (sorted by score, highest first) lists players by
 /// rank: #1 has -1 and is on top. Players without points and replay bots go to the bottom.
-/// Clan tags: the player's country and / or own tag, both switchable (!admin - Server - Timer settings).
+/// Clan tags: the player's country and / or own tag, both switchable (!surfadmin - Server - Timer settings).
 /// </summary>
 public partial class SurfTimer
 {

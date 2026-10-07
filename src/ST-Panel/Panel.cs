@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging;
 namespace SurfTimer;
 
 /// <summary>
-/// One page of a panel (!admin, !options): a title (breadcrumb part) and its rows, rebuilt on every
+/// One page of a panel (!surfadmin, !options): a title (breadcrumb part) and its rows, rebuilt on every
 /// refresh. State holds what the page loaded from the database (see PanelContext.Load).
 /// </summary>
 internal sealed class PanelPage(string title, Func<PanelContext, List<HudMenuItem>> build)

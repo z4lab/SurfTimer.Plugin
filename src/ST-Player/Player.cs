@@ -31,7 +31,7 @@ public class Player
 	internal string UserClanTag { get; set; } = "";
 	internal string? AppliedClanTag { get; set; }
 
-	// !admin / !options - the open panels (tab, pages), kept while connected
+	// !surfadmin / !options - the open panels (tab, pages), kept while connected
 	internal PanelSession? Admin { get; set; }
 	internal PanelSession? OptionsPanel { get; set; }
 

@@ -9,7 +9,7 @@ namespace SurfTimer;
 
 /// <summary>
 /// cfg/SurfTimer/trail_settings.json - trails on/off, their look and the color per group. Created with the
-/// defaults when missing; changed through !admin (Server - Trails). The role flags (root / admin / VIP)
+/// defaults when missing; changed through !surfadmin (Server - Trails). The role flags (root / admin / VIP)
 /// are the chat processor's (chat_settings.json).
 /// </summary>
 internal sealed class TrailSettings
@@ -89,7 +89,7 @@ internal sealed class TrailSettings
 }
 
 /// <summary>
-/// Trail colors: "#RRGGBB" or "rainbow", and the palette offered in !options / !admin.
+/// Trail colors: "#RRGGBB" or "rainbow", and the palette offered in !options / !surfadmin.
 /// </summary>
 internal static class TrailColors
 {

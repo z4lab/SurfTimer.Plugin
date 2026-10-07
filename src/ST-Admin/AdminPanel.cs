@@ -11,7 +11,8 @@ public partial class SurfTimer
 {
 	internal static readonly DateTime LoadedAt = DateTime.UtcNow;
 
-	[ConsoleCommand("css_admin", "Open the SurfTimer admin panel.")]
+	[ConsoleCommand("css_surfadmin", "Open the SurfTimer admin panel.")]
+	[ConsoleCommand("css_timeradmin", "Open the SurfTimer admin panel.")]
 	[CommandHelper(whoCanExecute: CommandUsage.CLIENT_ONLY)]
 	public void AdminCommand(CCSPlayerController? player, CommandInfo command)
 	{
@@ -41,7 +42,7 @@ public partial class SurfTimer
 
 		var session = admin.Admin;
 		if (session == null || !session.Sections.Select(s => s.Flag).SequenceEqual(sections.Select(s => s.Flag)))
-			admin.Admin = session = new PanelSession("Admin", admin, sections);
+			admin.Admin = session = new PanelSession("SurfTimer Admin", admin, sections);
 		return session;
 	}
 
