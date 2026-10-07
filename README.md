@@ -1,6 +1,6 @@
 <h1 align="center">
     <br>
-    <img src="https://api.xace.ch/z4lab/z4lab-logo-new-transparent.webp" width="128px"/>
+    <img src="assets/logo.svg" width="128px" alt="z4lab logo"/>
     <br>
 	SurfTimer for CS2
 </h1>
