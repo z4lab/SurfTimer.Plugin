@@ -17,6 +17,7 @@ public class PlayerTimer
 	public short Checkpoint { get; set; } = 0; // Current checkpoint tracker
 	public short Bonus { get; set; } = 0; // To-do: bonus implementation - Current bonus tracker
 	public short Style { get; set; } = 0; // To-do: functionality for player to change this value and the actual styles implementation - Current style tracker
+	public int StageFailures { get; set; } = 0; // Times the player was sent back to the start of `Stage` during this map run
 
 	// Velocity the player had when they started running the stage `Stage` currently identifies
 	public float StageEntryVelX { get; set; } = 0;
@@ -49,6 +50,7 @@ public class PlayerTimer
 		this.Ticks = 0;
 		this.Stage = 0;
 		this.Checkpoint = 0;
+		this.StageFailures = 0;
 		this.IsPaused = false;
 		this.IsPracticeMode = false;
 		this.IsStageMode = false;

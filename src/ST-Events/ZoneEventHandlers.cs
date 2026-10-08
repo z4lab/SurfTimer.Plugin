@@ -314,6 +314,11 @@ public partial class SurfTimer
 			player.Timer.IsStageMode = true;
 		}
 
+		// Back in the start zone of the stage being run (fell and got teleported, or !back): one more try
+		// at this stage. Stored on its split once the next stage zone is reached.
+		if (failed_stage && player.Timer.IsRunning && !player.Timer.IsStageMode)
+			player.Timer.StageFailures++;
+
 		player.Timer.Stage = stage;
 
 #if DEBUG
@@ -354,25 +359,20 @@ public partial class SurfTimer
 			// Checkpoint comparison - that's for non-staged maps only)
 			player.HUD.DisplayStageMessage((short)(stage - 1), stage_run_time, velocity);
 
-			// store the checkpoint in the player's current run checkpoints used for Checkpoint functionality
-			if (!player.Stats.ThisRun.Checkpoints.ContainsKey(player.Timer.Checkpoint))
-			{
-				var cp2 = new CheckpointEntity(player.Timer.Checkpoint,
-												player.Timer.Ticks,
-												velocity.X,
-												velocity.Y,
-												velocity.Z,
-												-1.0f,
-												-1.0f,
-												-1.0f,
-												0,
-												1);
-				player.Stats.ThisRun.Checkpoints[player.Timer.Checkpoint] = cp2;
-			}
-			else
-			{
-				player.Stats.ThisRun.Checkpoints[player.Timer.Checkpoint].Attempts++;
-			}
+			// store the checkpoint in the player's current run checkpoints used for Checkpoint functionality.
+			// Not recorded yet (guarded above); its tries are the finished stage's first try plus every fail.
+			var cp2 = new CheckpointEntity(player.Timer.Checkpoint,
+											player.Timer.Ticks,
+											velocity.X,
+											velocity.Y,
+											velocity.Z,
+											-1.0f,
+											-1.0f,
+											-1.0f,
+											0,
+											1 + player.Timer.StageFailures);
+			player.Stats.ThisRun.Checkpoints[player.Timer.Checkpoint] = cp2;
+			player.Timer.StageFailures = 0;
 		}
 
 		if (finishedStageForRepeat)
