@@ -312,6 +312,7 @@ public partial class SurfTimer
 	private static readonly Dictionary<string, (string Label, string Sub)> LiveSettingLabels = new()
 	{
 		["popup_menus"] = ("Popup menus", "clickable centre menus instead of chat menus"),
+		["round_timer_freeze"] = ("Freeze round timer", "CS2's round timer stands at 13:37 (it can't run out)"),
 		["block_map_chat"] = ("Block map chat", "map scripts' say messages"),
 		["protect_replay_bots"] = ("Protect replay bots", "block map bot kicks"),
 		["replay_bot_direct_spawn"] = ("Direct bot spawn", "CreateBot instead of bot_quota"),

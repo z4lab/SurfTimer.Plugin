@@ -31,7 +31,7 @@ internal static class CustomHud
 	internal static readonly IReadOnlyDictionary<string, (int Rows, int Segments)> Grid =
 		new Dictionary<string, (int, int)>
 		{
-			[Top] = (2, 8),
+			[Top] = (4, 8),
 			[Left] = (7, 4),
 			[Right] = (9, 2),
 		};
@@ -63,6 +63,9 @@ internal static class CustomHud
 		[Left] = 5,   // 400px
 		[Right] = 5,  // 400px
 	};
+
+	/// <summary>Highest shift-N class of the layout</summary>
+	internal const int MaxShift = 10;
 
 	internal static string SlotId(string slot) => $"st_{slot}";
 	internal static string RowId(string slot, int row) => $"st_{slot}_{row}";

@@ -92,5 +92,8 @@
 	"prompt_change_map": "Type a map name or workshop id in chat.",
 	"timer_banned": "{red}You are timer banned {0}{red}: {default}{1}{red}. Your runs aren't saved and your times are hidden.",
 	"timer_unbanned": "{lime}Your timer ban has ended{default} - your times are visible again.",
-	"timer_banned_run": "{red}You are timer banned - this run wasn't saved."
+	"timer_banned_run": "{red}You are timer banned - this run wasn't saved.",
+	"cursor_on": "Mouse cursor {lime}on{default} - click the menu. Move or {green}!cursor{default} to turn it off.",
+	"cursor_off": "Mouse cursor {red}off{default} - {green}!cursor{default} to click again.",
+	"cursor_no_hud": "The mouse cursor needs the custom HUD, which is off on this server."
 }

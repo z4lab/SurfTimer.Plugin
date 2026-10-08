@@ -35,6 +35,12 @@ public static class Config
 	public static bool PopupMenus { get; private set; } = TimerSettings.GetBool("popup_menus", true);
 
 	/// <summary>
+	/// CS2's round timer (top centre) stands still at 13:37 - a round time that runs out kicks everyone as idle
+	/// (RoundTimer.cs).
+	/// </summary>
+	public static bool RoundTimerFreeze { get; private set; } = TimerSettings.GetBool("round_timer_freeze", true);
+
+	/// <summary>
 	/// Points per stage / checkpoint segment WR (CS:GO SurfTimer's ck_wrcp_points, 0 = none).
 	/// </summary>
 	public static int PointsSegmentWr { get; private set; } = TimerSettings.GetInt("points_segment_wr", 0);
@@ -73,11 +79,12 @@ public static class Config
 	/// Timer settings the !surfadmin panel can change live - written back to timer_settings.json.
 	/// </summary>
 	internal static readonly IReadOnlyList<string> LiveBoolSettings =
-		["popup_menus", "block_map_chat", "protect_replay_bots", "replay_bot_direct_spawn", "replays_enabled", "replay_permanent_map_bot", "clan_tags_enabled", "country_clan_tag"];
+		["popup_menus", "round_timer_freeze", "block_map_chat", "protect_replay_bots", "replay_bot_direct_spawn", "replays_enabled", "replay_permanent_map_bot", "clan_tags_enabled", "country_clan_tag"];
 
 	internal static bool GetLiveBool(string key) => key switch
 	{
 		"popup_menus" => PopupMenus,
+		"round_timer_freeze" => RoundTimerFreeze,
 		"block_map_chat" => BlockMapChat,
 		"protect_replay_bots" => ProtectReplayBots,
 		"replay_bot_direct_spawn" => ReplayBotDirectSpawn,
@@ -101,6 +108,7 @@ public static class Config
 	{
 		ReplaysEnabled = TimerSettings.GetReplaysEnabled();
 		PopupMenus = TimerSettings.GetBool("popup_menus", true);
+		RoundTimerFreeze = TimerSettings.GetBool("round_timer_freeze", true);
 		PointsSegmentWr = TimerSettings.GetInt("points_segment_wr", 0);
 		BlockMapChat = TimerSettings.GetBool("block_map_chat", true);
 		ProtectReplayBots = TimerSettings.GetBool("protect_replay_bots", true);

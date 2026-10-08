@@ -79,8 +79,8 @@ internal sealed class SurfTimerApiImpl(SurfTimer plugin, ILogger logger) : ISurf
 		own[key] = value;
 	}
 
-	/// <summary>The addon values the viewer sees in the top HUD's first row (PlayerHud.TopRows)</summary>
-	internal static IEnumerable<PlayerHud.HudElement> TopHudFor(CCSPlayerController viewer)
+	/// <summary>The addon values the viewer sees in one of the top HUD's rows (PlayerHud.TopRows)</summary>
+	internal static IEnumerable<PlayerHud.HudElement> TopHudFor(CCSPlayerController viewer, HudRow row)
 	{
 		if (TopGlobal.Count == 0 && TopPerPlayer.Count == 0)
 			return [];
@@ -91,9 +91,10 @@ internal sealed class SurfTimerApiImpl(SurfTimer plugin, ILogger logger) : ISurf
 		foreach (var key in keys)
 		{
 			HudValue? value = own != null && own.TryGetValue(key, out var mine) ? mine : TopGlobal.GetValueOrDefault(key);
-			if (value == null || value.Value.Length == 0)
+			if (value == null || value.Value.Length == 0 || value.Row != row)
 				continue;
-			elements.Add(new PlayerHud.HudElement(value.Label, value.Value, HexOf(value.Color)));
+			elements.Add(new PlayerHud.HudElement(value.Label, value.Value, HexOf(value.Color),
+				Size: row == HudRow.Main ? PlayerHud.HudSize.Medium : PlayerHud.HudSize.Small));
 		}
 		return elements;
 	}
@@ -272,6 +273,9 @@ internal sealed class SurfTimerApiImpl(SurfTimer plugin, ILogger logger) : ISurf
 
 	public bool IsRunning(CCSPlayerController player) =>
 		plugin.PlayerOf(player) is { } target && target.Timer.IsRunning && !target.Timer.IsPracticeMode;
+
+	public bool IsInStartZone(CCSPlayerController player) =>
+		plugin.PlayerOf(player) is { } target && target.IsTouchingAnyStartZone;
 
 	public event Action<MapFinish>? MapFinished;
 

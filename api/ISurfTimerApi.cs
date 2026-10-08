@@ -21,11 +21,11 @@ public interface ISurfTimerApi
 	/// <summary>The loaded map, null between maps / before its data is loaded</summary>
 	SurfMapInfo? CurrentMap { get; }
 
-	// ---- Top HUD (custom HUD only - the row with the map name and tier) ----
+	// ---- Top HUD (custom HUD only) ----
 
 	/// <summary>
-	/// Shows a value after the map's tier for everyone, e.g. ("Time left", "12:34"). key keeps values of several
-	/// addons apart; null clears it.
+	/// Shows a value in the top HUD for everyone, e.g. ("Time left", "12:34"), on one of its rows (HudValue.Row). key
+	/// keeps values of several addons apart; null clears it.
 	/// </summary>
 	void SetTopHud(string key, HudValue? value);
 
@@ -62,6 +62,9 @@ public interface ISurfTimerApi
 
 	/// <summary>Whether the player is in a timed run that counts (not practice mode)</summary>
 	bool IsRunning(CCSPlayerController player);
+
+	/// <summary>Whether the player is in a start zone (map, stage or bonus start)</summary>
+	bool IsInStartZone(CCSPlayerController player);
 
 	/// <summary>
 	/// A map run was saved (not stages / bonuses). FirstCompletion: the player had no time on this map / style
@@ -110,6 +113,25 @@ public enum HudColor
 	Red,
 }
 
+/// <summary>
+/// The top HUD's rows: one big, three small. Empty rows collapse. The third and fourth need the HUD addon with four top
+/// rows - players with an older one don't see them.
+/// </summary>
+public enum HudRow
+{
+	/// <summary>Map name, tier, stage - after the mode flags</summary>
+	Main,
+
+	/// <summary>PB, rank and WR (or the replay) - after those</summary>
+	Second,
+
+	/// <summary>Addons - the map chooser's time left, vote and next map</summary>
+	Third,
+
+	/// <summary>Addons</summary>
+	Fourth,
+}
+
 /// <param name="Label">Small label before the value ("Time left"), empty for none</param>
 /// <param name="Value">The value ("12:34")</param>
-public sealed record HudValue(string Label, string Value, HudColor Color = HudColor.Default);
+public sealed record HudValue(string Label, string Value, HudColor Color = HudColor.Default, HudRow Row = HudRow.Main);

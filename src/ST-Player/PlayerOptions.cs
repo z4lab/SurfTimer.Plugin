@@ -73,6 +73,8 @@ internal sealed class PlayerOptions
 	internal const string KeyTrailColor = "trail_color";
 	internal const string KeyZonesShow = "zones_show";
 	internal const string KeySpeedAxes = "speed_axes";
+	/// <summary>Per HUD part: hud_pos_top, hud_pos_center, hud_pos_left, hud_pos_right - "" = the server's default</summary>
+	internal const string KeyHudPosPrefix = "hud_pos_";
 
 	/// <summary>Bottom HUD: rows split by '|', fields by ','</summary>
 	internal const string DefaultHudFields = "timer,speed|prespeed,keys,sync";
@@ -104,6 +106,7 @@ internal sealed class PlayerOptions
 	private string _trailColor = "";
 	private ZoneDisplay _zonesShow = ZoneDisplay.Off;
 	private SpeedAxes _speedAxes = SpeedAxes.XY;
+	private readonly Dictionary<string, int> _hudPositions = new();
 
 	internal PlayerOptions(PlayerProfile profile)
 	{
@@ -138,6 +141,13 @@ internal sealed class PlayerOptions
 		_zonesShow = _profile.Settings.TryGetValue(KeyZonesShow, out var zones)
 			&& Enum.TryParse(zones, ignoreCase: true, out ZoneDisplay display) && Enum.IsDefined(display) ? display : ZoneDisplay.Off;
 		_trailColor = _profile.Settings.TryGetValue(KeyTrailColor, out var trailColor) && TrailColors.IsValidCustom(trailColor) ? trailColor : "";
+		_hudPositions.Clear();
+		foreach (string slot in CustomHud.SlotShift.Keys)
+		{
+			if (_profile.Settings.TryGetValue(KeyHudPosPrefix + slot, out var pos) && int.TryParse(pos, out int shift)
+				&& shift >= 0 && shift <= CustomHud.MaxShift)
+				_hudPositions[slot] = shift;
+		}
 
 		// A stored layout the HUD can't show falls back to the default
 		string fields = _profile.Settings.TryGetValue(KeyHudFields, out var value) ? value : DefaultHudFields;
@@ -213,6 +223,22 @@ internal sealed class PlayerOptions
 	internal bool HudSplitsKeep { get => _hudSplitsKeep; set { _hudSplitsKeep = value; Save(KeyHudSplitsKeep, value); } }
 
 	internal bool HudSpectators { get => _hudSpectators; set { _hudSpectators = value; Save(KeyHudSpectators, value); } }
+
+	/// <summary>Where a HUD part sits (shift-0..10 of the layout) - the player's own, else the server's default</summary>
+	internal int HudPosition(string slot) =>
+		_hudPositions.TryGetValue(slot, out int shift) ? shift : CustomHud.SlotShift[slot];
+
+	/// <summary>The player's own position of a HUD part - null = the server's default</summary>
+	internal int? OwnHudPosition(string slot) => _hudPositions.TryGetValue(slot, out int shift) ? shift : null;
+
+	internal void SetHudPosition(string slot, int? shift)
+	{
+		if (shift is int value)
+			_hudPositions[slot] = Math.Clamp(value, 0, CustomHud.MaxShift);
+		else
+			_hudPositions.Remove(slot);
+		_profile.SetSetting(KeyHudPosPrefix + slot, shift?.ToString() ?? "");
+	}
 
 	/// <summary>Axes the HUD, prespeed and split speeds are shown with</summary>
 	internal SpeedAxes SpeedAxes

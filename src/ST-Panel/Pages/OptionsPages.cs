@@ -221,8 +221,33 @@ public partial class SurfTimer
 			rows.Add(ctx.Toggle("Keep last splits", options.HudSplitsKeep, "after a fail / reset, until your next run starts",
 				on => options.HudSplitsKeep = on));
 		rows.Add(ctx.Toggle("Spectator list", options.HudSpectators, "right side", on => options.HudSpectators = on));
+
+		// Positions: each click one step further down (top / sides) or up (bottom), after the last back to the default
+		foreach (var (slot, label, sub) in HudPositionRows)
+		{
+			int? own = options.OwnHudPosition(slot);
+			rows.Add(ctx.Act(label, own is int shift ? $"{shift}" : $"default ({CustomHud.SlotShift[slot]})", sub, () =>
+			{
+				int? next = own switch
+				{
+					null => 0,
+					>= CustomHud.MaxShift => null,
+					int value => value + 1,
+				};
+				options.SetHudPosition(slot, next);
+				ctx.Session.Status = next is int n ? $"{label}: {n}" : $"{label}: default";
+			}));
+		}
 		return rows;
 	});
+
+	private static readonly (string Slot, string Label, string Sub)[] HudPositionRows =
+	[
+		(CustomHud.Top, "Top position", "0-10 · 40-240px from the top"),
+		(CustomHud.Center, "Bottom position", "0-10 · 100-300px from the bottom"),
+		(CustomHud.Left, "Splits position", "0-10 · 200-600px from the top"),
+		(CustomHud.Right, "Spectators position", "0-10 · 200-600px from the top"),
+	];
 
 	/// <summary>Where a field is in the player's layout: (row, position) or null when hidden</summary>
 	private static (int Row, int Index)? FindHudField(IReadOnlyList<IReadOnlyList<HudFieldKind>> rows, HudFieldKind field)

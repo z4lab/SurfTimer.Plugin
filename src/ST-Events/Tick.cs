@@ -18,6 +18,9 @@ public partial class SurfTimer
 		// No "Game commencing" match restart when bots / the first player join (see MapCommandFilter.cs)
 		KeepGameCommenced();
 
+		// CS2's round timer stands at 13:37 (see RoundTimer.cs)
+		TickRoundTimer();
+
 		// Pawns that viewers with a hide option don't receive (see Visibility.cs)
 		RefreshTransmitTargets();
 
@@ -47,6 +50,7 @@ public partial class SurfTimer
 				}
 
 				player.HUD.Display(playerList.Values);
+				player.HUD.TickMenuKeys();
 
 				// Playtime / attempts in batches
 				if (Server.TickCount % StatsService.FlushIntervalTicks == 0)

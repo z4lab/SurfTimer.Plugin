@@ -3,6 +3,7 @@ using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Utils;
 using System.Globalization;
 using System.Net;
+using SurfTimer.Api;
 
 namespace SurfTimer;
 
@@ -472,7 +473,7 @@ public class PlayerHud
 			&& _player.Options.HudRows.Count > 0; // A layout without fields hides the block
 
 		SendClass(slotId, "hidden", !visible);
-		SendClass(slotId, $"shift-{CustomHud.SlotShift[CustomHud.Center]}", true);
+		SendExclusive(slotId, "shift", $"shift-{_player.Options.HudPosition(CustomHud.Center)}");
 		if (!visible)
 			return; // Keep the last texts - they're hidden anyway
 
@@ -610,7 +611,7 @@ public class PlayerHud
 
 		// Empty slots collapse
 		SendClass(slotId, "hidden", rows.Count == 0);
-		SendClass(slotId, $"shift-{CustomHud.SlotShift[slot]}", true);
+		SendExclusive(slotId, "shift", $"shift-{_player.Options.HudPosition(slot)}");
 
 		for (int r = 0; r < maxRows; r++)
 		{
@@ -688,7 +689,8 @@ public class PlayerHud
 
 	/// <summary>
 	/// Row 0: map, tier and where the shown player is (stage / bonus), plus mode flags and addon values.
-	/// Row 1 (smaller): PB, rank and WR for the current mode - or what replay is playing.
+	/// Row 1 (smaller): PB, rank and WR for the current mode - or what replay is playing - plus addon values.
+	/// Rows 2 and 3 (smaller): addon values only (SurfTimer.Api - row 2 is the map chooser's). Empty rows collapse.
 	/// </summary>
 	private List<List<HudElement>> TopRows(Player? subject, ReplayPlayer? replay)
 	{
@@ -701,21 +703,18 @@ public class PlayerHud
 
 		if (subject == null)
 		{
-			row.AddRange(SurfTimerApiImpl.TopHudFor(_player.Controller));
-			if (replay == null || ReplayTypeLabel(replay) == "")
-				return [row];
-
-			return
-			[
-				row,
-				[
-					new("", ReplayTypeLabel(replay), SpectatorColor, Label: true),
-					// The best segments replay has no single player - its label already says what it is
-					new("", replay.Type == ReplayManager.BestSegmentsType ? "" : replay.RecordPlayerName ?? "", "", Size: HudSize.Small),
-					new("", FormatTime(replay.RecordRunTime, PlayerTimer.TimeFormatStyle.Full), RankColorWr, Size: HudSize.Small),
-					new("Cycle", $"{replay.RepeatCount}", SpectatorColor, Size: HudSize.Small),
-				],
-			];
+			row.AddRange(SurfTimerApiImpl.TopHudFor(_player.Controller, HudRow.Main));
+			var sub = new List<HudElement>();
+			if (replay != null && ReplayTypeLabel(replay) != "")
+			{
+				sub.Add(new("", ReplayTypeLabel(replay), SpectatorColor, Label: true));
+				// The best segments replay has no single player - its label already says what it is
+				sub.Add(new("", replay.Type == ReplayManager.BestSegmentsType ? "" : replay.RecordPlayerName ?? "", "", Size: HudSize.Small));
+				sub.Add(new("", FormatTime(replay.RecordRunTime, PlayerTimer.TimeFormatStyle.Full), RankColorWr, Size: HudSize.Small));
+				sub.Add(new("Cycle", $"{replay.RepeatCount}", SpectatorColor, Size: HudSize.Small));
+			}
+			sub.AddRange(SurfTimerApiImpl.TopHudFor(_player.Controller, HudRow.Second));
+			return WithAddonRows(row, sub);
 		}
 
 		if (subject.Timer.IsBonusMode && subject.Timer.Bonus > 0)
@@ -730,8 +729,8 @@ public class PlayerHud
 			flags.Add("Repeat");
 		if (flags.Count > 0)
 			row.Add(new("", string.Join(" · ", flags), TimerColorPractice, Label: true));
-		// Addons' values (SurfTimer.Api), e.g. the map chooser's time left
-		row.AddRange(SurfTimerApiImpl.TopHudFor(_player.Controller));
+		// Addons' values (SurfTimer.Api)
+		row.AddRange(SurfTimerApiImpl.TopHudFor(_player.Controller, HudRow.Main));
 
 		var records = new List<HudElement>
 		{
@@ -739,8 +738,24 @@ public class PlayerHud
 			RankElement(subject) with { Size = HudSize.Small },
 			WrElement(subject, PlayerTimer.TimeFormatStyle.Full) with { Size = HudSize.Small },
 		};
+		records.AddRange(SurfTimerApiImpl.TopHudFor(_player.Controller, HudRow.Second));
 
-		return [row, records];
+		return WithAddonRows(row, records);
+	}
+
+	/// <summary>The first two top rows plus the addon rows 2 and 3 - trailing empty rows left out</summary>
+	private List<List<HudElement>> WithAddonRows(List<HudElement> main, List<HudElement> second)
+	{
+		var rows = new List<List<HudElement>>
+		{
+			main,
+			second,
+			SurfTimerApiImpl.TopHudFor(_player.Controller, HudRow.Third).ToList(),
+			SurfTimerApiImpl.TopHudFor(_player.Controller, HudRow.Fourth).ToList(),
+		};
+		while (rows.Count > 1 && rows[^1].Count == 0)
+			rows.RemoveAt(rows.Count - 1);
+		return rows;
 	}
 
 	// The splits panel as last shown during a map run, and whose run it was (!options - Keep last splits)
@@ -908,13 +923,22 @@ public class PlayerHud
 	}
 
 	// ---- Popup menu (st_menu) ----
-	// Opened through MenuPresenter. While it's open the player is in cursor mode (input capture) and
-	// clicks arrive in OnMenuClick. Rendered through the same cached senders as the HUD.
+	// Opened through MenuPresenter. Opening it puts the player in cursor mode (input capture), and
+	// clicks arrive in OnMenuClick. !cursor toggles cursor mode (with or without a menu); E closes the
+	// menu, and so does starting to move while the cursor is on. Rendered through the same cached
+	// senders as the HUD.
 
 	private HudMenu? _menu;
 	private int _menuTab;
 	private int _menuPage;
 	private bool? _sentInputCapture;
+	private bool _cursor;
+	private PlayerButtons _lastButtons;
+
+	private const PlayerButtons MoveButtons =
+		PlayerButtons.Forward | PlayerButtons.Back | PlayerButtons.Moveleft | PlayerButtons.Moveright | PlayerButtons.Jump;
+
+	internal bool IsCursorOn => _cursor;
 
 	internal bool IsMenuOpen => _menu != null;
 
@@ -926,6 +950,9 @@ public class PlayerHud
 		_menu = menu;
 		_menuTab = Math.Clamp(menu.ActiveTab, 0, Math.Max(0, menu.Tabs.Count - 1));
 		_menuPage = 0;
+		_cursor = true;
+		// Keys already held when it opens don't close it - only new presses
+		_lastButtons = _player.Controller.Buttons;
 		SendMenu();
 	}
 
@@ -943,11 +970,41 @@ public class PlayerHud
 
 	internal void CloseMenu()
 	{
-		if (_menu == null)
+		if (_menu == null && !_cursor)
 			return;
 
 		_menu = null;
+		_cursor = false;
 		SendMenu();
+	}
+
+	/// <summary>
+	/// Cursor mode on / off (!cursor) - for the open menu (move with it shown, click again later) or without one.
+	/// Returns the new state.
+	/// </summary>
+	internal bool ToggleCursor()
+	{
+		_cursor = !_cursor;
+		_lastButtons = _player.Controller.Buttons;
+		SendMenu();
+		return _cursor;
+	}
+
+	/// <summary>
+	/// Every tick: E closes the menu; a movement key pressed while the cursor is on closes the menu (or turns the
+	/// cursor off) - the player wants to move. Only presses, not keys held since the menu opened.
+	/// </summary>
+	internal void TickMenuKeys()
+	{
+		if (_menu == null && !_cursor)
+			return;
+
+		var buttons = _player.Controller.Buttons;
+		var pressed = buttons & ~_lastButtons;
+		_lastButtons = buttons;
+
+		if ((_menu != null && (pressed & PlayerButtons.Use) != 0) || (_cursor && (pressed & MoveButtons) != 0))
+			CloseMenu();
 	}
 
 	/// <summary>
@@ -1040,7 +1097,7 @@ public class PlayerHud
 
 		bool open = _menu != null;
 		SendClass(CustomHud.MenuId, "hidden", !open);
-		SendInputCapture(open);
+		SendInputCapture(_cursor);
 		if (!open)
 			return;
 

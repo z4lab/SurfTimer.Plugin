@@ -12,7 +12,10 @@
 Click a section to expand it.
 
 Every command works with `!` or `/` in chat, or with `css_` in the console (e.g. `!r`, `/r`, `css_r`). Commands aren't case sensitive: `!R` works like `!r`.
-If popup menus are on, menus open as a clickable popup in the centre of the screen. Otherwise they show as a chat menu you use with `!1`, `!2`, …
+If popup menus are on, menus open as a clickable popup in the centre of the screen, with the mouse cursor on. Otherwise they show as a chat menu you use with `!1`, `!2`, …
+
+- `!cursor` turns the cursor on or off: turn it off to move with the popup still shown, and on again to click. It also works without a popup. Bind it: `bind <key> css_cursor`.
+- `!close` closes the popup. **E** (use) closes it too, and so does starting to move (W / A / S / D / jump) while the cursor is on. ESC can't be detected by the server.
 Some menu rows ask you to type something in chat. Type `!cancel` to abort.
 
 # Players
@@ -135,10 +138,14 @@ If the server has the custom HUD turned off, a note at the top says so. Your set
 | **Keys first** preset | | Keys, Timer, Speed \| Prespeed, Sync |
 | Custom layout › | | Set each field yourself (see below). |
 | Speed | XY | Each press switches: **XY** (horizontal) → **XYZ** (3D) → **Z** (vertical, negative = falling). Applies to the HUD speed, prespeed and split speeds. |
-| Top bar | On | Rank, PB and WR at the top. With [SurfTimer.MapChooser](https://github.com/z4lab/SurfTimer.MapChooser) it also shows the time left (or the running vote) next to the map name. |
+| Top bar | On | Map, tier and stage, then a smaller row with rank, PB and WR. With [SurfTimer.MapChooser](https://github.com/z4lab/SurfTimer.MapChooser), a third row shows the time left, the running vote and the map's end (needs the HUD addon with four top rows). |
 | Splits panel › | PB | Left-side panel that compares your run against a target (see below). |
 | Keep last splits | On | *Only shown when the splits panel is on.* Keeps the last run's splits after a fail or reset, until your next run starts. |
 | Spectator list | On | Right side. |
+| Top position | default (4) | Each press moves the top bar one step down (0-10, 40-240px from the top). After 10 it goes back to the server's default. |
+| Bottom position | default (3) | Same for the bottom HUD (timer, speed): 0-10, 100-300px from the bottom. |
+| Splits position | default (5) | Same for the splits panel on the left: 0-10, 200-600px from the top. |
+| Spectators position | default (5) | Same for the spectator list on the right: 0-10, 200-600px from the top. |
 
 <details>
 <summary>HUD › Custom layout</summary>
@@ -345,6 +352,7 @@ Info rows: SurfTimer version/commit, players and tickrate, memory.
 | Setting | Description |
 |---|---|
 | Popup menus | Clickable centre menus instead of chat menus. |
+| Freeze round timer | CS2's round timer (top centre) stands still at 13:37. A round time that runs out would kick every player as idle. |
 | Block map chat | Blocks the map scripts' `say` messages. |
 | Protect replay bots | Blocks map bot kicks. |
 | Direct bot spawn | CreateBot instead of bot_quota. |
