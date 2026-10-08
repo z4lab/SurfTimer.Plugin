@@ -38,6 +38,9 @@ public partial class SurfTimer
 			ctx.Nav("Trails", TrailSettings.Current.Enabled ? "on" : "off", "look and colors per group", AdminTrailsPage),
 		};
 
+		// Pages of addons (SurfTimer.Api), e.g. the map chooser
+		rows.AddRange(SurfTimerApiImpl.AdminPageRows(ctx));
+
 		if (CurrentMap != null)
 		{
 			string name = CurrentMap.Name!;

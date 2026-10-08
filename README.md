@@ -135,7 +135,7 @@ If the server has the custom HUD turned off, a note at the top says so. Your set
 | **Keys first** preset | | Keys, Timer, Speed \| Prespeed, Sync |
 | Custom layout › | | Set each field yourself (see below). |
 | Speed | XY | Each press switches: **XY** (horizontal) → **XYZ** (3D) → **Z** (vertical, negative = falling). Applies to the HUD speed, prespeed and split speeds. |
-| Top bar | On | Rank, PB and WR at the top. |
+| Top bar | On | Rank, PB and WR at the top. With [SurfTimer.MapChooser](https://github.com/z4lab/SurfTimer.MapChooser) it also shows the time left (or the running vote) next to the map name. |
 | Splits panel › | PB | Left-side panel that compares your run against a target (see below). |
 | Keep last splits | On | *Only shown when the splits panel is on.* Keeps the last run's splits after a fail or reset, until your next run starts. |
 | Spectator list | On | Right side. |
@@ -214,7 +214,7 @@ Permissions are granted through CounterStrikeSharp (`admins.json` / admin groups
 |---|---|---|
 | Root | `@css/root` | Root name color and trail color. Can pick a custom trail color. Not limited by anti-spam. |
 | Admin | `@css/generic` | Admin name color and trail color. Can pick a custom trail color. Not limited by anti-spam. |
-| VIP | `@css/reservation` | VIP name color and trail color. Can pick a custom trail color. |
+| VIP | `@z4lab/vip` | VIP name color and trail color. Can pick a custom trail color. |
 
 </details>
 
@@ -336,6 +336,7 @@ Info rows: SurfTimer version/commit, players and tickrate, memory.
 | Timer settings › | Saved to `timer_settings.json` (see below). |
 | Chat › | See below. |
 | Trails › | See below. |
+| Map chooser › | *Only with [SurfTimer.MapChooser](https://github.com/z4lab/SurfTimer.MapChooser) installed. Needs its admin flag (`@css/changemap` by default).* Time, votes, next map and per-map length and cooldown. Documented in the map chooser's README. Addons add their pages here through SurfTimer.Api. |
 | Restart map | Danger. Everyone's running times are lost. |
 
 <details>

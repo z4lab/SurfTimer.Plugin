@@ -51,7 +51,7 @@ internal sealed class ChatSettings
 	{
 		[JsonPropertyName("root")] public string Root { get; set; } = "@css/root";
 		[JsonPropertyName("admin")] public string Admin { get; set; } = "@css/generic";
-		[JsonPropertyName("vip")] public string Vip { get; set; } = "@css/reservation";
+		[JsonPropertyName("vip")] public string Vip { get; set; } = "@z4lab/vip";
 	}
 
 	internal sealed class AntiSpamSettings

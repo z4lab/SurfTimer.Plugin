@@ -687,7 +687,7 @@ public class PlayerHud
 	}
 
 	/// <summary>
-	/// Row 0: map, tier and where the shown player is (stage / bonus), plus mode flags.
+	/// Row 0: map, tier and where the shown player is (stage / bonus), plus mode flags and addon values.
 	/// Row 1 (smaller): PB, rank and WR for the current mode - or what replay is playing.
 	/// </summary>
 	private List<List<HudElement>> TopRows(Player? subject, ReplayPlayer? replay)
@@ -701,6 +701,7 @@ public class PlayerHud
 
 		if (subject == null)
 		{
+			row.AddRange(SurfTimerApiImpl.TopHudFor(_player.Controller));
 			if (replay == null || ReplayTypeLabel(replay) == "")
 				return [row];
 
@@ -729,6 +730,8 @@ public class PlayerHud
 			flags.Add("Repeat");
 		if (flags.Count > 0)
 			row.Add(new("", string.Join(" · ", flags), TimerColorPractice, Label: true));
+		// Addons' values (SurfTimer.Api), e.g. the map chooser's time left
+		row.AddRange(SurfTimerApiImpl.TopHudFor(_player.Controller));
 
 		var records = new List<HudElement>
 		{

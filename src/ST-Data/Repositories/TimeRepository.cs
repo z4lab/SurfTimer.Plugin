@@ -15,7 +15,8 @@ internal static class TimeRepository
 		float StartVelX, float StartVelY, float StartVelZ, float EndVelX, float EndVelY, float EndVelZ,
 		IReadOnlyCollection<CheckpointEntity>? Splits, ReplayCodec.Encoded? Replay);
 
-	internal sealed record SaveResult(int TimeId, bool Improved);
+	/// <param name="First">The player had no time on this course / style before</param>
+	internal sealed record SaveResult(int TimeId, bool Improved, bool First = false);
 
 	private sealed class ExistingRow
 	{
@@ -194,7 +195,7 @@ internal static class TimeRepository
 			// Leaderboard cache: completions and WR of the course
 			await RefreshCourseStatsAsync(tx, [(run.CourseId, run.StyleId)]);
 
-			return new SaveResult(timeId, true);
+			return new SaveResult(timeId, true, existing == null);
 		});
 
 	/// <summary>

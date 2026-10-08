@@ -470,7 +470,11 @@ public class Map : MapEntity
 		this.ExitLimitEnabled = IsTrue(SettingExitLimit, false);
 
 		var snapshot = new Dictionary<string, string>(Settings, StringComparer.OrdinalIgnoreCase);
-		Server.NextFrame(() => MapCvars.Apply(snapshot));
+		Server.NextFrame(() =>
+		{
+			MapCvars.Apply(snapshot);
+			SurfTimerApiImpl.ApplyForcedCvars();
+		});
 
 		bool IsTrue(string key, bool fallback) =>
 			Settings.TryGetValue(key, out var value) ? value is "1" or "true" : fallback;

@@ -25,6 +25,12 @@
 		<PackageReference Include="Dapper" Version="2.1.79" />
 	</ItemGroup>
 
+	<!-- Public API for addons - deployed to shared/SurfTimer.Api/ (build.ps1), never next to the plugin: a copy here
+	     would give addons other types -->
+	<ItemGroup>
+		<ProjectReference Include="..\api\SurfTimer.Api.csproj" />
+	</ItemGroup>
+
 	<!-- Database migrations, applied by MigrationRunner on plugin load -->
 	<ItemGroup>
 		<EmbeddedResource Include="ST-Data\Migrations\*.sql" LogicalName="Migrations.%(Filename)%(Extension)" />
@@ -59,5 +65,22 @@
 		</ItemGroup>
 
 		<Delete Files="@(ToDelete)" />
+	</Target>
+
+	<!-- Same for publish (build.ps1 stages the publish output) -->
+	<Target Name="KeepOnlySelectedPublishedDlls" AfterTargets="Publish">
+		<ItemGroup>
+			<PublishKeep
+				Include="$(PublishDir)SurfTimer.Plugin.dll;
+					  $(PublishDir)SurfTimer.Plugin.pdb;
+					  $(PublishDir)Dapper.dll;
+					  $(PublishDir)MaxMind.Db.dll;
+					  $(PublishDir)MaxMind.GeoIP2.dll;
+					  $(PublishDir)MySqlConnector.dll" />
+			<PublishAll Include="$(PublishDir)*.dll;$(PublishDir)*.pdb" />
+			<PublishDelete Include="@(PublishAll)" Exclude="@(PublishKeep)" />
+		</ItemGroup>
+
+		<Delete Files="@(PublishDelete)" />
 	</Target>
 </Project>

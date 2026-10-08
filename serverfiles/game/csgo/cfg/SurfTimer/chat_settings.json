@@ -22,7 +22,7 @@
 	"flags": {
 		"root": "@css/root",
 		"admin": "@css/generic",
-		"vip": "@css/reservation"
+		"vip": "@z4lab/vip"
 	},
 	"antispam": {
 		"enabled": true,

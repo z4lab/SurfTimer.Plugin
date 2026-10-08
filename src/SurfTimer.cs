@@ -22,7 +22,9 @@ using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Core.Attributes;
 using CounterStrikeSharp.API.Core.Attributes.Registration;
+using CounterStrikeSharp.API.Core.Capabilities;
 using Microsoft.Extensions.Logging;
+using SurfTimer.Api;
 
 namespace SurfTimer;
 
@@ -168,6 +170,8 @@ public partial class SurfTimer : BasePlugin
 		{
 			if (CurrentMap != null)
 				MapCvars.Apply(CurrentMap.Settings);
+			// Cvars addons keep at a value (SurfTimer.Api ForceCvar) - after everything else
+			SurfTimerApiImpl.ApplyForcedCvars();
 		}, CounterStrikeSharp.API.Modules.Timers.TimerFlags.STOP_ON_MAPCHANGE);
 
 		_logger.LogInformation("[{Prefix}] Executed configuration: server_settings.cfg ({Reason})", Config.PluginName, reason);
@@ -182,10 +186,21 @@ public partial class SurfTimer : BasePlugin
 		SimpleAdminGags.Resolve(_logger);
 	}
 
+	public override void Unload(bool hotReload)
+	{
+		SurfTimerApiImpl.Clear();
+	}
+
 	public override void Load(bool hotReload)
 	{
 		_instance = this;
 		LocalizationService.Init(Localizer);
+
+		// Our API for addons (SurfTimer.Api, e.g. the map chooser) - offered in Load, so it's there when the
+		// addons look for it in their OnAllPluginsLoaded
+		var api = new SurfTimerApiImpl(this, _logger);
+		SurfTimerApiImpl.Register(api);
+		Capabilities.RegisterPluginCapability(SurfTimerApi.Capability, () => api);
 
 		// === Database: connect, create / upgrade the schema, clean up after a crash ===
 		try

@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	<!-- Public API of SurfTimer.Plugin for addons (SurfTimer.MapChooser, ...) - deployed to
+	     addons/counterstrikesharp/shared/SurfTimer.Api/ so every plugin resolves the same types.
+	     Only depends on CounterStrikeSharp. -->
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<RootNamespace>SurfTimer.Api</RootNamespace>
+		<Authors>z4lab</Authors>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="CounterStrikeSharp.API" Version="1.0.374" ExcludeAssets="runtime" />
+	</ItemGroup>
+</Project>

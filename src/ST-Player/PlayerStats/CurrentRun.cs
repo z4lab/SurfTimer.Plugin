@@ -161,6 +161,14 @@ public class CurrentRun : RunStatsEntity
 		_logger.LogTrace("[{ClassName}] {MethodName} -> Saved time {TimeId} (course {CourseId}, improved {Improved}, replay {Frames} frames / {Bytes} bytes)",
 			nameof(CurrentRun), methodName, result.TimeId, courseId, result.Improved, replay?.FrameCount ?? 0, replay?.Data.Length ?? 0);
 
+		// Addons (SurfTimer.Api) - e.g. the map chooser asks for a rating after the first completion
+		if (recType == 0)
+		{
+			var controller = player.Controller;
+			int mapId = map.ID;
+			Server.NextFrame(() => SurfTimerApiImpl.RaiseMapFinished(controller, mapId, style, save.RunTimeTicks, result.First, result.Improved));
+		}
+
 		// Records (and WR replays that changed), the player's PB with its new rank, everyone's points
 		await map.LoadMapRecordRuns();
 
