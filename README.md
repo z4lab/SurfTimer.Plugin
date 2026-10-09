@@ -27,8 +27,8 @@ Some menu rows ask you to type something in chat. Type `!cancel` to abort.
 |---|---|---|
 | `!r` | | Back to the map start. Also takes you out of spectator. |
 | `!rs` | | Back to the start of the stage or bonus you're on. Otherwise the map start. |
-| `!s <n>` | `!stage` | Teleports you to stage *n* and resets your timer (stage mode). Staged maps only. |
-| `!b <n>` | `!bonus` | Teleports you to bonus *n*. You stay on that bonus until you use `!r`, `!s` or `!b`. |
+| `!s [n]` | `!stage` | Teleports you to stage *n* and resets your timer (stage mode). Staged maps only. Without a number it opens a picker with every stage and its tier. |
+| `!b [n]` | `!bonus` | Teleports you to bonus *n*. You stay on that bonus until you use `!r`, `!s` or `!b`. Without a number: bonus 1 if the map has only one, otherwise a picker with every bonus and its tier. |
 | `!repeat` | | Turns repeat mode on or off: after each stage you go back to that stage's start. Staged maps only. Not saved, so it's off every time you join. |
 | `!startpos` | | Saves where `!r` / `!rs` / `!s` / `!b` put you in the start zone you're standing in, and which way you face. Stand still on the ground, not crouched. Kept until the map changes. **Deprecated soon:** will be replaced by saving a saveloc (`!saveloc`) in the start zone. |
 | `!clearstartpos [all]` | | Removes your start position for this start zone. `all` removes every one. **Deprecated soon**, together with `!startpos`. |

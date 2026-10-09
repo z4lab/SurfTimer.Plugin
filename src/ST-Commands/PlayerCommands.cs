@@ -136,20 +136,31 @@ public partial class SurfTimer
 			TeleportToZone(player, ZoneType.MapStart, 1);
 	}
 
-	[ConsoleCommand("css_s", "Teleport to a stage")]
-	[ConsoleCommand("css_stage", "Teleport to a stage")]
-	[CommandHelper(minArgs: 1, usage: "<Stage Number> [1/2/3]", whoCanExecute: CommandUsage.CLIENT_ONLY)]
+	[ConsoleCommand("css_s", "Teleport to a stage - without a number: stage 1, or a picker on staged maps")]
+	[ConsoleCommand("css_stage", "Teleport to a stage - without a number: stage 1, or a picker on staged maps")]
+	[CommandHelper(usage: "[Stage Number]", whoCanExecute: CommandUsage.CLIENT_ONLY)]
 	public void PlayerGoToStage(CCSPlayerController? player, CommandInfo command)
 	{
 		if (player == null)
 			return;
 
-		short stage;
-		try
+		if (CurrentMap.Stages <= 0)
 		{
-			stage = short.Parse(command.ArgByIndex(1));
+			player.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["not_staged"]}");
+			return;
 		}
-		catch (System.Exception)
+
+		// Without a number: the only stage, or a picker
+		if (command.ArgCount <= 1)
+		{
+			if (CurrentMap.Stages == 1)
+				GoToStage(player, 1);
+			else
+				ShowCoursePicker(player, "Stage", CurrentMap.Stages, CourseKind.Stage, n => GoToStage(player, n));
+			return;
+		}
+
+		if (!short.TryParse(command.ArgByIndex(1), out short stage) || stage < 1)
 		{
 			player.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["invalid_usage",
 				"!s <stage>"]}"
@@ -157,12 +168,7 @@ public partial class SurfTimer
 			return;
 		}
 
-		if (CurrentMap.Stages <= 0)
-		{
-			player.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["not_staged"]}");
-			return;
-		}
-		else if (stage > CurrentMap.Stages)
+		if (stage > CurrentMap.Stages)
 		{
 			player.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["invalid_stage_value",
 				CurrentMap.Stages]}"
@@ -170,10 +176,42 @@ public partial class SurfTimer
 			return;
 		}
 
+		GoToStage(player, stage);
+	}
+
+	private void GoToStage(CCSPlayerController player, short stage)
+	{
+		if (!player.IsValid)
+			return;
+
 		if (!TeleportToStage(player, stage))
 			player.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["invalid_usage",
 				"!s <stage>"]}"
 			);
+	}
+
+	/// <summary>
+	/// A popup (or chat menu) with the map's stages / bonuses - their tier and whether the zone exists. Picking one
+	/// teleports there.
+	/// </summary>
+	private void ShowCoursePicker(CCSPlayerController player, string label, int count, CourseKind kind, Action<short> go)
+	{
+		if (!playerList.TryGetValue(player.UserId ?? 0, out var oPlayer))
+			return;
+
+		var zone = kind == CourseKind.Bonus ? ZoneType.BonusStart : ZoneType.StageStart;
+		var items = new List<HudMenuItem>();
+		for (short n = 1; n <= count; n++)
+		{
+			short number = n;
+			// Stage 1 is the map start
+			bool exists = kind == CourseKind.Stage && n == 1 ? CurrentMap.HasZone(ZoneType.MapStart, 1) : CurrentMap.HasZone(zone, n);
+			byte? tier = CurrentMap.Course(kind, n)?.Tier;
+			items.Add(new HudMenuItem($"{label} {n}", exists ? _ => go(number) : null,
+				CurrentMap.Course(kind, n)?.Name ?? "", () => !exists ? "no zone" : tier is > 0 ? $"T{tier}" : ""));
+		}
+
+		MenuPresenter.Show(oPlayer, new HudMenu($"{label}s · {CurrentMap.Name}", [new HudMenuTab($"{label}s", items)]));
 	}
 
 	/// <summary>
@@ -312,21 +350,31 @@ public partial class SurfTimer
 		});
 	}
 
-	[ConsoleCommand("css_b", "Teleport to a bonus")]
-	[ConsoleCommand("css_bonus", "Teleport to a bonus")]
-	[CommandHelper(minArgs: 1, usage: "<Bonus Number> [1/2/3]", whoCanExecute: CommandUsage.CLIENT_ONLY)]
+	[ConsoleCommand("css_b", "Teleport to a bonus - without a number: bonus 1, or a picker with several bonuses")]
+	[ConsoleCommand("css_bonus", "Teleport to a bonus - without a number: bonus 1, or a picker with several bonuses")]
+	[CommandHelper(usage: "[Bonus Number]", whoCanExecute: CommandUsage.CLIENT_ONLY)]
 	public void PlayerGoToBonus(CCSPlayerController? player, CommandInfo command)
 	{
 		if (player == null)
 			return;
 
-		int bonus;
-
-		try
+		if (CurrentMap.Bonuses <= 0)
 		{
-			bonus = Int32.Parse(command.ArgByIndex(1));
+			player.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["not_bonused"]}");
+			return;
 		}
-		catch (System.Exception)
+
+		// Without a number: the only bonus, or a picker
+		if (command.ArgCount <= 1)
+		{
+			if (CurrentMap.Bonuses == 1)
+				GoToBonus(player, 1);
+			else
+				ShowCoursePicker(player, "Bonus", CurrentMap.Bonuses, CourseKind.Bonus, n => GoToBonus(player, n));
+			return;
+		}
+
+		if (!short.TryParse(command.ArgByIndex(1), out short bonus) || bonus < 1)
 		{
 			player.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["invalid_usage",
 				"!b <bonus>"]}"
@@ -334,12 +382,7 @@ public partial class SurfTimer
 			return;
 		}
 
-		if (CurrentMap.Bonuses <= 0)
-		{
-			player.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["not_bonused"]}");
-			return;
-		}
-		else if (bonus > CurrentMap.Bonuses)
+		if (bonus > CurrentMap.Bonuses)
 		{
 			player.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["invalid_bonus_value",
 				CurrentMap.Bonuses]}"
@@ -347,34 +390,46 @@ public partial class SurfTimer
 			return;
 		}
 
-		if (CurrentMap.HasZone(ZoneType.BonusStart, (short)bonus))
+		GoToBonus(player, bonus);
+	}
+
+	/// <summary>
+	/// Resets the timer and teleports the player to a bonus start - they stay on that bonus until !r / !s / !b.
+	/// </summary>
+	private void GoToBonus(CCSPlayerController player, short bonus)
+	{
+		if (!player.IsValid)
+			return;
+
+		if (!CurrentMap.HasZone(ZoneType.BonusStart, bonus))
 		{
-			playerList[player.UserId ?? 0].Timer.Reset();
-			playerList[player.UserId ?? 0].Timer.IsBonusMode = true;
-			playerList[player.UserId ?? 0].Timer.Bonus = (short)bonus;
-			playerList[player.UserId ?? 0].CourseBonus = (short)bonus; // Locked to this bonus until !r / !s / !b
-
-			if (player.Team == CsTeam.Spectator || player.Team == CsTeam.None)
-			{
-				Server.NextFrame(() =>  // Weird CS2 bug that requires doing this twice to show the Joined X team in chat and not stay in limbo
-					{
-						player.ChangeTeam(CsTeam.CounterTerrorist);
-						player.Respawn();
-
-						player.ChangeTeam(CsTeam.Spectator);
-
-						player.ChangeTeam(CsTeam.CounterTerrorist);
-						player.Respawn();
-					}
-				);
-			}
-
-			TeleportToZone(player, ZoneType.BonusStart, (short)bonus);
-		}
-		else
 			player.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["invalid_usage",
 				"!b <bonus>"]}"
 			);
+			return;
+		}
+
+		playerList[player.UserId ?? 0].Timer.Reset();
+		playerList[player.UserId ?? 0].Timer.IsBonusMode = true;
+		playerList[player.UserId ?? 0].Timer.Bonus = bonus;
+		playerList[player.UserId ?? 0].CourseBonus = bonus; // Locked to this bonus until !r / !s / !b
+
+		if (player.Team == CsTeam.Spectator || player.Team == CsTeam.None)
+		{
+			Server.NextFrame(() =>  // Weird CS2 bug that requires doing this twice to show the Joined X team in chat and not stay in limbo
+				{
+					player.ChangeTeam(CsTeam.CounterTerrorist);
+					player.Respawn();
+
+					player.ChangeTeam(CsTeam.Spectator);
+
+					player.ChangeTeam(CsTeam.CounterTerrorist);
+					player.Respawn();
+				}
+			);
+		}
+
+		TeleportToZone(player, ZoneType.BonusStart, bonus);
 	}
 
 	[ConsoleCommand("css_spec", "Spectate a player or bot by (partial) name, or open a picker menu")]
