@@ -77,6 +77,9 @@ public class Player
 	/// <summary>The saved in-progress run of this player on this map (PlayerStateService)</summary>
 	internal RunStateTracker RunState { get; } = new();
 
+	/// <summary>Options - HUD - Center speed: the speed text at the crosshair (CenterSpeed.cs)</summary>
+	internal CenterSpeedView CenterSpeedView { get; } = new();
+
 	internal bool IsOnCourse(ZoneInfo zone) => zone.Type switch
 	{
 		ZoneType.MapStart or ZoneType.MapEnd or ZoneType.StageStart or ZoneType.Checkpoint => this.CourseBonus == 0,

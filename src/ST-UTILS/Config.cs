@@ -144,6 +144,7 @@ public static class Config
 		ReplayPoolCap = Math.Clamp(TimerSettings.GetInt("replay_pool_cap", 5), 1, 10);
 		ReplayPermanentMapBot = TimerSettings.GetBool("replay_permanent_map_bot", false);
 		IdleThresholdSeconds = Math.Max(0, TimerSettings.GetInt("idle_threshold_seconds", 60));
+		CenterSpeedFont = TimerSettings.GetString("center_speed_font", "Consolas");
 		ResumeExpiryDays = Math.Clamp(TimerSettings.GetInt("resume_expiry_days", 3), 0, 365);
 		ResumeExpiryVipDays = Math.Clamp(TimerSettings.GetInt("resume_expiry_vip_days", 7), 0, 365);
 		SavelocLimit = Math.Max(1, TimerSettings.GetInt("saveloc_limit", 10000));
@@ -177,6 +178,12 @@ public static class Config
 	public static int SavelocLimit { get; private set; } = Math.Max(1, TimerSettings.GetInt("saveloc_limit", 10000));
 
 	public static int IdleThresholdSeconds { get; private set; } = Math.Max(0, TimerSettings.GetInt("idle_threshold_seconds", 60));
+
+	/// <summary>
+	/// Font of the centre speed (Options - HUD - Center speed) - a monospace font the players' PCs have, so the number
+	/// doesn't jump around as its digits change.
+	/// </summary>
+	public static string CenterSpeedFont { get; private set; } = TimerSettings.GetString("center_speed_font", "Consolas");
 
 	/// <summary>
 	/// Days a saved in-progress run can be resumed after the player left (PlayerStateService) - VIPs get their own,

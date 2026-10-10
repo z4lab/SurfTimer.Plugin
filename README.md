@@ -151,6 +151,7 @@ If the server has the custom HUD turned off, a note at the top says so. Your set
 | **Keys first** preset | | Keys, Timer, Speed \| Prespeed, Sync |
 | Custom layout › | | Set each field yourself (see below). |
 | Speed | XY | Each press switches: **XY** (horizontal) → **XYZ** (3D) → **Z** (vertical, negative = falling). Applies to the HUD speed, prespeed and split speeds. |
+| Center speed › | Off | Your speed in the middle of the screen, at the crosshair, in a monospace font. Works without the custom HUD. **Size** steps through 1–5 and off. **Move up** / **Move down** shift it above or below the crosshair (12 steps each way, default 3 below). It's drawn in the world just in front of you, so it trails your view a little on fast mouse movement, and your weapon and the HUD draw over it. Only you see it. |
 | Top bar | On | Map, tier and stage, then a smaller row with rank, PB and WR. With [SurfTimer.MapChooser](https://github.com/z4lab/SurfTimer.MapChooser), a third row shows the time left, the running vote and the map's end (needs the HUD addon with four top rows). |
 | Splits panel › | PB | Left-side panel that compares your run against a target (see below). |
 | Keep last splits | On | *Only shown when the splits panel is on.* Keeps the last run's splits after a fail or reset, until your next run starts. |
@@ -397,6 +398,8 @@ Info rows: SurfTimer version/commit, players and tickrate, memory.
 | Idle threshold | Stops replay recording for idle players (0 = off, max 3600 s). |
 | Resume expiry | Days a player's saved run is kept after they leave (0 = never expires, max 365). Default 3. `resume_expiry_days` |
 | Resume expiry (VIP) | The same for VIPs (VIP, admin or root flag from chat_settings.json). Default 7. `resume_expiry_vip_days` |
+
+The font of Options › HUD › Center speed is set in `timer_settings.json`: `center_speed_font` (default `Consolas`). Use a monospace font your players' PCs have, so the number doesn't shift as its digits change.
 | Replay bots max | How many requested bots can run at a time (1–10). |
 | Saveloc limit | Savelocs per map, all players combined. |
 | Start speed cap | Default for all maps (0 = no cap). |

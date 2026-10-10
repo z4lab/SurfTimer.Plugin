@@ -51,6 +51,7 @@ public partial class SurfTimer
 
 				player.HUD.Display(playerList.Values);
 				player.HUD.TickMenuKeys();
+				TickCenterSpeed(player); // Options - HUD - Center speed (CenterSpeed.cs)
 
 				// Playtime / attempts in batches
 				if (Server.TickCount % StatsService.FlushIntervalTicks == 0)

@@ -75,6 +75,14 @@ internal sealed class PlayerOptions
 	internal const string KeyZonesShow = "zones_show";
 	internal const string KeySpeedAxes = "speed_axes";
 	internal const string KeySoundVolume = "sound_volume";
+	/// <summary>Speed in the screen centre (CenterSpeed.cs): 0 off, 1-5 the size</summary>
+	internal const string KeyCenterSpeed = "center_speed";
+	/// <summary>Its height: steps above (+) / below (-) the crosshair</summary>
+	internal const string KeyCenterSpeedOffset = "center_speed_offset";
+
+	internal const int CenterSpeedSizes = 5;
+	internal const int CenterSpeedMaxOffset = 12;
+	internal const int DefaultCenterSpeedOffset = -3;
 	/// <summary>Main switch for every sound (!quake)</summary>
 	internal const string KeySounds = "sounds";
 	/// <summary>Per kind of sound: sound_&lt;key&gt; (Sounds.Categories)</summary>
@@ -118,6 +126,8 @@ internal sealed class PlayerOptions
 	private ZoneDisplay _zonesShow = ZoneDisplay.Off;
 	private SpeedAxes _speedAxes = SpeedAxes.XY;
 	private int _soundVolume = DefaultSoundVolume;
+	private int _centerSpeed;
+	private int _centerSpeedOffset = DefaultCenterSpeedOffset;
 	private bool _sounds = true;
 	private readonly Dictionary<string, int> _hudPositions = new();
 
@@ -157,6 +167,10 @@ internal sealed class PlayerOptions
 		_trailColor = _profile.Settings.TryGetValue(KeyTrailColor, out var trailColor) && TrailColors.IsValidCustom(trailColor) ? trailColor : "";
 		_soundVolume = _profile.Settings.TryGetValue(KeySoundVolume, out var volume) && int.TryParse(volume, out int percent)
 			&& percent is >= 0 and <= 100 ? percent : DefaultSoundVolume;
+		_centerSpeed = _profile.Settings.TryGetValue(KeyCenterSpeed, out var centerSize) && int.TryParse(centerSize, out int size)
+			&& size is >= 0 and <= CenterSpeedSizes ? size : 0;
+		_centerSpeedOffset = _profile.Settings.TryGetValue(KeyCenterSpeedOffset, out var centerOffset) && int.TryParse(centerOffset, out int offset)
+			&& Math.Abs(offset) <= CenterSpeedMaxOffset ? offset : DefaultCenterSpeedOffset;
 		_sounds = Bool(KeySounds, true);
 		_hudPositions.Clear();
 		foreach (string slot in CustomHud.SlotShift.Keys)
@@ -279,6 +293,30 @@ internal sealed class PlayerOptions
 		{
 			_soundVolume = Math.Clamp(value, 0, 100);
 			_profile.SetSetting(KeySoundVolume, _soundVolume.ToString());
+		}
+	}
+
+	// ---- Center speed ----
+
+	/// <summary>Speed in the screen centre: 0 off (default), 1-5 its size</summary>
+	internal int CenterSpeed
+	{
+		get => _centerSpeed;
+		set
+		{
+			_centerSpeed = Math.Clamp(value, 0, CenterSpeedSizes);
+			_profile.SetSetting(KeyCenterSpeed, _centerSpeed.ToString());
+		}
+	}
+
+	/// <summary>Steps above (+) / below (-) the crosshair</summary>
+	internal int CenterSpeedOffset
+	{
+		get => _centerSpeedOffset;
+		set
+		{
+			_centerSpeedOffset = Math.Clamp(value, -CenterSpeedMaxOffset, CenterSpeedMaxOffset);
+			_profile.SetSetting(KeyCenterSpeedOffset, _centerSpeedOffset.ToString());
 		}
 	}
 

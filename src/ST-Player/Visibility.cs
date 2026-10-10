@@ -73,7 +73,8 @@ public partial class SurfTimer
 	{
 		bool hidePawns = _anyoneHiding && _transmitTargets.Count > 0;
 		bool zoneBeams = ZoneBeamsExist;
-		if (!hidePawns && !_anyoneFilteringTrails && !zoneBeams)
+		bool centerSpeed = AnyCenterSpeed;
+		if (!hidePawns && !_anyoneFilteringTrails && !zoneBeams && !centerSpeed)
 			return;
 
 		foreach ((CCheckTransmitInfo info, CCSPlayerController? viewer) in infoList)
@@ -90,6 +91,10 @@ public partial class SurfTimer
 			// Zone outlines the viewer doesn't get (see ZoneDrawing.cs)
 			if (zoneBeams)
 				FilterZoneTransmit(info, player);
+
+			// Other players' centre speed texts (see CenterSpeed.cs)
+			if (centerSpeed)
+				FilterCenterSpeedTransmit(info, viewer);
 
 			if (!hidePawns || (!options.HidePlayers && !options.HideBots))
 				continue;

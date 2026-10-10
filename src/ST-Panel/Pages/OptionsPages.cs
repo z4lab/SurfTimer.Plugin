@@ -216,6 +216,8 @@ public partial class SurfTimer
 				_ => "Speed shows XY (horizontal)",
 			};
 		}));
+		rows.Add(ctx.Nav("Center speed", options.CenterSpeed > 0 ? $"size {options.CenterSpeed}" : "off", "your speed at the crosshair",
+			OptionsCenterSpeedPage));
 		rows.Add(ctx.Toggle("Top bar", options.HudTop, "rank, PB and WR", on => options.HudTop = on));
 		rows.Add(ctx.Nav("Splits panel", SplitTargetLabel(options.HudSplitTarget), "left side - compare against", OptionsSplitTargetPage));
 		if (options.HudSplits)
@@ -239,6 +241,47 @@ public partial class SurfTimer
 				ctx.Session.Status = next is int n ? $"{label}: {n}" : $"{label}: default";
 			}));
 		}
+		return rows;
+	});
+
+	/// <summary>Center speed: size (off, 1-5) and height above / below the crosshair - works without the custom HUD</summary>
+	private PanelPage OptionsCenterSpeedPage() => new("Center speed", ctx =>
+	{
+		var options = ctx.Player.Options;
+		string Position() => options.CenterSpeedOffset switch
+		{
+			0 => "at the crosshair",
+			> 0 => $"{options.CenterSpeedOffset} up",
+			_ => $"{-options.CenterSpeedOffset} down",
+		};
+
+		var rows = new List<HudMenuItem>
+		{
+			ctx.Act("Size", options.CenterSpeed > 0 ? $"{options.CenterSpeed} / {PlayerOptions.CenterSpeedSizes}" : "off",
+				"each press one step bigger, then off", () =>
+				{
+					options.CenterSpeed = (options.CenterSpeed + 1) % (PlayerOptions.CenterSpeedSizes + 1);
+					ctx.Session.Status = options.CenterSpeed > 0 ? $"Center speed: size {options.CenterSpeed}" : "Center speed: off";
+				}),
+		};
+		if (options.CenterSpeed <= 0)
+			return rows;
+
+		rows.Add(ctx.Act("Move up", Position(), $"up to {PlayerOptions.CenterSpeedMaxOffset} steps", () =>
+		{
+			options.CenterSpeedOffset++;
+			ctx.Session.Status = $"Center speed: {Position()}";
+		}));
+		rows.Add(ctx.Act("Move down", Position(), $"up to {PlayerOptions.CenterSpeedMaxOffset} steps", () =>
+		{
+			options.CenterSpeedOffset--;
+			ctx.Session.Status = $"Center speed: {Position()}";
+		}));
+		rows.Add(ctx.Act("Reset position", "", $"{-PlayerOptions.DefaultCenterSpeedOffset} down", () =>
+		{
+			options.CenterSpeedOffset = PlayerOptions.DefaultCenterSpeedOffset;
+			ctx.Session.Status = $"Center speed: {Position()}";
+		}));
 		return rows;
 	});
 
