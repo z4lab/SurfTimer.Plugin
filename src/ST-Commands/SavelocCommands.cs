@@ -283,6 +283,7 @@ public partial class SurfTimer
 		if (!CanLoadSaveloc(p))
 			return;
 
+		ClaimPlacement(p); // Puts the player somewhere - a saved run not restored yet is given up (RunResume.cs)
 		ApplySaveloc(p, saveloc);
 	}
 

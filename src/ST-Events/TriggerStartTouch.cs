@@ -35,6 +35,8 @@ public partial class SurfTimer
 		var client = zone == null ? null : ControllerOfActivator(activator);
 		if (zone == null || client == null || !client.PawnIsAlive || !playerList.TryGetValue(client.UserId ?? 0, out var player))
 			return HookResult.Continue;
+		if (player.IsPlacementPending)
+			return HookResult.Continue; // Being placed - entered after it, by the zone tracker (ZoneTracker.cs)
 
 		bool editing = _zoneEditor != null && ReferenceEquals(_zoneEditor.Editor, player);
 		if (!editing && player.IsOnCourse(zone) && !player.TouchingTriggers.ContainsKey(zone.ZoneId))

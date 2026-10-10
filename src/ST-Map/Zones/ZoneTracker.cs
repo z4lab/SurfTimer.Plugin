@@ -18,12 +18,20 @@ public partial class SurfTimer
 		var controller = player.Controller;
 		var pawn = controller.PlayerPawn.Value;
 		bool editing = _zoneEditor != null && ReferenceEquals(_zoneEditor.Editor, player);
-		if (editing || map == null || !controller.PawnIsAlive || pawn == null || !pawn.IsValid || pawn.AbsOrigin == null)
+		if (editing || map == null || player.IsPlacementPending || !controller.PawnIsAlive || pawn == null || !pawn.IsValid || pawn.AbsOrigin == null)
 		{
-			// Dead / spectating: forgotten without exit handlers (as a trigger's EndTouch did for dead players)
+			// Dead / spectating / being placed (RunResume.cs): forgotten without exit handlers (as a trigger's EndTouch
+			// did for dead players) - where the player ends up is entered like walking in
 			player.TouchingTriggers.Clear();
+			if (player.IsPlacementPending)
+				player.PlacementCatchUp = true;
 			return;
 		}
+
+		// Just placed: their map triggers' touches were ignored meanwhile and won't fire again while inside - trigger-linked
+		// zones are entered by their bounds this once
+		bool catchUp = player.PlacementCatchUp;
+		player.PlacementCatchUp = false;
 
 		if (!HullOf(pawn, out var mins, out var maxs))
 			return;
@@ -53,7 +61,7 @@ public partial class SurfTimer
 		// Only zones of the player's course count (Player.CourseBonus) - others are crossed without effect
 		foreach (var zone in map.ActiveZones)
 		{
-			if (!zone.IsTriggerLinked && !player.TouchingTriggers.ContainsKey(zone.ZoneId) && player.IsOnCourse(zone) && zone.Overlaps(mins, maxs))
+			if ((!zone.IsTriggerLinked || catchUp) && !player.TouchingTriggers.ContainsKey(zone.ZoneId) && player.IsOnCourse(zone) && zone.Overlaps(mins, maxs))
 				_zonesEntered.Add(zone);
 		}
 

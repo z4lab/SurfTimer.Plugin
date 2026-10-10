@@ -181,7 +181,7 @@ internal sealed class SavelocRun
 	internal (int Good, int Total, int SegmentGood, int SegmentTotal) Sync { get; init; }
 	internal VectorT? LastPrespeed { get; init; }
 
-	private static CheckpointEntity Copy(CheckpointEntity c) =>
+	internal static CheckpointEntity Copy(CheckpointEntity c) =>
 		new(c.CP, c.RunTime, c.StartVelX, c.StartVelY, c.StartVelZ, c.EndVelX, c.EndVelY, c.EndVelZ, c.EndTouch, c.Attempts);
 
 	internal static SavelocRun Capture(Player player)
@@ -254,8 +254,11 @@ internal sealed class SavelocRun
 		};
 	}
 
-	/// <summary>The run continues from here - in practice mode (nothing it finishes is saved)</summary>
-	internal void Apply(Player player)
+	/// <summary>
+	/// The run continues from here - in practice mode (nothing it finishes is saved), unless practice is false: a resumed
+	/// run (PlayerRunState) counts like before it was saved.
+	/// </summary>
+	internal void Apply(Player player, bool practice = true)
 	{
 		var timer = player.Timer;
 		timer.Reset();
@@ -272,7 +275,7 @@ internal sealed class SavelocRun
 		timer.CheckpointEntryVelX = CheckpointEntryVelocity.X;
 		timer.CheckpointEntryVelY = CheckpointEntryVelocity.Y;
 		timer.CheckpointEntryVelZ = CheckpointEntryVelocity.Z;
-		timer.IsPracticeMode = true;
+		timer.IsPracticeMode = practice;
 		timer.Start();
 
 		var run = player.Stats.ThisRun;

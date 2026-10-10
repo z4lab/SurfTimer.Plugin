@@ -124,6 +124,24 @@ public class ReplayRecorder
 	/// <summary>The run has ended (timer not running any more) - the next Start may record again</summary>
 	internal void ClearDropped() => this.DroppedForRun = false;
 
+	/// <summary>
+	/// A resumed run (PlayerRunState): the frames recorded before it was saved come back and recording goes on after
+	/// them, so finishing it saves one replay of the whole run.
+	/// </summary>
+	internal void RestoreForRun(List<ReplayFrame> frames, PlayerRunState state)
+	{
+		Reset();
+		this.Frames = frames;
+		this.StageEnterSituations.AddRange(state.StageEnterSituations);
+		this.StageExitSituations.AddRange(state.StageExitSituations);
+		this.CheckpointEnterSituations.AddRange(state.CheckpointEnterSituations);
+		this.CheckpointExitSituations.AddRange(state.CheckpointExitSituations);
+		this.MapSituations.AddRange(state.MapSituations);
+		this.BonusSituations.AddRange(state.BonusSituations);
+		this.CurrentSituation = ReplayFrameSituation.NONE;
+		Start();
+	}
+
 	internal void Tick(Player player, [CallerMemberName] string methodName = "")
 	{
 		if (!this.IsRecording || player == null)

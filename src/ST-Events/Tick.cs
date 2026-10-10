@@ -37,8 +37,8 @@ public partial class SurfTimer
 				TickZones(player);
 
 				// Spectators/dead players have no live PlayerPawn - the timer, recorder and speed cap
-				// all read it.
-				if (player.Controller.PawnIsAlive)
+				// all read it. A player being placed (respawn + teleport, RunResume.cs) isn't counted either.
+				if (player.Controller.PawnIsAlive && !player.IsPlacementPending)
 				{
 					player.Timer.Tick();
 					player.ReplayRecorder.Tick(player);
@@ -55,6 +55,9 @@ public partial class SurfTimer
 				// Playtime / attempts in batches
 				if (Server.TickCount % StatsService.FlushIntervalTicks == 0)
 					StatsService.Flush(player, final: false);
+
+				// The in-progress run, saved every few seconds and dropped when it ends (resume runs)
+				PlayerStateService.Tick(player);
 			}
 			catch (Exception ex)
 			{

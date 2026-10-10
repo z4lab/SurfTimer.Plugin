@@ -97,5 +97,9 @@
 	"cursor_off": "Mouse cursor {red}off{default} - {green}!cursor{default} to click again.",
 	"sounds_on": "Timer sounds {lime}on{default}.",
 	"sounds_off": "Timer sounds {red}off{default}.",
-	"cursor_no_hud": "The mouse cursor needs the custom HUD, which is off on this server."
+	"cursor_no_hud": "The mouse cursor needs the custom HUD, which is off on this server.",
+	"reset_confirm": "{yellow}Type !r again{default} within {0}s to reset your run ({1}).",
+	"resume_restored": "Your run was restored · {green}{0}{default} {grey}(!r to start over)",
+	"resume_restored_no_replay": "Your run was restored · {green}{0}{default} {grey}(no replay for this run · !r to start over)",
+	"resume_discarded": "{red}Your saved run couldn't be restored{default} - {0}."
 }

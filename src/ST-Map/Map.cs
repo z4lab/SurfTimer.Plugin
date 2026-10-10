@@ -241,6 +241,8 @@ public class Map : MapEntity
 			this.ActiveZoneById[zone.ZoneId] = zone;
 		}
 
+		this.ZonesHash = HashCourseZones();
+
 		if (!initial)
 			return;
 
@@ -260,6 +262,25 @@ public class Map : MapEntity
 
 		_logger.LogDebug("[{ClassName}] ActivateZones -> {Boxes} zone boxes in {Roles} zones",
 			nameof(Map), this.ActiveZones.Count, this.Zones.Count);
+	}
+
+	/// <summary>
+	/// The course zones as they are now (type, number, bounds) - a saved run (PlayerRunState) is only resumed while they
+	/// haven't changed, so a moved or added checkpoint can't be skipped.
+	/// </summary>
+	internal string ZonesHash { get; private set; } = "";
+
+	private string HashCourseZones()
+	{
+		static string F(float value) => MathF.Round(value, 1).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
+
+		var lines = this.ActiveZones
+			.Where(z => z.Type is ZoneType.MapStart or ZoneType.MapEnd or ZoneType.StageStart or ZoneType.Checkpoint
+				or ZoneType.BonusStart or ZoneType.BonusEnd)
+			.Select(z => $"{(int)z.Type}:{z.Number}:{F(z.Mins.X)},{F(z.Mins.Y)},{F(z.Mins.Z)}:{F(z.Maxs.X)},{F(z.Maxs.Y)},{F(z.Maxs.Z)}")
+			.OrderBy(line => line, StringComparer.Ordinal);
+		string text = $"{(this.StagesAsCheckpoints ? 1 : 0)}|{string.Join('|', lines)}";
+		return Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(text)))[..16];
 	}
 
 	/// <summary>A (remapped) zone the map's loaded counts cover - unnumbered zones always are</summary>

@@ -29,6 +29,7 @@ public partial class SurfTimer
 		new("Visibility", null, OptionsVisibilityRoot),
 		new("HUD", null, OptionsHudRoot),
 		new("Chat", null, OptionsChatRoot),
+		new("Gameplay", null, OptionsGameplayRoot),
 		new("Sound", null, OptionsSoundRoot),
 	];
 
@@ -380,6 +381,17 @@ public partial class SurfTimer
 	});
 
 	// ---- Gameplay ----
+
+	private PanelPage OptionsGameplayRoot() => new("Gameplay", ctx =>
+	{
+		var options = ctx.Player.Options;
+		return
+		[
+			ctx.Toggle("Confirm !r", options.ConfirmReset, "during a run: !r twice within 3 s to reset", on => options.ConfirmReset = on),
+		];
+	});
+
+	// ---- Sound ----
 
 	/// <summary>
 	/// Sound tab: the main switch (also !quake), the volume, and each kind of sound - the timer's, then the addons'.

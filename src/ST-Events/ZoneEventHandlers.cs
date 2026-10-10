@@ -58,6 +58,10 @@ public partial class SurfTimer
 		player.ReplayRecorder.CurrentSituation = ReplayFrameSituation.END_ZONE_ENTER;
 		player.ReplayRecorder.MapSituations.Add(player.Timer.Ticks);
 
+		// The last stage by the timer (RunTime is the tick its stage start was left) - used when the replay frames
+		// can't tell (LastStageTicks)
+		int lastStageTimerTicks = player.Timer.Ticks - player.Stats.ThisRun.RunTime;
+
 		player.Stats.ThisRun.RunTime = player.Timer.Ticks; // End time for the Map run
 		player.Stats.ThisRun.EndVelX = velocity.X; // End speed for the Map run
 		player.Stats.ThisRun.EndVelY = velocity.Y; // End speed for the Map run
@@ -137,7 +141,7 @@ public partial class SurfTimer
 					ScheduleRunSave(player, "SaveStageTime (last)", async () =>
 					{
 						// This calculation is wrong unless we wait for a bit in order for the `END_ZONE_ENTER` to be available in the `Frames` object
-						int stage_run_time = player.ReplayRecorder.Frames.FindLastIndex(f => f.Situation == ReplayFrameSituation.END_ZONE_ENTER) - player.ReplayRecorder.Frames.FindLastIndex(f => f.Situation == ReplayFrameSituation.STAGE_ZONE_EXIT);
+						int stage_run_time = LastStageTicks(player, lastStageTimerTicks);
 
 						// Before the save: still on the main thread (chat can't be printed after an await),
 						// and compared against the previous PB rather than the one being saved
@@ -198,7 +202,7 @@ public partial class SurfTimer
 				ScheduleRunSave(player, "SaveStageTime (last, stage mode)", async () =>
 				{
 					// This calculation is wrong unless we wait for a bit in order for the `END_ZONE_ENTER` to be available in the `Frames` object
-					int stage_run_time = player.ReplayRecorder.Frames.FindLastIndex(f => f.Situation == ReplayFrameSituation.END_ZONE_ENTER) - player.ReplayRecorder.Frames.FindLastIndex(f => f.Situation == ReplayFrameSituation.STAGE_ZONE_EXIT);
+					int stage_run_time = LastStageTicks(player, lastStageTimerTicks);
 
 					// Before the save: still on the main thread (chat can't be printed after an await),
 					// and compared against the previous PB rather than the one being saved
@@ -217,6 +221,18 @@ public partial class SurfTimer
 #if DEBUG
 		player.Controller.PrintToChat($"CS2 Surf DEBUG >> CBaseTrigger_{ChatColors.Lime}StartTouchFunc{ChatColors.Default} -> {ChatColors.Red}Map Stop Zone");
 #endif
+	}
+
+	/// <summary>
+	/// The last stage's ticks (its stage start left -> map end entered) from the replay frames. Without them - the run's
+	/// replay was dropped (idle, resumed after a crash) - the timer's value: the frames would give 0, a new stage record.
+	/// </summary>
+	private static int LastStageTicks(Player player, int timerTicks)
+	{
+		var frames = player.ReplayRecorder.Frames;
+		int endEnter = frames.FindLastIndex(f => f.Situation == ReplayFrameSituation.END_ZONE_ENTER);
+		int stageExit = frames.FindLastIndex(f => f.Situation == ReplayFrameSituation.STAGE_ZONE_EXIT);
+		return endEnter >= 0 && stageExit >= 0 && endEnter > stageExit ? endEnter - stageExit : timerTicks;
 	}
 
 	/// <summary>"-0:01.234" (green, faster) / "+0:01.234" (red, slower) against a time - "-" when there is none</summary>

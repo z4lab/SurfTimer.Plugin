@@ -52,6 +52,31 @@ public class Player
 	/// <summary>Tick of the last saveloc load - "Teleported to #N" is shown once per burst of loads</summary>
 	internal int LastSavelocLoadTick { get; set; } = int.MinValue / 2;
 
+	/// <summary>
+	/// Until this tick the player is being put somewhere (RunResume.cs): zones are ignored and the timer doesn't count,
+	/// so a respawn at the map's spawn point (usually inside the map start) can't reset or advance the run.
+	/// </summary>
+	internal int PlacementPendingUntilTick { get; set; }
+	internal bool IsPlacementPending => Server.TickCount < this.PlacementPendingUntilTick;
+
+	/// <summary>Placed just now: the zone tracker enters trigger-linked zones once by their bounds (their touches were ignored)</summary>
+	internal bool PlacementCatchUp { get; set; }
+
+	/// <summary>Bumped by every placement - a newer one cancels the waiting ones</summary>
+	internal int PlacementToken { get; set; }
+
+	/// <summary>The first spawn on this map was placed (saved run restored, or the map start)</summary>
+	internal bool FirstSpawnHandled { get; set; }
+
+	/// <summary>Where the player was when they went to spectator - leaving it puts them back there (RunResume.cs)</summary>
+	internal SpecReturn? SpecReturn { get; set; }
+
+	/// <summary>A first !r during a run asked for a second one until this tick (Options - Gameplay - Confirm !r)</summary>
+	internal int ResetConfirmUntilTick { get; set; }
+
+	/// <summary>The saved in-progress run of this player on this map (PlayerStateService)</summary>
+	internal RunStateTracker RunState { get; } = new();
+
 	internal bool IsOnCourse(ZoneInfo zone) => zone.Type switch
 	{
 		ZoneType.MapStart or ZoneType.MapEnd or ZoneType.StageStart or ZoneType.Checkpoint => this.CourseBonus == 0,

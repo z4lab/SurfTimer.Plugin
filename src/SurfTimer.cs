@@ -42,7 +42,7 @@ public partial class SurfTimer : BasePlugin
 
 	// Metadata
 	public override string ModuleName => $"z4lab/{Config.PluginName}";
-	public override string ModuleVersion => "1.0.1";
+	public override string ModuleVersion => "1.0.2";
 	public override string ModuleDescription => Config.PluginName;
 	public override string ModuleAuthor => "z4lab";
 
@@ -68,6 +68,9 @@ public partial class SurfTimer : BasePlugin
 
 		// The server's map list (MapList.cs) - after the workshop collection is known
 		AddTimer(5f, RefreshMapList, CounterStrikeSharp.API.Modules.Timers.TimerFlags.STOP_ON_MAPCHANGE);
+
+		// Saved runs nobody can resume any more (resume expiry)
+		PlayerStateService.CleanupExpired();
 
 		// Initialise Map Object
 		if ((CurrentMap == null || CurrentMap.Name!.Equals(mapName)) && mapName.Contains("surf_"))
@@ -118,9 +121,13 @@ public partial class SurfTimer : BasePlugin
 			);
 		}
 
-		// Playtime / attempts of this map - players come back as new Player objects
+		// Running runs (resumed when the player spawns on this map again), playtime / attempts of this map - players
+		// come back as new Player objects
 		foreach (var player in playerList.Values)
+		{
+			PlayerStateService.SaveFinal(player, "map end");
 			StatsService.Flush(player, final: true);
+		}
 
 		// Per-map cvar overrides back to the server's values, open chat prompts dropped
 		MapCvars.RestoreAll();
@@ -187,6 +194,11 @@ public partial class SurfTimer : BasePlugin
 	public override void Unload(bool hotReload)
 	{
 		SurfTimerApiImpl.Clear();
+
+		// Running runs kept to resume (server shutdown / plugin reload) - a short wait so they reach the database
+		foreach (var player in playerList.Values)
+			PlayerStateService.SaveFinal(player, "plugin unload");
+		PlayerStateService.Drain(TimeSpan.FromSeconds(3));
 	}
 
 	public override void Load(bool hotReload)

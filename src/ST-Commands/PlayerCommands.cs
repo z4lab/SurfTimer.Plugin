@@ -15,35 +15,56 @@ public partial class SurfTimer
 	[CommandHelper(whoCanExecute: CommandUsage.CLIENT_ONLY)]
 	public void PlayerReset(CCSPlayerController? player, CommandInfo command)
 	{
-		if (player == null)
+		if (player == null || !playerList.TryGetValue(player.UserId ?? 0, out var oPlayer))
 			return;
 
-		if (player.Team == CsTeam.Spectator || player.Team == CsTeam.None)
-		{
-			Server.NextFrame(() =>  // Weird CS2 bug that requires doing this twice to show the Joined X team in chat and not stay in limbo
-				{
-					player.ChangeTeam(CsTeam.CounterTerrorist);
-					player.Respawn();
-
-					player.ChangeTeam(CsTeam.Spectator);
-
-					player.ChangeTeam(CsTeam.CounterTerrorist);
-					player.Respawn();
-				}
-			);
-		}
-
-		Player oPlayer = playerList[player.UserId ?? 0];
 		if (oPlayer.ReplayRecorder.IsSaving)
 		{
 			player.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["reset_delay"]}");
 			return;
 		}
 
-		oPlayer.Timer.Reset();
-		oPlayer.Stats.ThisRun.Checkpoints.Clear();
-		oPlayer.CourseBonus = 0; // Back on the map course
-		TeleportToZone(player, ZoneType.MapStart, 1);
+		if (AskResetConfirm(oPlayer))
+			return;
+
+		ClaimPlacement(oPlayer);
+		RespawnThenPlace(oPlayer, () => ResetToMapStart(oPlayer));
+	}
+
+	/// <summary>A !r during a run first only warns for this long - a second one within it resets</summary>
+	private const int ResetConfirmSeconds = 3;
+	/// <summary>Runs shorter than this reset right away - starting again costs nothing</summary>
+	private const int ResetConfirmMinTicks = 5 * 64;
+
+	/// <summary>
+	/// Options - Gameplay - Confirm !r: during a run the first !r only warns (chat + a subtle sound), a second one within
+	/// ResetConfirmSeconds resets. Not for practice runs, the first seconds of a run, or from spectator / dead (!r is how
+	/// they join). True when this !r was only the warning.
+	/// </summary>
+	private static bool AskResetConfirm(Player p)
+	{
+		var timer = p.Timer;
+		if (!p.Options.ConfirmReset || !p.Controller.PawnIsAlive || !timer.IsRunning || timer.IsPracticeMode || timer.Ticks < ResetConfirmMinTicks
+			|| Server.TickCount <= p.ResetConfirmUntilTick)
+		{
+			p.ResetConfirmUntilTick = 0;
+			return false;
+		}
+
+		p.ResetConfirmUntilTick = Server.TickCount + ResetConfirmSeconds * 64;
+		p.Controller.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["reset_confirm",
+			ResetConfirmSeconds, PlayerHud.FormatTime(timer.Ticks)]}");
+		Sounds.Play(p, Sounds.ResetConfirm);
+		return true;
+	}
+
+	/// <summary>!r: the timer reset and the player at the map start, on the map course</summary>
+	private void ResetToMapStart(Player p)
+	{
+		p.Timer.Reset();
+		p.Stats.ThisRun.Checkpoints.Clear();
+		p.CourseBonus = 0; // Back on the map course
+		TeleportToZone(p.Controller, ZoneType.MapStart, 1);
 	}
 
 	/// <summary>
@@ -86,35 +107,30 @@ public partial class SurfTimer
 	}
 
 	[ConsoleCommand("css_rs", "Reset back to the start of the stage or bonus you were in.")]
+	[ConsoleCommand("css_back", "Reset back to the start of the stage or bonus you were in.")]
 	[CommandHelper(whoCanExecute: CommandUsage.CLIENT_ONLY)]
 	public void PlayerResetStage(CCSPlayerController? player, CommandInfo command)
 	{
-		if (player == null)
+		if (player == null || !playerList.TryGetValue(player.UserId ?? 0, out var oPlayer))
 			return;
 
-		if (player.Team == CsTeam.Spectator || player.Team == CsTeam.None)
-		{
-			Server.NextFrame(() =>  // Weird CS2 bug that requires doing this twice to show the Joined X team in chat and not stay in limbo
-				{
-					player.ChangeTeam(CsTeam.CounterTerrorist);
-					player.Respawn();
-
-					player.ChangeTeam(CsTeam.Spectator);
-
-					player.ChangeTeam(CsTeam.CounterTerrorist);
-					player.Respawn();
-				}
-			);
-		}
-
-		Player oPlayer = playerList[player.UserId ?? 0];
 		if (oPlayer.ReplayRecorder.IsSaving)
 		{
 			player.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["reset_delay"]}");
 			return;
 		}
 
-		ResetToCurrentStart(oPlayer);
+		// From spectator: back to where they were - a paused run goes on from its stage start (RunResume.cs)
+		bool fromSpectator = player.Team == CsTeam.Spectator || player.Team == CsTeam.None;
+		var specReturn = oPlayer.SpecReturn;
+		ClaimPlacement(oPlayer);
+		RespawnThenPlace(oPlayer, () =>
+		{
+			if (fromSpectator)
+				ReturnFromSpectator(oPlayer, specReturn);
+			else
+				ResetToCurrentStart(oPlayer);
+		});
 	}
 
 	/// <summary>
@@ -181,13 +197,19 @@ public partial class SurfTimer
 
 	private void GoToStage(CCSPlayerController player, short stage)
 	{
-		if (!player.IsValid)
+		if (!player.IsValid || !playerList.TryGetValue(player.UserId ?? 0, out var oPlayer))
 			return;
 
-		if (!TeleportToStage(player, stage))
+		if (!CurrentMap.HasZone(stage == 1 ? ZoneType.MapStart : ZoneType.StageStart, stage))
+		{
 			player.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["invalid_usage",
 				"!s <stage>"]}"
 			);
+			return;
+		}
+
+		ClaimPlacement(oPlayer);
+		RespawnThenPlace(oPlayer, () => TeleportToStage(player, stage));
 	}
 
 	/// <summary>
@@ -226,21 +248,6 @@ public partial class SurfTimer
 			return false;
 
 		playerList[player.UserId ?? 0].Timer.Reset();
-
-		if (player.Team == CsTeam.Spectator || player.Team == CsTeam.None)
-		{
-			Server.NextFrame(() =>  // Weird CS2 bug that requires doing this twice to show the Joined X team in chat and not stay in limbo
-				{
-					player.ChangeTeam(CsTeam.CounterTerrorist);
-					player.Respawn();
-
-					player.ChangeTeam(CsTeam.Spectator);
-
-					player.ChangeTeam(CsTeam.CounterTerrorist);
-					player.Respawn();
-				}
-			);
-		}
 
 		if (stage > 1)
 		{
@@ -398,7 +405,7 @@ public partial class SurfTimer
 	/// </summary>
 	private void GoToBonus(CCSPlayerController player, short bonus)
 	{
-		if (!player.IsValid)
+		if (!player.IsValid || !playerList.TryGetValue(player.UserId ?? 0, out var oPlayer))
 			return;
 
 		if (!CurrentMap.HasZone(ZoneType.BonusStart, bonus))
@@ -409,27 +416,18 @@ public partial class SurfTimer
 			return;
 		}
 
-		playerList[player.UserId ?? 0].Timer.Reset();
-		playerList[player.UserId ?? 0].Timer.IsBonusMode = true;
-		playerList[player.UserId ?? 0].Timer.Bonus = bonus;
-		playerList[player.UserId ?? 0].CourseBonus = bonus; // Locked to this bonus until !r / !s / !b
+		ClaimPlacement(oPlayer);
+		RespawnThenPlace(oPlayer, () => EnterBonus(oPlayer, bonus));
+	}
 
-		if (player.Team == CsTeam.Spectator || player.Team == CsTeam.None)
-		{
-			Server.NextFrame(() =>  // Weird CS2 bug that requires doing this twice to show the Joined X team in chat and not stay in limbo
-				{
-					player.ChangeTeam(CsTeam.CounterTerrorist);
-					player.Respawn();
-
-					player.ChangeTeam(CsTeam.Spectator);
-
-					player.ChangeTeam(CsTeam.CounterTerrorist);
-					player.Respawn();
-				}
-			);
-		}
-
-		TeleportToZone(player, ZoneType.BonusStart, bonus);
+	/// <summary>The timer reset and the player at a bonus start - locked to that bonus until !r / !s / !b</summary>
+	private void EnterBonus(Player oPlayer, short bonus)
+	{
+		oPlayer.Timer.Reset();
+		oPlayer.Timer.IsBonusMode = true;
+		oPlayer.Timer.Bonus = bonus;
+		oPlayer.CourseBonus = bonus;
+		TeleportToZone(oPlayer.Controller, ZoneType.BonusStart, bonus);
 	}
 
 	[ConsoleCommand("css_spec", "Spectate a player or bot by (partial) name, or open a picker menu")]
@@ -532,6 +530,7 @@ public partial class SurfTimer
 
 			if (playerList.TryGetValue(spectator.UserId ?? 0, out var oPlayer))
 			{
+				RememberSpecReturn(oPlayer); // Coming back puts them on that stage / bonus again
 				oPlayer.Timer.Reset();
 				oPlayer.Stats.ThisRun.Checkpoints.Clear();
 			}

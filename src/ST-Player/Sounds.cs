@@ -33,8 +33,11 @@ internal static class Sounds
 		new("record", "Your record", "WR on the map, a stage, bonus or checkpoint", true, "UIPanorama.XP.NewSkillGroup");
 	internal static readonly SoundCategory OthersRecord =
 		new("others_record", "Others' records", "another player sets a WR", false, "UI.ArmsRace.BecomeMatchLeader");
+	// The timer start click, lower - the first !r during a run (Options - Gameplay - Confirm !r)
+	internal static readonly SoundCategory ResetConfirm =
+		new("reset_confirm", "Reset warning", "first !r during a run", true, "UIPanorama.generic_button_press", Pitch: 0.7f);
 
-	private static readonly List<SoundCategory> Builtin = [TimerStart, AheadOfPb, Pb, Record, OthersRecord];
+	private static readonly List<SoundCategory> Builtin = [TimerStart, AheadOfPb, Pb, Record, OthersRecord, ResetConfirm];
 	private static readonly List<SoundCategory> Addon = [];
 
 	/// <summary>All kinds in !options order: the timer's, then the addons'</summary>

@@ -20,6 +20,11 @@ public partial class SurfTimer
 
 		if (!controller.IsBot)
 		{
+			// First spawn on this map: the saved run is restored, else the map start (RunResume.cs) - right away, so the
+			// spawn point's start zone doesn't count until the player is placed
+			if (playerList.TryGetValue(controller.UserId ?? 0, out var firstSpawn))
+				BeginFirstSpawn(firstSpawn);
+
 			// Re-apply the hide-legs option on every spawn - the game resets the pawn's render state.
 			// Slight delay so the spawn has finished setting up the model/weapons first.
 			AddTimer(0.1f, () =>
@@ -110,6 +115,16 @@ public partial class SurfTimer
 		var controller = @event.Userid;
 		if (controller == null || !controller.IsValid || @event.Disconnect)
 			return HookResult.Continue;
+
+		// Spectator and back (RunResume.cs): where they were is remembered, and coming back puts them there
+		if (!controller.IsBot && playerList.TryGetValue(controller.UserId ?? 0, out var teamPlayer))
+		{
+			if (@event.Team == (int)CsTeam.Spectator)
+				RememberSpecReturn(teamPlayer);
+			else if ((@event.Team == (int)CsTeam.Terrorist || @event.Team == (int)CsTeam.CounterTerrorist)
+				&& (@event.Oldteam == (int)CsTeam.Spectator || @event.Oldteam == (int)CsTeam.None))
+				BeginReturnFromSpectator(teamPlayer);
+		}
 
 		if (@event.Team != (int)CsTeam.Terrorist && @event.Team != (int)CsTeam.CounterTerrorist)
 			return HookResult.Continue;
@@ -206,6 +221,20 @@ public partial class SurfTimer
 
 		_ = p.Stats.LoadPlayerMapTimesData(p);
 
+		if (!player.IsBot)
+		{
+			// The saved run of this map, read in the background - restored on the first spawn (RunResume.cs)
+			if (CurrentMap != null && CurrentMap.ID > 0)
+				PlayerStateService.BeginLoad(p);
+
+			// Already spawned before this event: placed now
+			Server.NextFrame(() =>
+			{
+				if (player.IsValid && player.PawnIsAlive)
+					BeginFirstSpawn(p);
+			});
+		}
+
 		// Go back to the Main Thread for chat message
 		Server.NextFrame(() =>
 		{
@@ -286,6 +315,7 @@ public partial class SurfTimer
 				{
 					// Release cursor mode, or whoever gets this slot next could start with it
 					playerData.HUD.CloseMenu();
+					PlayerStateService.SaveFinal(playerData, "disconnect"); // The running run, to resume (any server)
 					StatsService.Flush(playerData, final: true); // Also closes the session
 					playerList.TryRemove(userId, out _);
 				}

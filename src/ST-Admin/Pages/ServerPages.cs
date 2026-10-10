@@ -46,7 +46,7 @@ public partial class SurfTimer
 			string name = CurrentMap.Name!;
 			ulong? workshopId = CurrentMap.WorkshopId;
 			rows.Add(ctx.Danger("Restart map", name, () => PanelContext.Confirm("Restart map",
-				_ => [PanelContext.Info("Reloads", name, "everyone's running times are lost")], "Restart", c =>
+				_ => [PanelContext.Info("Reloads", name, "running runs resume after it (not if zones changed)")], "Restart", c =>
 				{
 					c.Audit("restart map", "map", CurrentMap.ID, name);
 					c.Player.HUD.CloseMenu();
@@ -340,6 +340,11 @@ public partial class SurfTimer
 
 		rows.Add(ctx.Nav("Idle threshold", Config.IdleThresholdSeconds <= 0 ? "off" : $"{Config.IdleThresholdSeconds} s", "stops replay recording of idle players",
 			() => AdminNumberSettingPage("Idle threshold", "idle_threshold_seconds", () => Config.IdleThresholdSeconds, [10, 60], 0, 3600, " s")));
+		static string Days(int days) => days <= 0 ? "never" : days == 1 ? "1 day" : $"{days} days";
+		rows.Add(ctx.Nav("Resume expiry", Days(Config.ResumeExpiryDays), "saved runs kept after leaving",
+			() => AdminNumberSettingPage("Resume expiry", "resume_expiry_days", () => Config.ResumeExpiryDays, [1, 7], 0, 365, " d", "Never (0)")));
+		rows.Add(ctx.Nav("Resume expiry (VIP)", Days(Config.ResumeExpiryVipDays), "the same for VIPs",
+			() => AdminNumberSettingPage("Resume expiry (VIP)", "resume_expiry_vip_days", () => Config.ResumeExpiryVipDays, [1, 7], 0, 365, " d", "Never (0)")));
 		rows.Add(ctx.Nav("Replay bots max", Config.ReplayPoolCap.ToString(), "requested bots at a time",
 			() => AdminNumberSettingPage("Replay bots max", "replay_pool_cap", () => Config.ReplayPoolCap, [1], 1, 10, "")));
 		rows.Add(ctx.Nav("Saveloc limit", Config.SavelocLimit.ToString(), "savelocs per map, all players",
@@ -354,7 +359,8 @@ public partial class SurfTimer
 		return rows;
 	});
 
-	private PanelPage AdminNumberSettingPage(string title, string key, Func<int> current, int[] steps, int min, int max, string unit) => new(title, ctx =>
+	private PanelPage AdminNumberSettingPage(string title, string key, Func<int> current, int[] steps, int min, int max, string unit,
+		string zeroLabel = "Off (0)") => new(title, ctx =>
 	{
 		int value = current();
 		var rows = new List<HudMenuItem> { PanelContext.Info("Current", $"{value}{unit}", "timer_settings.json") };
@@ -364,7 +370,7 @@ public partial class SurfTimer
 			rows.Add(ctx.Act($"-{step}", "", "", () => AdminSaveTimerSetting(ctx, key, JsonValue.Create(Math.Clamp(value - step, min, max)), "")));
 		}
 		if (min == 0)
-			rows.Add(ctx.Act("Off (0)", "", "", () => AdminSaveTimerSetting(ctx, key, JsonValue.Create(0), "")));
+			rows.Add(ctx.Act(zeroLabel, "", "", () => AdminSaveTimerSetting(ctx, key, JsonValue.Create(0), "")));
 		return rows;
 	});
 

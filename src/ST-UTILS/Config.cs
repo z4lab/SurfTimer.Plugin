@@ -144,6 +144,8 @@ public static class Config
 		ReplayPoolCap = Math.Clamp(TimerSettings.GetInt("replay_pool_cap", 5), 1, 10);
 		ReplayPermanentMapBot = TimerSettings.GetBool("replay_permanent_map_bot", false);
 		IdleThresholdSeconds = Math.Max(0, TimerSettings.GetInt("idle_threshold_seconds", 60));
+		ResumeExpiryDays = Math.Clamp(TimerSettings.GetInt("resume_expiry_days", 3), 0, 365);
+		ResumeExpiryVipDays = Math.Clamp(TimerSettings.GetInt("resume_expiry_vip_days", 7), 0, 365);
 		SavelocLimit = Math.Max(1, TimerSettings.GetInt("saveloc_limit", 10000));
 		WorkshopContentPath = TimerSettings.GetString("workshop_content_path", "").Trim();
 		ClanTagsEnabled = TimerSettings.GetBool("clan_tags_enabled", true);
@@ -175,6 +177,13 @@ public static class Config
 	public static int SavelocLimit { get; private set; } = Math.Max(1, TimerSettings.GetInt("saveloc_limit", 10000));
 
 	public static int IdleThresholdSeconds { get; private set; } = Math.Max(0, TimerSettings.GetInt("idle_threshold_seconds", 60));
+
+	/// <summary>
+	/// Days a saved in-progress run can be resumed after the player left (PlayerStateService) - VIPs get their own,
+	/// 0 = never expires.
+	/// </summary>
+	public static int ResumeExpiryDays { get; private set; } = Math.Clamp(TimerSettings.GetInt("resume_expiry_days", 3), 0, 365);
+	public static int ResumeExpiryVipDays { get; private set; } = Math.Clamp(TimerSettings.GetInt("resume_expiry_vip_days", 7), 0, 365);
 
 	/// <summary>
 	/// Maximum number of requested replay bots at a time (!replay) - the permanent map bot isn't counted.

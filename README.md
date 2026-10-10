@@ -25,13 +25,26 @@ Some menu rows ask you to type something in chat. Type `!cancel` to abort.
 
 | Command | Aliases | What it does |
 |---|---|---|
-| `!r` | | Back to the map start. Also takes you out of spectator. |
-| `!rs` | | Back to the start of the stage or bonus you're on. Otherwise the map start. |
+| `!r` | | Back to the map start. Also takes you out of spectator. During a run you type it twice within 3 seconds: the first one only warns, with a quiet sound (turn this off in Options › Gameplay). |
+| `!rs` | `!back` | Back to the start of the stage or bonus you're on. Otherwise the map start. From spectator: back to where you were (see **Joining, resuming & spectating**). |
 | `!s [n]` | `!stage` | Teleports you to stage *n* and resets your timer (stage mode). Staged maps only. Without a number it opens a picker with every stage and its tier. |
 | `!b [n]` | `!bonus` | Teleports you to bonus *n*. You stay on that bonus until you use `!r`, `!s` or `!b`. Without a number: bonus 1 if the map has only one, otherwise a picker with every bonus and its tier. |
 | `!repeat` | | Turns repeat mode on or off: after each stage you go back to that stage's start. Staged maps only. Not saved, so it's off every time you join. |
 | `!startpos` | | Saves where `!r` / `!rs` / `!s` / `!b` put you in the start zone you're standing in, and which way you face. Stand still on the ground, not crouched. Kept until the map changes. **Deprecated soon:** will be replaced by saving a saveloc (`!saveloc`) in the start zone. |
 | `!clearstartpos [all]` | | Removes your start position for this start zone. `all` removes every one. **Deprecated soon**, together with `!startpos`. |
+
+</details>
+
+<details>
+<summary><b>Joining, resuming & spectating</b></summary>
+
+- **Joining a map** puts you in the map start zone, like `!r`, not at the map's spawn point.
+- **Your run is kept.** While your timer runs, it's saved every 5 seconds, and fully (with its replay so far) when you leave or the map changes. Join the same map again, on this server or any other server of ours, and you continue where you were: same spot, view, speed, time, stage and splits. It still counts for PBs and records.
+  - After a server crash you continue from at most 5 seconds earlier, but that run has no replay.
+  - A saved run is kept for **3 days** (**7 days** for VIPs). The server can change both.
+  - It isn't restored if the map's zones changed since. `!r`, `!rs`, `!s`, `!b` or loading a saveloc before it's restored starts you over instead.
+  - Practice runs (from a saveloc) come back as practice.
+- **Spectating** through the M menu pauses your run (the time stops). `!rs` / `!back` or joining a team again puts you at the start of the stage or bonus you were on, and the run goes on. `!spec` ends your run: coming back puts you at the start of the bonus you were on, or on staged maps the stage you were on (stage mode). Otherwise the map start.
 
 </details>
 
@@ -189,6 +202,15 @@ All on by default.
 </details>
 
 <details>
+<summary><b>Gameplay</b></summary>
+
+| Option | Default | Description |
+|---|---|---|
+| Confirm !r | **On** | During a run, `!r` has to be typed twice within 3 seconds. The first one only warns (chat and the Reset warning sound). Not for practice runs, the first 5 seconds of a run, or from spectator. |
+
+</details>
+
+<details>
 <summary><b>Sound</b></summary>
 
 Every sound plays only for you, at your volume. Turning a sound on plays a sample.
@@ -202,9 +224,10 @@ Every sound plays only for you, at your volume. Turning a sound on plays a sampl
 | New PB | On | A new personal best on the map, a stage, a bonus or a checkpoint. |
 | Your record | On | Your WR on the map, a stage, a bonus or a checkpoint. |
 | Others' records | Off | Another player sets a WR. |
+| Reset warning | On | The first `!r` during a run (Options › Gameplay › Confirm !r). |
 | Map vote / Vote countdown | On | *Only with [SurfTimer.MapChooser](https://github.com/z4lab/SurfTimer.MapChooser).* A vote starts / its last 3 seconds. Addons add their sounds here. |
 
-The server can change which CS2 sound event each kind plays in `timer_settings.json`: `sound_timer_start`, `sound_ahead_pb`, `sound_pb`, `sound_record`, `sound_others_record` (`""` = no sound).
+The server can change which CS2 sound event each kind plays in `timer_settings.json`: `sound_timer_start`, `sound_ahead_pb`, `sound_pb`, `sound_record`, `sound_others_record`, `sound_reset_confirm` (`""` = no sound).
 
 </details>
 
@@ -355,7 +378,7 @@ Info rows: SurfTimer version/commit, players and tickrate, memory.
 | Chat › | See below. |
 | Trails › | See below. |
 | Map chooser › | *Only with [SurfTimer.MapChooser](https://github.com/z4lab/SurfTimer.MapChooser) installed. Needs its admin flag (`@css/changemap` by default).* Time, votes, next map and per-map length and cooldown. Documented in the map chooser's README. Addons add their pages here through SurfTimer.Api. |
-| Restart map | Danger. Everyone's running times are lost. |
+| Restart map | Danger. Running runs are saved and resume after the restart, unless the zones changed. |
 
 <details>
 <summary>Server › Timer settings</summary>
@@ -372,6 +395,8 @@ Info rows: SurfTimer version/commit, players and tickrate, memory.
 | Clan tags | Players' clan tags on the scoreboard. |
 | Country tag | `[DE]` in front of the clan tag. |
 | Idle threshold | Stops replay recording for idle players (0 = off, max 3600 s). |
+| Resume expiry | Days a player's saved run is kept after they leave (0 = never expires, max 365). Default 3. `resume_expiry_days` |
+| Resume expiry (VIP) | The same for VIPs (VIP, admin or root flag from chat_settings.json). Default 7. `resume_expiry_vip_days` |
 | Replay bots max | How many requested bots can run at a time (1–10). |
 | Saveloc limit | Savelocs per map, all players combined. |
 | Start speed cap | Default for all maps (0 = no cap). |
