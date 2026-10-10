@@ -337,6 +337,7 @@ public class PlayerHud
 	// Slot updates are sent 16x/s at most, and each segment's text/class only when it changed
 	private const int CustomHudUpdateTicks = 4;
 	private const int MaxSplitLines = 6;
+	private const int PaceSplitLines = 4;
 	private const int MaxSpectatorLines = 8;
 	private int _customHudGeneration = -1;
 	private readonly Dictionary<string, string> _sentText = new();
@@ -400,6 +401,9 @@ public class PlayerHud
 		var leftRows = subject != null ? SplitRowsKept(subject, options)
 			: replay?.Type == ReplayManager.BestSegmentsType ? BestSegmentRows(replay)
 			: [];
+		// Live pace under the splits (also in stage / bonus mode, where there are no splits)
+		if (subject != null && options.HudPace && options.HudSplits)
+			leftRows = [.. leftRows, .. PaceRows(subject, options)];
 		SendSlot(CustomHud.Left, options.HudSplits ? leftRows : []);
 		// Spectators of whoever this HUD shows - ourselves while alive, else the watched player / replay bot
 		var watched = subject?.Controller ?? replay?.Controller;
@@ -553,8 +557,14 @@ public class PlayerHud
 				? new FieldSegment(syncPercent.Value.ToString("00.00", CultureInfo.InvariantCulture) + "%", Mono: true)
 				: NotAvailable]);
 
+		var energy = new HudField("Energy",
+			[subject != null
+				? new FieldSegment(subject.Energy.Value.ToString("0", CultureInfo.InvariantCulture), EnergyClassOf(subject.Energy.Value), Mono: true)
+				: NotAvailable]);
+
 		HudField FieldOf(HudFieldKind kind) => kind switch
 		{
+			HudFieldKind.Energy => energy,
 			HudFieldKind.Timer => timer,
 			HudFieldKind.Speed => speed,
 			HudFieldKind.Prespeed => prespeed,
@@ -680,6 +690,120 @@ public class PlayerHud
 			SendExclusive(id, "font", mono ? CustomHud.MonoFontClass : null);
 		}
 		SendClass(CustomHud.MidId, "hidden", !any);
+	}
+
+	// ---- Live pace and energy (!options - HUD - Pace, Energy field) ----
+
+	private readonly PaceTracker _pace = new();
+	private float? _lastEnergy;
+	/// <summary>Energy changes smaller than this (units per HUD update) count as neither gaining nor losing</summary>
+	private const float EnergyDeadZone = 1f;
+
+	/// <summary>The Energy field's colour: green gaining, red losing, white otherwise</summary>
+	private string EnergyClassOf(float energy)
+	{
+		float? last = _lastEnergy;
+		_lastEnergy = energy;
+		return last is not float before ? "nc-snow"
+			: energy - before > EnergyDeadZone ? "nc-green"
+			: before - energy > EnergyDeadZone ? "nc-red"
+			: "nc-snow";
+	}
+
+	/// <summary>
+	/// What the pace compares against: the splits panel's target for map runs (PB, WR, #10, a group's rank); in stage /
+	/// bonus mode that stage's / bonus's PB (target PB) or WR (any other target). Null when there's no such time.
+	/// </summary>
+	private static PaceReference? PaceReferenceOf(Player p, SplitTarget target)
+	{
+		var map = SurfTimer.CurrentMap;
+		int style = p.Timer.Style;
+		var replays = map.ReplayManager;
+
+		static IReadOnlyList<ReplayFrame>? Template(Dictionary<int, ReplayPlayer>[] byNumber, int number, int style, int? replayId) =>
+			number > 0 && number < byNumber.Length && byNumber[number] != null && byNumber[number].TryGetValue(style, out var template)
+				&& template.ReplayId == replayId ? template.Frames : null;
+
+		if (p.Timer.IsBonusMode && RunTargets.HasBonusData(p, style))
+		{
+			short bonus = p.Timer.Bonus;
+			var pb = p.Stats.BonusPB[bonus][style];
+			if (target == SplitTarget.Pb && pb.RunTime > 0)
+				return new($"bpb{bonus}:{pb.ID}", pb.RunTime, null, pb.ReplayId, null, 1, bonus);
+			var wr = map.BonusWR[bonus][style];
+			return wr.RunTime > 0
+				? new($"bwr{bonus}:{wr.ID}", wr.RunTime, null, wr.ReplayId, Template(replays.AllBonusWR, bonus, style, wr.ReplayId), 1, bonus)
+				: null;
+		}
+
+		if (p.Timer.IsStageMode && RunTargets.HasStageData(p, style))
+		{
+			short stage = p.Timer.Stage;
+			var pb = p.Stats.StagePB[stage][style];
+			if (target == SplitTarget.Pb && pb.RunTime > 0)
+				return new($"spb{stage}:{pb.ID}", pb.RunTime, null, pb.ReplayId, null, 2, stage);
+			var wr = map.StageWR[stage][style];
+			return wr.RunTime > 0
+				? new($"swr{stage}:{wr.ID}", wr.RunTime, null, wr.ReplayId, Template(replays.AllStageWR, stage, style, wr.ReplayId), 2, stage)
+				: null;
+		}
+
+		if (p.Timer.IsStageMode || p.Timer.IsBonusMode)
+			return null; // No data for that stage / bonus
+
+		var (_, splits, rank) = ResolveSplitTarget(p, target);
+		if (rank == 0)
+		{
+			var pb = p.Stats.PB.GetValueOrDefault(style);
+			return pb != null && pb.RunTime > 0 ? new($"pb:{pb.ID}", pb.RunTime, splits, pb.ReplayId, null, 0, 0) : null;
+		}
+		if (rank == 1)
+		{
+			var wr = map.WR.GetValueOrDefault(style);
+			var template = style == 0 && replays.MapWR?.ReplayId == wr?.ReplayId ? replays.MapWR?.Frames : null;
+			return wr != null && wr.RunTime > 0 ? new($"wr:{wr.ID}", wr.RunTime, splits, wr.ReplayId, template, 0, 0) : null;
+		}
+		var ranked = rank > 1 ? map.SplitTargets.Get(map.CourseId(0, 0), style, rank) : null;
+		return ranked != null && ranked.RunTime > 0
+			? new($"rank{rank}:{ranked.RunTime}", ranked.RunTime, splits, ranked.ReplayId, null, 0, 0)
+			: null;
+	}
+
+	/// <summary>
+	/// Under the splits: the projected finish ("~" when only from the splits) and how far ahead / behind - and, with
+	/// Energy vs reference, the energy and speed difference to the reference at the same spot.
+	/// </summary>
+	private List<List<HudElement>> PaceRows(Player subject, PlayerOptions options)
+	{
+		if (!subject.Controller.PawnIsAlive)
+			return [];
+		var reference = PaceReferenceOf(subject, options.HudSplitTarget);
+		if (reference == null)
+			return [];
+
+		float speed = Extensions.SpeedOf(subject.Controller, SpeedAxes.XYZ);
+		if (_pace.Update(subject, reference, speed, Gravity.Current, Server.TickCount) is not PaceResult pace)
+			return [];
+
+		string Signed(float value) => $"{(value >= 0 ? "+" : "-")}{Math.Abs(value).ToString("0", CultureInfo.InvariantCulture)}";
+		var rows = new List<List<HudElement>>
+		{
+			new()
+			{
+				new("Pace", (pace.Live ? "" : "~") + FormatTime(pace.PaceTicks), "", Mono: true),
+				new("", $"{(pace.DeltaTicks <= 0 ? "-" : "+")}{FormatTime(Math.Abs(pace.DeltaTicks))}",
+					pace.DeltaTicks <= 0 ? TimerColorActive : SlowerColor, Size: HudSize.Small, Mono: true),
+			},
+		};
+		if (options.HudPaceEnergy && pace.EnergyDiff is float energy && pace.SpeedDiff is float speedDiff)
+		{
+			rows.Add(
+			[
+				new("Energy", Signed(energy), energy >= 0 ? TimerColorActive : SlowerColor, Size: HudSize.Small, Mono: true),
+				new("Speed", Signed(speedDiff), speedDiff >= 0 ? TimerColorActive : SlowerColor, Size: HudSize.Small, Mono: true),
+			]);
+		}
+		return rows;
 	}
 
 	/// <param name="field">null hides the field</param>
@@ -937,10 +1061,12 @@ public class PlayerHud
 			return [];
 
 		string label = SurfTimer.CurrentMap.Stages > 0 ? "Stage" : "CP";
-		var (header, targetSplits) = ResolveSplitTarget(p, target);
+		var (header, targetSplits, _) = ResolveSplitTarget(p, target);
 
 		var rows = new List<List<HudElement>> { new() { new("", header, SpectatorColor, Label: true) } };
-		foreach (var cp in p.Stats.ThisRun.Checkpoints.OrderByDescending(cp => cp.Key).Take(MaxSplitLines).OrderBy(cp => cp.Key))
+		// With the pace below (two rows), fewer splits fit the panel
+		int lines = _player.Options.HudPace ? PaceSplitLines : MaxSplitLines;
+		foreach (var cp in p.Stats.ThisRun.Checkpoints.OrderByDescending(cp => cp.Key).Take(lines).OrderBy(cp => cp.Key))
 		{
 			var row = new List<HudElement>
 			{
@@ -964,7 +1090,8 @@ public class PlayerHud
 	/// The splits panel's header and the splits of the run it compares against - null splits = no diffs
 	/// (no such run, or its splits are still loading).
 	/// </summary>
-	private static (string Header, Dictionary<int, CheckpointEntity>? Splits) ResolveSplitTarget(Player p, SplitTarget target)
+	/// <returns>Rank: 0 the PB, 1 the WR, n that leaderboard rank, -1 none</returns>
+	private static (string Header, Dictionary<int, CheckpointEntity>? Splits, int Rank) ResolveSplitTarget(Player p, SplitTarget target)
 	{
 		var map = SurfTimer.CurrentMap;
 		int style = p.Timer.Style;
@@ -973,9 +1100,9 @@ public class PlayerHud
 		var pb = p.Stats.PB.GetValueOrDefault(style);
 
 		if (target == SplitTarget.Wr)
-			return ("Splits vs WR", wrSplits);
+			return ("Splits vs WR", wrSplits, 1);
 		if (target is not (SplitTarget.Top10 or >= SplitTarget.G1 and <= SplitTarget.G5))
-			return ("Splits vs PB", pb?.Checkpoints);
+			return ("Splits vs PB", pb?.Checkpoints, 0);
 
 		int completions = map.MapCompletions.GetValueOrDefault(style);
 		int rank;
@@ -984,7 +1111,7 @@ public class PlayerHud
 		{
 			int pbRank = pb != null && pb.ID != -1 && pb.RunTime > 0 ? pb.Rank : 0;
 			if (pbRank == 1)
-				return ("Splits vs WR", wrSplits);
+				return ("Splits vs WR", wrSplits, 1);
 			rank = pbRank is >= 2 and <= 10 ? pbRank - 1 : Math.Min(10, completions);
 			name = rank > 0 ? $"#{rank}" : "#10";
 		}
@@ -992,17 +1119,17 @@ public class PlayerHud
 		{
 			int group = target - SplitTarget.G1 + 1;
 			if (completions < 11)
-				return ($"Splits vs G{group} · none yet", null);
+				return ($"Splits vs G{group} · none yet", null, -1);
 			rank = Math.Min(PointsCalculator.GroupLastRank(completions, group), completions);
 			name = $"G{group} · #{rank}";
 		}
 
 		string header = $"Splits vs {name}";
 		if (rank < 1)
-			return (header, null);
+			return (header, null, -1);
 		if (rank == 1)
-			return (header, wrSplits); // Already in memory
-		return (header, map.SplitTargets.Get(map.CourseId(0, 0), style, rank)?.Splits);
+			return (header, wrSplits, 1); // Already in memory
+		return (header, map.SplitTargets.Get(map.CourseId(0, 0), style, rank)?.Splits, rank);
 	}
 
 	/// <summary>

@@ -240,6 +240,7 @@ internal static class TimeRepository
 		public int Id { get; set; }
 		public string PlayerName { get; set; } = "";
 		public int RunTime { get; set; }
+		public int? ReplayId { get; set; }
 	}
 
 	/// <summary>
@@ -247,7 +248,7 @@ internal static class TimeRepository
 	/// </summary>
 	internal static Task<RankedTimeRow?> GetTimeAtRankAsync(int courseId, int style, int rank) =>
 		SurfTimer.DB.QueryFirstOrDefaultAsync<RankedTimeRow>(@"
-			SELECT t.`id`, p.`name` AS PlayerName, t.`run_time_ticks` AS RunTime
+			SELECT t.`id`, p.`name` AS PlayerName, t.`run_time_ticks` AS RunTime, t.`replay_id` AS ReplayId
 			FROM `{p}times` t JOIN `{p}players` p ON p.`id` = t.`player_id`
 			WHERE t.`course_id` = @CourseId AND t.`style_id` = @Style AND t.`hidden` = 0
 			ORDER BY t.`run_time_ticks`, t.`updated_at`

@@ -42,7 +42,7 @@ public partial class SurfTimer : BasePlugin
 
 	// Metadata
 	public override string ModuleName => $"z4lab/{Config.PluginName}";
-	public override string ModuleVersion => "1.0.6";
+	public override string ModuleVersion => "1.0.7";
 	public override string ModuleDescription => Config.PluginName;
 	public override string ModuleAuthor => "z4lab";
 
@@ -138,6 +138,7 @@ public partial class SurfTimer : BasePlugin
 		ForgetZoneOutlines();
 
 		// Clear/reset stuff here
+		ReferenceRuns.Clear(); // The live pace's reference paths belong to the map
 		CurrentMap = null!;
 		playerList.Clear();
 	}

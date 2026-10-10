@@ -8,6 +8,8 @@ internal enum HudFieldKind
 	Prespeed,
 	Keys,
 	Sync,
+	/// <summary>Mechanical energy (Energy.cs) - not in the presets</summary>
+	Energy,
 }
 
 /// <summary>Which velocity axes speeds are shown with (!options - HUD)</summary>
@@ -95,6 +97,9 @@ internal sealed class PlayerOptions
 	internal const string KeySoundVolume = "sound_volume";
 	/// <summary>The center HUD (custom HUD middle slots - the speed above the crosshair) on / off</summary>
 	internal const string KeyCenterHud = "center_hud";
+	/// <summary>Live pace (projected finish) under the splits, and the energy / speed difference to the reference there</summary>
+	internal const string KeyHudPace = "hud_pace";
+	internal const string KeyHudPaceEnergy = "hud_pace_energy";
 	/// <summary>Size of the center speed, 1-5 (0 meant off before center_hud existed)</summary>
 	internal const string KeyCenterSpeed = "center_speed";
 	/// <summary>The center speed's colour: follow (the HUD speed colour) or a SpeedColorMode of its own</summary>
@@ -164,6 +169,7 @@ internal sealed class PlayerOptions
 	private int _centerSpeed;
 	private int _centerSpeedOffset = DefaultCenterSpeedOffset;
 	private bool _centerHud;
+	private bool _hudPace, _hudPaceEnergy;
 	private SpeedColorMode? _centerSpeedColor;
 	private string _centerSpeedColorStatic = "snow";
 	private bool _centerSpeedMono = true;
@@ -214,6 +220,8 @@ internal sealed class PlayerOptions
 		// Before center_hud existed, size 0 meant off
 		_centerHud = Bool(KeyCenterHud, storedSize > 0);
 		_centerSpeed = storedSize > 0 ? storedSize : DefaultCenterSpeedSize;
+		_hudPace = Bool(KeyHudPace, false);
+		_hudPaceEnergy = Bool(KeyHudPaceEnergy, false);
 		_centerSpeedColor = _profile.Settings.TryGetValue(KeyCenterSpeedColor, out var centerColor)
 			&& Enum.TryParse(centerColor, ignoreCase: true, out SpeedColorMode parsedCenterColor) && Enum.IsDefined(parsedCenterColor)
 				? parsedCenterColor : null;
@@ -354,6 +362,12 @@ internal sealed class PlayerOptions
 	}
 
 	// ---- Center speed ----
+
+	/// <summary>Live pace under the splits (off by default) - against the splits panel's target</summary>
+	internal bool HudPace { get => _hudPace; set { _hudPace = value; Save(KeyHudPace, value); } }
+
+	/// <summary>With the pace: energy and speed difference to the reference at the same spot (off by default)</summary>
+	internal bool HudPaceEnergy { get => _hudPaceEnergy; set { _hudPaceEnergy = value; Save(KeyHudPaceEnergy, value); } }
 
 	/// <summary>The center HUD on / off (off by default)</summary>
 	internal bool CenterHud { get => _centerHud; set { _centerHud = value; Save(KeyCenterHud, value); } }

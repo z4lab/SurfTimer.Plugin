@@ -82,6 +82,9 @@ public class Player
 	internal bool MissedWrPlayed { get; set; }
 	internal int MissedCheckTicks { get; set; }
 
+	/// <summary>Mechanical energy, Momentum Mod style (Energy.cs) - the bottom HUD's Energy field</summary>
+	internal EnergyMeter Energy { get; } = new();
+
 	internal bool IsOnCourse(ZoneInfo zone) => zone.Type switch
 	{
 		ZoneType.MapStart or ZoneType.MapEnd or ZoneType.StageStart or ZoneType.Checkpoint => this.CourseBonus == 0,

@@ -11,7 +11,9 @@ namespace SurfTimer;
 /// </summary>
 internal sealed class SplitTargets
 {
-	internal sealed record Target(int Rank, string Holder, Dictionary<int, CheckpointEntity> Splits);
+	/// <param name="RunTime">The run's time (ticks)</param>
+	/// <param name="ReplayId">Its stored replay - the live pace matches positions on it</param>
+	internal sealed record Target(int Rank, string Holder, Dictionary<int, CheckpointEntity> Splits, int RunTime, int? ReplayId);
 
 	private readonly Dictionary<(int Style, int Rank), Target?> _loaded = new();
 	private readonly HashSet<(int Style, int Rank)> _loading = new();
@@ -43,7 +45,7 @@ internal sealed class SplitTargets
 			{
 				var row = await TimeRepository.GetTimeAtRankAsync(courseId, style, rank);
 				if (row != null)
-					result = new Target(rank, row.PlayerName, await TimeRepository.GetSplitsAsync(row.Id));
+					result = new Target(rank, row.PlayerName, await TimeRepository.GetSplitsAsync(row.Id), row.RunTime, row.ReplayId);
 			}
 			catch (Exception ex)
 			{

@@ -42,6 +42,7 @@ public partial class SurfTimer
 				{
 					player.Timer.Tick();
 					Sounds.CheckMissed(player); // Missed PB / WR sounds, once per run
+					player.Energy.Tick(player);
 					player.ReplayRecorder.Tick(player);
 					player.TickIdle();
 					player.TickPendingStartRecording();

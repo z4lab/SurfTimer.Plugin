@@ -143,6 +143,7 @@ public partial class SurfTimer
 		[HudFieldKind.Prespeed] = "Prespeed",
 		[HudFieldKind.Keys] = "Keys",
 		[HudFieldKind.Sync] = "Sync",
+		[HudFieldKind.Energy] = "Energy",
 	};
 
 	private static string DescribeHud(string fields) => string.Join(" | ", fields.Split('|')
@@ -229,6 +230,13 @@ public partial class SurfTimer
 		}));
 		rows.Add(ctx.Toggle("Top bar", options.HudTop, "rank, PB and WR", on => options.HudTop = on));
 		rows.Add(ctx.Nav("Splits panel", SplitTargetLabel(options.HudSplitTarget), "left side - compare against", OptionsSplitTargetPage));
+		if (options.HudSplits)
+		{
+			rows.Add(ctx.Toggle("Pace", options.HudPace, "projected finish, live - under the splits", on => options.HudPace = on));
+			if (options.HudPace)
+				rows.Add(ctx.Toggle("Energy vs reference", options.HudPaceEnergy, "energy / speed vs the reference at the same spot",
+					on => options.HudPaceEnergy = on));
+		}
 		if (options.HudSplits)
 			rows.Add(ctx.Toggle("Keep last splits", options.HudSplitsKeep, "after a fail / reset, until your next run starts",
 				on => options.HudSplitsKeep = on));

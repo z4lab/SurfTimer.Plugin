@@ -160,6 +160,8 @@ The HUD uses the [Nord](https://www.nordtheme.com) colors. Its accent (field bor
 | Top bar | On | Map, tier and stage, then a smaller row with rank, PB and WR. With [SurfTimer.MapChooser](https://github.com/z4lab/SurfTimer.MapChooser), a third row shows the time left, the running vote and the map's end (needs the HUD addon with four top rows). |
 | Splits panel › | PB | Left-side panel that compares your run against a target (see below). |
 | Keep last splits | On | *Only shown when the splits panel is on.* Keeps the last run's splits after a fail or reset, until your next run starts. |
+| Pace | Off | *Only shown when the splits panel is on.* Under the splits: your projected finish time, live, and how far ahead (green) or behind (red) you are - against the splits panel's target (in stage / bonus mode: that stage's / bonus's PB, or its WR for any other target). It matches your position on the target run's replay every update, so it moves while you surf, not only at checkpoints. Without a replay it's worked out from the splits (shown with a `~`). The splits panel shows 4 splits instead of 6 then. |
+| Energy vs reference | Off | *Only shown with Pace on.* Under the pace: your energy and speed compared to the target run at the same spot (+ green / − red). |
 | Spectator list | On | Right side. |
 | Top position | default (4) | Each press moves the top bar one step down (0-10, 40-240px from the top). After 10 it goes back to the server's default. |
 | Bottom position | default (3) | Same for the bottom HUD (timer, speed): 0-10, 100-300px from the bottom. |
@@ -171,11 +173,13 @@ The HUD uses the [Nord](https://www.nordtheme.com) colors. Its accent (field bor
 
 The bottom HUD has up to **2 rows** of **4 slots** each. The **Timer takes 2 slots**. Each field can be used once.
 
-For each field (**Timer, Speed, Prespeed, Keys, Sync**):
+For each field (**Timer, Speed, Prespeed, Keys, Sync, Energy**):
 - **Show**: turn the field on or off. It goes into the first row with room.
 - **Move earlier / Move later**: moves it left or right. At the end of a row it wraps to the row above or below.
 - **Move to row 1 / 2**
 - **Reset to default**: restores the default layout.
+
+**Energy** (not in the presets) is your mechanical energy, as in Momentum Mod: the height your speed could carry you to plus how high you are above where the run started - `speed² / (2 · gravity) + height`. Air strafing raises it; ramp hits, walls and friction lower it, so it shows how clean your surf is. Green while it rises, red while it drops.
 
 </details>
 
