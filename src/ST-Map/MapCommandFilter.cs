@@ -89,7 +89,7 @@ public partial class SurfTimer
 			if (string.Equals(current, value, StringComparison.OrdinalIgnoreCase))
 				continue;
 
-			_logger.LogInformation("[{ClassName}] {ConVar} was changed to '{Current}' (map/config?) - set back to '{Value}' for replay bots",
+			_logger.LogDebug("[{ClassName}] {ConVar} was changed to '{Current}' (map/config?) - set back to '{Value}' for replay bots",
 				nameof(SurfTimer), name, current, value);
 			Server.ExecuteCommand($"{name} {value}");
 		}
@@ -102,7 +102,7 @@ public partial class SurfTimer
 			if (!team.Equals("ct", StringComparison.OrdinalIgnoreCase) && !team.Equals("t", StringComparison.OrdinalIgnoreCase)
 				&& !team.Equals("any", StringComparison.OrdinalIgnoreCase))
 			{
-				_logger.LogInformation("[{ClassName}] bot_join_team was changed to '{Current}' - set back to 'any' for replay bots",
+				_logger.LogDebug("[{ClassName}] bot_join_team was changed to '{Current}' - set back to 'any' for replay bots",
 					nameof(SurfTimer), team);
 				Server.ExecuteCommand("bot_join_team any");
 			}
@@ -117,7 +117,7 @@ public partial class SurfTimer
 	public HookResult OnBotConnect(EventPlayerConnect @event, GameEventInfo info)
 	{
 		if (@event.Bot)
-			_logger.LogInformation("[{ClassName}] Bot connected: {Name}", nameof(SurfTimer), @event.Name);
+			_logger.LogDebug("[{ClassName}] Bot connected: {Name}", nameof(SurfTimer), @event.Name);
 		return HookResult.Continue;
 	}
 

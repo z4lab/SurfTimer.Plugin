@@ -73,6 +73,15 @@ internal sealed class PlayerOptions
 	internal const string KeyTrailColor = "trail_color";
 	internal const string KeyZonesShow = "zones_show";
 	internal const string KeySpeedAxes = "speed_axes";
+	internal const string KeySoundVolume = "sound_volume";
+	/// <summary>Main switch for every sound (!quake)</summary>
+	internal const string KeySounds = "sounds";
+	/// <summary>Per kind of sound: sound_&lt;key&gt; (Sounds.Categories)</summary>
+	internal const string KeySoundPrefix = "sound_";
+
+	/// <summary>Sound volume steps in !options (percent) - the default is subtle</summary>
+	internal static readonly int[] SoundVolumeSteps = [0, 10, 20, 30, 50, 75, 100];
+	internal const int DefaultSoundVolume = 20;
 	/// <summary>Per HUD part: hud_pos_top, hud_pos_center, hud_pos_left, hud_pos_right - "" = the server's default</summary>
 	internal const string KeyHudPosPrefix = "hud_pos_";
 
@@ -106,6 +115,8 @@ internal sealed class PlayerOptions
 	private string _trailColor = "";
 	private ZoneDisplay _zonesShow = ZoneDisplay.Off;
 	private SpeedAxes _speedAxes = SpeedAxes.XY;
+	private int _soundVolume = DefaultSoundVolume;
+	private bool _sounds = true;
 	private readonly Dictionary<string, int> _hudPositions = new();
 
 	internal PlayerOptions(PlayerProfile profile)
@@ -141,6 +152,9 @@ internal sealed class PlayerOptions
 		_zonesShow = _profile.Settings.TryGetValue(KeyZonesShow, out var zones)
 			&& Enum.TryParse(zones, ignoreCase: true, out ZoneDisplay display) && Enum.IsDefined(display) ? display : ZoneDisplay.Off;
 		_trailColor = _profile.Settings.TryGetValue(KeyTrailColor, out var trailColor) && TrailColors.IsValidCustom(trailColor) ? trailColor : "";
+		_soundVolume = _profile.Settings.TryGetValue(KeySoundVolume, out var volume) && int.TryParse(volume, out int percent)
+			&& percent is >= 0 and <= 100 ? percent : DefaultSoundVolume;
+		_sounds = Bool(KeySounds, true);
 		_hudPositions.Clear();
 		foreach (string slot in CustomHud.SlotShift.Keys)
 		{
@@ -238,6 +252,26 @@ internal sealed class PlayerOptions
 		else
 			_hudPositions.Remove(slot);
 		_profile.SetSetting(KeyHudPosPrefix + slot, shift?.ToString() ?? "");
+	}
+
+	/// <summary>Main switch for every timer / addon sound (!quake)</summary>
+	internal bool SoundsEnabled { get => _sounds; set { _sounds = value; Save(KeySounds, value); } }
+
+	/// <summary>Whether a kind of sound is on - its default until the player changes it</summary>
+	internal bool SoundOn(SoundCategory category) =>
+		_profile.Settings.TryGetValue(KeySoundPrefix + category.Key, out var stored) ? stored is "1" or "true" : category.DefaultOn;
+
+	internal void SetSoundOn(SoundCategory category, bool on) => Save(KeySoundPrefix + category.Key, on);
+
+	/// <summary>Volume of plugin / addon sounds (e.g. the map chooser's vote beeps), 0-100 percent</summary>
+	internal int SoundVolume
+	{
+		get => _soundVolume;
+		set
+		{
+			_soundVolume = Math.Clamp(value, 0, 100);
+			_profile.SetSetting(KeySoundVolume, _soundVolume.ToString());
+		}
 	}
 
 	/// <summary>Axes the HUD, prespeed and split speeds are shown with</summary>

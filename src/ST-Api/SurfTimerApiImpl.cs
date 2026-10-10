@@ -22,6 +22,9 @@ internal sealed class SurfTimerApiImpl(SurfTimer plugin, ILogger logger) : ISurf
 	private sealed record AdminPage(string Name, string Flag, string Sub, Func<ApiPanelPage> Root);
 	private static readonly List<AdminPage> AdminPages = [];
 
+	internal sealed record AddonPrefix(string Key, string Label, string Default);
+	private static readonly Dictionary<string, AddonPrefix> AddonPrefixes = new();
+
 	private static readonly Dictionary<string, string> ForcedCvars = new(StringComparer.OrdinalIgnoreCase);
 	private static readonly Regex CvarName = new("^[A-Za-z0-9_]+$", RegexOptions.Compiled);
 
@@ -38,6 +41,8 @@ internal sealed class SurfTimerApiImpl(SurfTimer plugin, ILogger logger) : ISurf
 		TopPerPlayer.Clear();
 		AdminPages.Clear();
 		ForcedCvars.Clear();
+		Sounds.ClearAddons();
+		AddonPrefixes.Clear();
 	}
 
 	// ---- Map ----
@@ -269,10 +274,37 @@ internal sealed class SurfTimerApiImpl(SurfTimer plugin, ILogger logger) : ISurf
 		private bool Allowed() => AdminPermissions.Has(ctx.Player.Controller, flag);
 	}
 
+	// ---- Chat ----
+
+	public void RegisterChatPrefix(string key, string label, string defaultPrefix) =>
+		AddonPrefixes[key] = new AddonPrefix(key, label, defaultPrefix);
+
+	public string ChatPrefix(string key) => EffectivePrefix(key);
+
+	internal static string EffectivePrefix(string key)
+	{
+		string custom = ChatSettings.Current.AddonPrefixes.GetValueOrDefault(key, "");
+		if (custom.Length > 0)
+			return ChatSettings.Colorize(custom);
+		return AddonPrefixes.TryGetValue(key, out var addon) ? addon.Default : "";
+	}
+
+	/// <summary>The addons' prefixes for the admin panel (Server - Chat)</summary>
+	internal static IEnumerable<AddonPrefix> RegisteredPrefixes => AddonPrefixes.Values;
+
 	// ---- Players and runs ----
 
 	public bool IsRunning(CCSPlayerController player) =>
 		plugin.PlayerOf(player) is { } target && target.Timer.IsRunning && !target.Timer.IsPracticeMode;
+
+	public void PlaySound(CCSPlayerController player, string sound, float pitch = 1f, string? category = null)
+	{
+		if (plugin.PlayerOf(player) is { } target)
+			Sounds.Play(target, sound, pitch, category == null ? null : Sounds.Find(category));
+	}
+
+	public void RegisterSoundCategory(string key, string label, string sub, bool defaultOn = true) =>
+		Sounds.Register(new SoundCategory(key, label, sub, defaultOn));
 
 	public bool IsInStartZone(CCSPlayerController player) =>
 		plugin.PlayerOf(player) is { } target && target.IsTouchingAnyStartZone;

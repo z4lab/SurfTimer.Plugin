@@ -168,7 +168,7 @@ public partial class SurfTimer
 			|| (now - _permanentLastRestart).TotalSeconds < PermanentRestartCooldownSeconds)
 			return;
 
-		_logger.LogInformation("[Replay] Permanent map bot isn't playing (playing {Playing}, alive {Alive}, team {Team}) - restarting it",
+		_logger.LogDebug("[Replay] Permanent map bot isn't playing (playing {Playing}, alive {Alive}, team {Team}) - restarting it",
 			permanent.IsPlaying, controller.PawnIsAlive, controller.Team);
 		_permanentLastRestart = now;
 		_permanentStalledSince = null;

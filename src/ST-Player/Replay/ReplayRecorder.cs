@@ -214,7 +214,7 @@ public class ReplayRecorder
 		var start_exit_index = Frames.FindLastIndex(f => f.Situation == ReplayFrameSituation.START_ZONE_EXIT);
 		var end_enter_index = Frames.FindLastIndex(f => f.Situation == ReplayFrameSituation.END_ZONE_ENTER);
 
-		_logger.LogInformation("[{ClassName}] {MethodName} -> Trimming Map Run replay. Last start enter {StartEnterIndex} | last start exit {StartExitIndex} | end enter {EndEnterIndex}",
+		_logger.LogDebug("[{ClassName}] {MethodName} -> Trimming Map Run replay. Last start enter {StartEnterIndex} | last start exit {StartExitIndex} | end enter {EndEnterIndex}",
 		nameof(ReplayRecorder), methodName, start_enter_index, start_exit_index, end_enter_index);
 
 		if (start_enter_index == -1)
@@ -253,7 +253,7 @@ public class ReplayRecorder
 		var bonus_enter_index = Frames.FindLastIndex(f => f.Situation == ReplayFrameSituation.START_ZONE_ENTER);
 		var bonus_exit_index = Frames.FindLastIndex(f => f.Situation == ReplayFrameSituation.START_ZONE_EXIT);
 		var bonus_end_enter_index = Frames.FindLastIndex(f => f.Situation == ReplayFrameSituation.END_ZONE_ENTER);
-		_logger.LogInformation("[{ClassName}] {MethodName} -> Looking for Bonus Run replay trim indexes. Last start enter {BonusEnterIndex}, last start exit {BonusExitIndex}, end enter {BonusEndEnterIndex}",
+		_logger.LogDebug("[{ClassName}] {MethodName} -> Looking for Bonus Run replay trim indexes. Last start enter {BonusEnterIndex}, last start exit {BonusExitIndex}, end enter {BonusEndEnterIndex}",
 			nameof(ReplayRecorder), methodName, bonus_enter_index, bonus_exit_index, bonus_end_enter_index
 		);
 
@@ -322,7 +322,7 @@ public class ReplayRecorder
 			}
 		}
 
-		_logger.LogInformation("[{ClassName}] {MethodName} -> Trimming replay for Stage {TrimmingStage} (player is currently on Stage {CurrentStage})",
+		_logger.LogDebug("[{ClassName}] {MethodName} -> Trimming replay for Stage {TrimmingStage} (player is currently on Stage {CurrentStage})",
 			nameof(ReplayRecorder), methodName, stage, player.Timer.Stage
 		);
 
@@ -331,7 +331,7 @@ public class ReplayRecorder
 		stage_exit_index = stage_end_index >= 1 ? Frames.FindLastIndex(stage_end_index - 1, f => f.Situation == exitZone) : -1;
 		stage_enter_index = stage_end_index >= 1 ? Frames.FindLastIndex(stage_end_index - 1, f => f.Situation == enterZone) : -1;
 
-		_logger.LogInformation("[{ClassName}] {MethodName} -> Trimming Stage Run replay. Stage {Stage}, enter {EnterIndex}, exit {ExitIndex}, end {EndIndex}",
+		_logger.LogDebug("[{ClassName}] {MethodName} -> Trimming Stage Run replay. Stage {Stage}, enter {EnterIndex}, exit {ExitIndex}, end {EndIndex}",
 			nameof(ReplayRecorder), methodName, stage, stage_enter_index, stage_exit_index, stage_end_index
 		);
 
@@ -349,7 +349,7 @@ public class ReplayRecorder
 
 		new_frames = GetTrimmedFrames(startIndex, endIndex);
 
-		_logger.LogInformation("<<< [{ClassName}] {MethodName} -> Trimmed Stage {Stage} replay from {Start} to {End} (Total Frames: {NewFrames})",
+		_logger.LogDebug("<<< [{ClassName}] {MethodName} -> Trimmed Stage {Stage} replay from {Start} to {End} (Total Frames: {NewFrames})",
 			nameof(ReplayRecorder), methodName, stage, startIndex, endIndex, new_frames.Count
 		);
 
@@ -391,7 +391,7 @@ public class ReplayRecorder
 			}
 		}
 
-		_logger.LogInformation("[{ClassName}] {MethodName} -> Trimming replay for Checkpoint {TrimmingCheckpoint} (player is currently on Checkpoint {CurrentCheckpoint})",
+		_logger.LogDebug("[{ClassName}] {MethodName} -> Trimming replay for Checkpoint {TrimmingCheckpoint} (player is currently on Checkpoint {CurrentCheckpoint})",
 			nameof(ReplayRecorder), methodName, checkpoint, player.Timer.Checkpoint
 		);
 
@@ -400,7 +400,7 @@ public class ReplayRecorder
 		checkpoint_exit_index = checkpoint_end_index >= 1 ? Frames.FindLastIndex(checkpoint_end_index - 1, f => f.Situation == exitZone) : -1;
 		checkpoint_enter_index = checkpoint_end_index >= 1 ? Frames.FindLastIndex(checkpoint_end_index - 1, f => f.Situation == enterZone) : -1;
 
-		_logger.LogInformation("[{ClassName}] {MethodName} -> Trimming Checkpoint Run replay. Checkpoint {Checkpoint}, enter {EnterIndex}, exit {ExitIndex}, end {EndIndex}",
+		_logger.LogDebug("[{ClassName}] {MethodName} -> Trimming Checkpoint Run replay. Checkpoint {Checkpoint}, enter {EnterIndex}, exit {ExitIndex}, end {EndIndex}",
 			nameof(ReplayRecorder), methodName, checkpoint, checkpoint_enter_index, checkpoint_exit_index, checkpoint_end_index
 		);
 
@@ -418,7 +418,7 @@ public class ReplayRecorder
 
 		new_frames = GetTrimmedFrames(startIndex, endIndex);
 
-		_logger.LogInformation("<<< [{ClassName}] {MethodName} -> Trimmed Checkpoint {Checkpoint} replay from {Start} to {End} (Total Frames: {NewFrames})",
+		_logger.LogDebug("<<< [{ClassName}] {MethodName} -> Trimmed Checkpoint {Checkpoint} replay from {Start} to {End} (Total Frames: {NewFrames})",
 			nameof(ReplayRecorder), methodName, checkpoint, startIndex, endIndex, new_frames.Count
 		);
 

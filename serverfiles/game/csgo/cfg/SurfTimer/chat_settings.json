@@ -1,5 +1,7 @@
 {
 	"enabled": true,
+	"prefix": "",
+	"addon_prefixes": {},
 	"format": "{grey}[{country}] {rank} {name}: {message}",
 	"team_prefix": "(Team)",
 	"spectator_prefix": "*SPEC*",

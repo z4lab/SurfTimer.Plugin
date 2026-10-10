@@ -76,13 +76,13 @@ public partial class SurfTimer
 			});
 
 			// Auto-spectate whoever requested this replay, if they're still around
-			_logger.LogInformation("[{ClassName}] OnPlayerSpawn -> PendingSpectatorUserId = {PendingSpectatorUserId} for bot {BotName}",
+			_logger.LogDebug("[{ClassName}] OnPlayerSpawn -> PendingSpectatorUserId = {PendingSpectatorUserId} for bot {BotName}",
 				nameof(SurfTimer), slot.PendingSpectatorUserId, controller.PlayerName
 			);
 			if (slot.PendingSpectatorUserId.HasValue)
 			{
 				bool found = playerList.TryGetValue(slot.PendingSpectatorUserId.Value, out var requester);
-				_logger.LogInformation("[{ClassName}] OnPlayerSpawn -> Auto-spectate lookup: found={Found} controllerValid={Valid}",
+				_logger.LogDebug("[{ClassName}] OnPlayerSpawn -> Auto-spectate lookup: found={Found} controllerValid={Valid}",
 					nameof(SurfTimer), found, found && requester!.Controller.IsValid
 				);
 
@@ -116,7 +116,7 @@ public partial class SurfTimer
 
 		if (controller.IsBot)
 		{
-			_logger.LogInformation("[{ClassName}] OnPlayerTeam -> Bot {BotName} joined team {Team}",
+			_logger.LogDebug("[{ClassName}] OnPlayerTeam -> Bot {BotName} joined team {Team}",
 				nameof(SurfTimer), controller.PlayerName, @event.Team
 			);
 
@@ -249,7 +249,7 @@ public partial class SurfTimer
 			{
 				// Reason is the engine's disconnect reason code - a kick right after "Bot connected" means
 				// something removed it (e.g. a map script)
-				_logger.LogInformation("[{ClassName}] Bot disconnected: {Name} (reason {Reason})",
+				_logger.LogDebug("[{ClassName}] Bot disconnected: {Name} (reason {Reason})",
 					nameof(SurfTimer), @event.Name, @event.Reason);
 			}
 			return HookResult.Continue;

@@ -13,24 +13,40 @@ public class Injection : IPluginServiceCollection<SurfTimer>
 	private static readonly string LogDirectory =
 		$"{Server.GameDirectory}/csgo/addons/counterstrikesharp/logs";
 
+#if DEBUG
+	private const LogEventLevel ConsoleLevel = LogEventLevel.Verbose;
+	private const LogEventLevel FileLevel = LogEventLevel.Verbose;
+#else
+	private const LogEventLevel ConsoleLevel = LogEventLevel.Warning;
+	private const LogEventLevel FileLevel = LogEventLevel.Information;
+#endif
+
+	/// <summary>Players' chat lines (ChatProcessor) - the game doesn't print them anymore, so they stay on the console</summary>
+	private static bool IsChat(LogEvent e) => e.MessageTemplate.Text.StartsWith("[Chat] {Prefix}", StringComparison.Ordinal);
+
 	public void ConfigureServices(IServiceCollection serviceCollection)
 	{
 		var fileName = $"log-SurfTimer-.txt"; // Date seems to be automatically appended so we leave it out
 		var filePath = Path.Combine(LogDirectory, fileName);
 
-		// Configure Serilog
+		// Configure Serilog - the console only gets warnings and errors (and the chat log) in release builds,
+		// the log file everything from Information; debug builds get everything in both
 		Log.Logger = new LoggerConfiguration()
 			.MinimumLevel.Verbose()
-			.WriteTo.Console()
+			.WriteTo.Logger(console => console
+				.Filter.ByIncludingOnly(e => e.Level >= ConsoleLevel || IsChat(e))
+				.WriteTo.Console())
 			.WriteTo.File(
 				path: filePath,
-				restrictedToMinimumLevel: LogEventLevel.Verbose,
+				restrictedToMinimumLevel: FileLevel,
 				rollingInterval: RollingInterval.Day
 			)
 			.CreateLogger();
 
 		// Show the full path to the log file
+#if DEBUG
 		Console.WriteLine($"[SurfTimer] Logging to file: {filePath}");
+#endif
 		Log.Information("[SurfTimer] Logging to file: {LogFile}", filePath);
 
 		// Register Serilog as a logging provider for Microsoft.Extensions.Logging

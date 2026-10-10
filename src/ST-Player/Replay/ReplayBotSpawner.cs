@@ -64,7 +64,7 @@ internal static class ReplayBotSpawner
 			}
 
 			var bot = new CCSPlayerController(pointer);
-			Logger.LogInformation("[ReplayBotSpawner] CreateBot created bot #{Slot}", bot.IsValid ? bot.Slot : -1);
+			Logger.LogDebug("[ReplayBotSpawner] CreateBot created bot #{Slot}", bot.IsValid ? bot.Slot : -1);
 			return bot.IsValid ? bot : null;
 		}
 		catch (Exception ex)

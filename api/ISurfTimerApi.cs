@@ -63,6 +63,20 @@ public interface ISurfTimerApi
 	/// <summary>Whether the player is in a timed run that counts (not practice mode)</summary>
 	bool IsRunning(CCSPlayerController player);
 
+	/// <summary>
+	/// Plays a sound to this player only, at their own volume - nothing when they turned sounds off (!quake) or this
+	/// category off (!options - Sound). A CS2 sound event name gets the volume and pitch; a file path
+	/// ("sounds/....vsnd") is played with the client's "play" at full volume.
+	/// </summary>
+	/// <param name="category">A key from RegisterSoundCategory - null: only the main switch and the volume apply</param>
+	void PlaySound(CCSPlayerController player, string sound, float pitch = 1f, string? category = null);
+
+	/// <summary>
+	/// Adds a kind of sound players can turn on / off in !options - Sound, after the timer's own. defaultOn: sounds about
+	/// the player themselves should be on, about others off. Registering a key again replaces it.
+	/// </summary>
+	void RegisterSoundCategory(string key, string label, string sub, bool defaultOn = true);
+
 	/// <summary>Whether the player is in a start zone (map, stage or bonus start)</summary>
 	bool IsInStartZone(CCSPlayerController player);
 
@@ -71,6 +85,17 @@ public interface ISurfTimerApi
 	/// before.
 	/// </summary>
 	event Action<MapFinish>? MapFinished;
+
+	// ---- Chat ----
+
+	/// <summary>
+	/// Lets admins change an addon's chat prefix in !surfadmin - Server - Chat (saved in chat_settings.json, {color}
+	/// tags). defaultPrefix is the addon's own (with colors applied, e.g. from its language file).
+	/// </summary>
+	void RegisterChatPrefix(string key, string label, string defaultPrefix);
+
+	/// <summary>The addon's chat prefix: the admin's (colors applied), else the default it registered</summary>
+	string ChatPrefix(string key);
 
 	// ---- Server ----
 

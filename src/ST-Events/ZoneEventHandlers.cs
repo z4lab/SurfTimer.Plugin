@@ -100,6 +100,7 @@ public partial class SurfTimer
 				player.Controller.PrintToChat($"{Config.PluginPrefix} {PracticeString}{LocalizationService.LocalizerNonNull["mappb_set",
 					PlayerHud.FormatTime(player.Timer.Ticks)]}"
 				);
+				Sounds.Play(player, Sounds.Pb);
 			}
 			else if (player.Timer.Ticks < player.Stats.PB[pStyle].RunTime) // Player beating their existing PersonalBest for the map
 			{
@@ -349,6 +350,7 @@ public partial class SurfTimer
 			}
 
 			player.Timer.Checkpoint = (short)(stage - 1); // Stage = Checkpoint when in a run on a Staged map
+			Sounds.CheckAheadOfPb(player, stage - 1);
 
 #if DEBUG
 			Console.WriteLine($"============== Initial entity value: {zone.Number} | Assigned to `stage`: {stage} | player.Timer.Checkpoint: {stage - 1}");
@@ -415,6 +417,7 @@ public partial class SurfTimer
 			// cp 1) to here. The last segment (last cp -> map end) is saved in the map end handler.
 			// player.Stats.ThisRun.RunTime is the tick we left the previous checkpoint zone / the map start.
 			int checkpoint_run_time = player.Timer.Ticks - player.Stats.ThisRun.RunTime;
+			Sounds.CheckAheadOfPb(player, checkpoint);
 
 			// Print Checkpoint completion message (non-staged maps compare against the standalone
 			// Checkpoint PB/WR records; the rare staged-map-with-checkpoint-zones case falls back to
@@ -533,6 +536,7 @@ public partial class SurfTimer
 			player.Controller.PrintToChat($"{Config.PluginPrefix} {PracticeString}{LocalizationService.LocalizerNonNull["bonuspb_set",
 				bonus_idx, PlayerHud.FormatTime(player.Timer.Ticks)]}"
 			);
+			Sounds.Play(player, Sounds.Pb);
 		}
 		else if (player.Timer.Ticks < player.Stats.BonusPB[bonus_idx][pStyle].RunTime) // Player beating their existing PersonalBest for the bonus
 		{
@@ -594,6 +598,8 @@ public partial class SurfTimer
 		if (!player.Timer.IsStageMode && !player.Timer.IsBonusMode)
 		{
 			player.Timer.Start();
+			if (player.Timer.IsRunning && !player.Timer.IsPracticeMode)
+				Sounds.Play(player, Sounds.TimerStart);
 			player.ResetSync();
 			player.CountAttempt(0, 0, finished: false);
 			player.Stats.ThisRun.RunTime = player.Timer.Ticks;
@@ -652,6 +658,8 @@ public partial class SurfTimer
 		if (player.Timer.IsStageMode && player.Timer.Stage == stage)
 		{
 			player.Timer.Start();
+			if (player.Timer.IsRunning && !player.Timer.IsPracticeMode)
+				Sounds.Play(player, Sounds.TimerStart);
 			player.ResetSync();
 			player.CountAttempt(2, stage, finished: false);
 		}
@@ -747,6 +755,8 @@ public partial class SurfTimer
 
 		// BONUS START ZONE
 		player.Timer.Start();
+		if (player.Timer.IsRunning && !player.Timer.IsPracticeMode)
+			Sounds.Play(player, Sounds.TimerStart);
 		player.ResetSync();
 		player.CountAttempt(1, zone.Number, finished: false);
 		// Set the CurrentRunData values

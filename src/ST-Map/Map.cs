@@ -118,11 +118,11 @@ public class Map : MapEntity
 		ZonesFromDatabase = storedZones.Count > 0;
 		_exportZones = !ZonesFromDatabase;
 		ZoneDefinitions = ZonesFromDatabase ? storedZones : ZoneImport.FromTriggers();
-		_logger.LogInformation("[{ClassName}] -> {Count} zones {Source}", nameof(Map), ZoneDefinitions.Count,
+		_logger.LogDebug("[{ClassName}] -> {Count} zones {Source}", nameof(Map), ZoneDefinitions.Count,
 			ZonesFromDatabase ? "loaded from the database" : "imported from the map's triggers");
 		ActivateZones(ZoneDefinitions, initial: true);
 		KillServerCommandEnts();
-		_logger.LogInformation("[{ClassName}] -> Zones have been loaded. | Bonuses: {Bonuses} | Stages: {Stages} | Checkpoints: {Checkpoints}",
+		_logger.LogDebug("[{ClassName}] -> Zones have been loaded. | Bonuses: {Bonuses} | Stages: {Stages} | Checkpoints: {Checkpoints}",
 			nameof(Map), this.Bonuses, this.Stages, this.TotalCheckpoints
 		);
 	}
@@ -182,7 +182,7 @@ public class Map : MapEntity
 			}
 		}
 
-		_logger.LogInformation("[{ClassName}] {MethodName} -> Initialized WR variables. | Bonuses: {Bonuses} | Stages: {Stages} | Checkpoints: {Checkpoints}",
+		_logger.LogDebug("[{ClassName}] {MethodName} -> Initialized WR variables. | Bonuses: {Bonuses} | Stages: {Stages} | Checkpoints: {Checkpoints}",
 			nameof(Map), methodName, initBonuses, initStages, initCheckpoints
 		);
 
@@ -258,7 +258,7 @@ public class Map : MapEntity
 		_loadedBonuses = (short)this.Bonuses;
 		_loadedCheckpoints = HighestNumber(ZoneType.Checkpoint);
 
-		_logger.LogInformation("[{ClassName}] ActivateZones -> {Boxes} zone boxes in {Roles} zones",
+		_logger.LogDebug("[{ClassName}] ActivateZones -> {Boxes} zone boxes in {Roles} zones",
 			nameof(Map), this.ActiveZones.Count, this.Zones.Count);
 	}
 
@@ -501,7 +501,7 @@ public class Map : MapEntity
 		var wrIds = records.Where(r => r.WrTimeId != null).Select(r => r.WrTimeId!.Value).Distinct().ToList();
 		var wrTimes = (await TimeRepository.GetTimesAsync(wrIds)).ToDictionary(t => t.Id);
 
-		_logger.LogInformation("[{ClassName}] {MethodName} -> {Records} course records, {Wrs} WRs",
+		_logger.LogDebug("[{ClassName}] {MethodName} -> {Records} course records, {Wrs} WRs",
 			nameof(Map), methodName, records.Count, wrTimes.Count);
 
 		foreach (var record in records)

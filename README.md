@@ -90,13 +90,13 @@ Some menu rows ask you to type something in chat. Type `!cancel` to abort.
 | `!hideself` | Options › Visibility › Hide own legs |
 | `!hide` | Options › Visibility › Hide players |
 | `!hidebots` | Options › Visibility › Hide replay bots |
-| `!repeat` | Options › Gameplay › Repeat mode |
+| `!quake` | Options › Sound › Sounds (all timer sounds on / off) |
 
 </details>
 
 ## Options (`!options` / `!settings`)
 
-Everything here is saved to your profile, except **Repeat mode**. The menu reopens on the tab and page where you left it.
+Everything here is saved to your profile. The menu reopens on the tab and page where you left it.
 
 <details>
 <summary><b>Visibility</b></summary>
@@ -189,11 +189,22 @@ All on by default.
 </details>
 
 <details>
-<summary><b>Gameplay</b></summary>
+<summary><b>Sound</b></summary>
 
-| Option | Description |
-|---|---|
-| Repeat mode | Sends you back to the start of a stage after you finish it. Staged maps only. **Not saved.** Same as `!repeat`. |
+Every sound plays only for you, at your volume. Turning a sound on plays a sample.
+
+| Option | Default | Description |
+|---|---|---|
+| Sounds | On | Main switch for every sound below. Same as `!quake`. |
+| Volume | 20% | Each press goes one step up (off, 10, 20, 30, 50, 75, 100%), then back to off, and plays a sample. |
+| Timer start | On | Your run starts (map, stage or bonus). |
+| Ahead of PB | On | You reach a checkpoint or stage faster than in your PB. |
+| New PB | On | A new personal best on the map, a stage, a bonus or a checkpoint. |
+| Your record | On | Your WR on the map, a stage, a bonus or a checkpoint. |
+| Others' records | Off | Another player sets a WR. |
+| Map vote / Vote countdown | On | *Only with [SurfTimer.MapChooser](https://github.com/z4lab/SurfTimer.MapChooser).* A vote starts / its last 3 seconds. Addons add their sounds here. |
+
+The server can change which CS2 sound event each kind plays in `timer_settings.json`: `sound_timer_start`, `sound_ahead_pb`, `sound_pb`, `sound_record`, `sound_others_record` (`""` = no sound).
 
 </details>
 
@@ -374,6 +385,8 @@ Info rows: SurfTimer version/commit, players and tickrate, memory.
 
 - **Chat processor**: on/off. Off means normal engine chat.
 - **Format**: placeholders `{rank} {ranknum} {points} {name} {message} {country} {team} {prefix} {grey}` … You can also **Reset format**.
+- **Prefix ›**: SurfTimer's chat prefix, typed in chat with color tags, e.g. `[{blue}Surf{bluegrey}Timer{default}]`. `default` goes back to the language file's. A preview is printed to you.
+- **Map chooser prefix ›** (one row per addon that registers its prefix): the same for that addon.
 - **Rank colors ›**: #1, #2, #3, #4–#10, other ranks, no points.
 - **Name colors ›**: Root, Admin, VIP, everyone else (can be the team color).
 - **Anti-spam ›**: on/off, the minimum gap between messages (±0.5 s), and how long the same message is blocked (±5 s). Admins aren't limited.

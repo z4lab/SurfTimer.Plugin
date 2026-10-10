@@ -82,7 +82,7 @@ public partial class SurfTimer
 			if (cbq != replaybot_count)
 			{
 				// If a replay bot never joins after this, the server refused it (e.g. the map has no nav mesh)
-				_logger.LogInformation("[{ClassName}] bot_quota {Old} -> {New} (replay pool slots: {Slots}, awaiting a bot: {Awaiting})",
+				_logger.LogDebug("[{ClassName}] bot_quota {Old} -> {New} (replay pool slots: {Slots}, awaiting a bot: {Awaiting})",
 					nameof(SurfTimer), cbq, replaybot_count, replaybot_count, CurrentMap.ReplayManager.Pool.Count(s => s.Controller == null));
 				bot_quota.SetValue(replaybot_count);
 			}

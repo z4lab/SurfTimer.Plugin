@@ -18,6 +18,10 @@ internal sealed class ChatSettings
 	internal const string DefaultFormat = "{rank} ~ {name}: {message}";
 
 	[JsonPropertyName("enabled")] public bool Enabled { get; set; } = true;
+	/// <summary>SurfTimer's chat prefix with {color} tags - empty = the language file's</summary>
+	[JsonPropertyName("prefix")] public string Prefix { get; set; } = "";
+	/// <summary>Addons' chat prefixes by key (SurfTimer.Api RegisterChatPrefix) - missing / empty = the addon's own</summary>
+	[JsonPropertyName("addon_prefixes")] public Dictionary<string, string> AddonPrefixes { get; set; } = new();
 	[JsonPropertyName("format")] public string Format { get; set; } = DefaultFormat;
 	[JsonPropertyName("team_prefix")] public string TeamPrefix { get; set; } = "(Team)";
 	[JsonPropertyName("spectator_prefix")] public string SpectatorPrefix { get; set; } = "*SPEC*";
@@ -99,6 +103,32 @@ internal sealed class ChatSettings
 
 	internal static bool IsColor(string name, bool allowTeam) =>
 		Colors.ContainsKey(name) || (allowTeam && name.Equals(TeamColor, StringComparison.OrdinalIgnoreCase));
+
+	internal const int MaxPrefixLength = 64;
+
+	/// <summary>
+	/// {color} tags (names of Colors) as chat colors - unknown tags stay as they are. A line can't start with a color
+	/// code (CS2 drops it), so a leading space is added then.
+	/// </summary>
+	internal static string Colorize(string text)
+	{
+		var colored = System.Text.RegularExpressions.Regex.Replace(text, @"\{([A-Za-z]+)\}", m =>
+			Colors.TryGetValue(m.Groups[1].Value, out char color) ? color.ToString() : m.Value);
+		return colored.Length > 0 && colored[0] < ' ' ? " " + colored : colored;
+	}
+
+	/// <summary>Why a prefix can't be used - null when it's fine (empty = back to the default)</summary>
+	internal static string? CheckPrefix(string prefix)
+	{
+		if (prefix.Length > MaxPrefixLength)
+			return $"At most {MaxPrefixLength} characters";
+
+		var unknown = System.Text.RegularExpressions.Regex.Matches(prefix, @"\{([A-Za-z]+)\}")
+			.Select(m => m.Groups[1].Value)
+			.Where(name => !Colors.ContainsKey(name))
+			.ToList();
+		return unknown.Count > 0 ? $"Unknown color: {string.Join(", ", unknown)} - use e.g. {{blue}} {{lime}} {{gold}} {{grey}} {{default}}" : null;
+	}
 
 	/// <summary>A format must show who wrote what</summary>
 	internal static bool IsValidFormat(string format) =>

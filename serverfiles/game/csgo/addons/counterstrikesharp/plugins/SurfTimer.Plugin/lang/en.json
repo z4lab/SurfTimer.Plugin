@@ -95,5 +95,7 @@
 	"timer_banned_run": "{red}You are timer banned - this run wasn't saved.",
 	"cursor_on": "Mouse cursor {lime}on{default} - click the menu. Move or {green}!cursor{default} to turn it off.",
 	"cursor_off": "Mouse cursor {red}off{default} - {green}!cursor{default} to click again.",
+	"sounds_on": "Timer sounds {lime}on{default}.",
+	"sounds_off": "Timer sounds {red}off{default}.",
 	"cursor_no_hud": "The mouse cursor needs the custom HUD, which is off on this server."
 }

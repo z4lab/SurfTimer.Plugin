@@ -9,7 +9,27 @@ namespace SurfTimer;
 public static class Config
 {
 	public static string PluginName => Assembly.GetExecutingAssembly().GetName().Name ?? "";
-	public static readonly string PluginPrefix = LocalizationService.LocalizerNonNull["prefix"];
+	/// <summary>
+	/// Chat prefix: the admin's (!surfadmin - Server - Chat - Prefix, chat_settings.json), else the language file's.
+	/// </summary>
+	public static string PluginPrefix
+	{
+		get
+		{
+			string custom = ChatSettings.Current.Prefix;
+			if (custom.Length == 0)
+				return LocalizationService.LocalizerNonNull["prefix"];
+			if (!ReferenceEquals(custom, _prefixSource))
+			{
+				_prefixSource = custom;
+				_prefixColored = ChatSettings.Colorize(custom);
+			}
+			return _prefixColored;
+		}
+	}
+
+	private static string? _prefixSource;
+	private static string _prefixColored = "";
 	public static string PluginPath =>
 		$"{Server.GameDirectory}/csgo/addons/counterstrikesharp/plugins/{PluginName}/";
 
@@ -39,6 +59,12 @@ public static class Config
 	/// (RoundTimer.cs).
 	/// </summary>
 	public static bool RoundTimerFreeze { get; private set; } = TimerSettings.GetBool("round_timer_freeze", true);
+
+	/// <summary>
+	/// The CS2 sound event of a kind of sound (Sounds.cs) - timer_settings.json "sound_&lt;key&gt;" overrides the default,
+	/// "" turns it off for everyone.
+	/// </summary>
+	internal static string SoundEvent(string key, string fallback) => TimerSettings.GetString($"sound_{key}", fallback);
 
 	/// <summary>
 	/// Points per stage / checkpoint segment WR (CS:GO SurfTimer's ck_wrcp_points, 0 = none).

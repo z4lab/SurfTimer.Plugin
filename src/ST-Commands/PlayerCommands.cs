@@ -587,13 +587,13 @@ public partial class SurfTimer
 
 			if (observerPawn.ObserverServices.ObserverTarget.Raw == targetPawnRaw)
 			{
-				_logger.LogInformation("[{ClassName}] SpectateTarget -> {Spectator} -> {Target}: observer target set (schema)",
+				_logger.LogDebug("[{ClassName}] SpectateTarget -> {Spectator} -> {Target}: observer target set (schema)",
 					nameof(SurfTimer), spectator.PlayerName, target.PlayerName
 				);
 				return;
 			}
 
-			_logger.LogInformation("[{ClassName}] SpectateTarget -> {Spectator} -> {Target}: schema write was overridden, falling back to spec_player",
+			_logger.LogDebug("[{ClassName}] SpectateTarget -> {Spectator} -> {Target}: schema write was overridden, falling back to spec_player",
 				nameof(SurfTimer), spectator.PlayerName, target.PlayerName
 			);
 			spectator.ExecuteClientCommandFromServer($"spec_player \"{target.PlayerName}\"");

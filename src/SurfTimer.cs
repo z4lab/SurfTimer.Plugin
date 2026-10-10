@@ -15,8 +15,6 @@
 	Modified Fork: https://github.com/z4lab/SurfTimer.Plugin
 */
 
-#define DEBUG
-
 using System.Collections.Concurrent;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
@@ -74,11 +72,11 @@ public partial class SurfTimer : BasePlugin
 		// Initialise Map Object
 		if ((CurrentMap == null || CurrentMap.Name!.Equals(mapName)) && mapName.Contains("surf_"))
 		{
-			_logger.LogInformation($"[CS2 Surf] {Config.PluginName} Initializing Map object for {mapName}");
+			_logger.LogDebug($"[CS2 Surf] {Config.PluginName} Initializing Map object for {mapName}");
 
 			Server.NextWorldUpdateAsync(async () => // NextWorldUpdate runs even during server hibernation
 			{
-				_logger.LogInformation($"[CS2 Surf] {Config.PluginName} {ModuleVersion} - loading map {mapName}");
+				_logger.LogDebug($"[CS2 Surf] {Config.PluginName} {ModuleVersion} - loading map {mapName}");
 				var (stagesAsCheckpoints, zones) = LoadMapBootstrap(mapName);
 				CurrentMap = new Map(mapName, stagesAsCheckpoints, zones);
 				await CurrentMap.InitializeAsync();
@@ -113,7 +111,7 @@ public partial class SurfTimer : BasePlugin
 	{
 		if (CurrentMap is not null)
 		{
-			_logger.LogInformation(
+			_logger.LogDebug(
 				"[{Prefix}] Map ({MapName}) ended. Cleaning up resources...",
 				Config.PluginName,
 				CurrentMap.Name
@@ -174,7 +172,7 @@ public partial class SurfTimer : BasePlugin
 			SurfTimerApiImpl.ApplyForcedCvars();
 		}, CounterStrikeSharp.API.Modules.Timers.TimerFlags.STOP_ON_MAPCHANGE);
 
-		_logger.LogInformation("[{Prefix}] Executed configuration: server_settings.cfg ({Reason})", Config.PluginName, reason);
+		_logger.LogDebug("[{Prefix}] Executed configuration: server_settings.cfg ({Reason})", Config.PluginName, reason);
 	}
 
 	/* ========== PLUGIN LOAD ========== */

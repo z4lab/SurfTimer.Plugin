@@ -29,7 +29,7 @@ public partial class SurfTimer
 		new("Visibility", null, OptionsVisibilityRoot),
 		new("HUD", null, OptionsHudRoot),
 		new("Chat", null, OptionsChatRoot),
-		new("Gameplay", null, OptionsGameplayRoot),
+		new("Sound", null, OptionsSoundRoot),
 	];
 
 	// ---- Visibility ----
@@ -381,22 +381,38 @@ public partial class SurfTimer
 
 	// ---- Gameplay ----
 
-	private PanelPage OptionsGameplayRoot() => new("Gameplay", ctx =>
+	/// <summary>
+	/// Sound tab: the main switch (also !quake), the volume, and each kind of sound - the timer's, then the addons'.
+	/// </summary>
+	private PanelPage OptionsSoundRoot() => new("Sound", ctx =>
 	{
-		var player = ctx.Player;
-		bool staged = CurrentMap != null && CurrentMap.Stages > 0;
-		return
-		[
-			ctx.Toggle("Repeat mode", player.IsRepeatMode, staged ? "back to the stage start after each stage · not saved" : "staged maps only", on =>
+		var options = ctx.Player.Options;
+		var rows = new List<HudMenuItem>
+		{
+			ctx.Toggle("Sounds", options.SoundsEnabled, "all timer sounds · same as !quake", on => options.SoundsEnabled = on),
+		};
+		if (!options.SoundsEnabled)
+			return rows;
+
+		// Each press one step louder, after 100% back to off - plays a sample at the new volume
+		rows.Add(ctx.Act("Volume", options.SoundVolume == 0 ? "off" : $"{options.SoundVolume}%", "every sound below", () =>
+		{
+			int next = PlayerOptions.SoundVolumeSteps.FirstOrDefault(v => v > options.SoundVolume, 0);
+			options.SoundVolume = next;
+			Sounds.Play(ctx.Player, Sounds.Pb.Event, 1f, null);
+			ctx.Session.Status = next == 0 ? "Volume: off" : $"Volume: {next}%";
+		}));
+
+		foreach (var category in Sounds.Categories)
+		{
+			var kind = category;
+			rows.Add(ctx.Toggle(kind.Label, options.SoundOn(kind), kind.Sub, on =>
 			{
-				string result = SetRepeat(player, on);
-				ctx.Session.Status = result switch
-				{
-					"repeat_enabled" => "Repeat mode on",
-					"not_staged" => "Repeat mode only works on staged maps",
-					_ => "Repeat mode off",
-				};
-			}),
-		];
+				options.SetSoundOn(kind, on);
+				if (on)
+					Sounds.Play(ctx.Player, kind.Event, kind.Pitch, null); // A sample
+			}));
+		}
+		return rows;
 	});
 }

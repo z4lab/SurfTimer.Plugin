@@ -23,7 +23,7 @@ unsafe static class Extensions
 			return;
 
 		var logger = SurfTimer.ServiceProvider.GetRequiredService<ILogger<SurfTimer>>();
-		void LogState(string step) => logger.LogInformation(
+		void LogState(string step) => logger.LogDebug(
 			"[MoveToSpectator] {Name} {Step}: team={Team} alive={Alive}",
 			controller.PlayerName, step, controller.Team, controller.PawnIsAlive);
 

@@ -32,6 +32,15 @@ public partial class SurfTimer
 				settings.Format = ChatSettings.DefaultFormat;
 				SaveChatSettings(ctx, "format", ChatSettings.DefaultFormat);
 			}),
+			PrefixRow(ctx, "Prefix", "SurfTimer", settings.Prefix, value => settings.Prefix = value, () => Config.PluginPrefix),
+			.. SurfTimerApiImpl.RegisteredPrefixes.Select(addon => PrefixRow(ctx, $"{addon.Label} prefix", addon.Label,
+				settings.AddonPrefixes.GetValueOrDefault(addon.Key, ""), value =>
+				{
+					if (value.Length == 0)
+						settings.AddonPrefixes.Remove(addon.Key);
+					else
+						settings.AddonPrefixes[addon.Key] = value;
+				}, () => SurfTimerApiImpl.EffectivePrefix(addon.Key))),
 			ctx.Nav("Rank colors", "", "tag colors by server rank", AdminChatRankColorsPage),
 			ctx.Nav("Name colors", "", "root, admin, VIP", AdminChatNameColorsPage),
 			ctx.Nav("Anti-spam", settings.AntiSpam.Enabled ? "on" : "off", "admins aren't limited", AdminChatAntiSpamPage),
@@ -115,6 +124,27 @@ public partial class SurfTimer
 			ctx.Act("Window -5 s", "", "", () => SetWindow(antiSpam.DuplicateWindowSeconds - 5)),
 		];
 	});
+
+	/// <summary>
+	/// A chat prefix: typed in chat with {color} tags, "default" (or nothing) goes back to the plugin's own. A preview is
+	/// printed to the admin.
+	/// </summary>
+	private HudMenuItem PrefixRow(PanelContext ctx, string label, string owner, string current, Action<string> set, Func<string> effective) =>
+		ctx.Ask(label, current.Length > 0 ? current : "default", $"{owner} · {{color}} tags",
+			$"Type the {owner} chat prefix with colors, e.g. [{{blue}}Surf{{bluegrey}}Timer{{default}}] - or \"default\" for the original.",
+			text =>
+			{
+				string value = text.Trim();
+				if (value.Equals("default", StringComparison.OrdinalIgnoreCase))
+					value = "";
+				if (ChatSettings.CheckPrefix(value) is { } error)
+					return error;
+
+				set(value);
+				SaveChatSettings(ctx, $"{owner} prefix", value.Length > 0 ? value : "default");
+				ctx.Player.Controller.PrintToChat($"{effective()} Prefix preview");
+				return null;
+			});
 
 	/// <summary>
 	/// Writes chat_settings.json after a change from the panel (the in-memory settings already changed).

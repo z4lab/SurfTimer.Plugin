@@ -188,7 +188,7 @@ public class CurrentRun : RunStatsEntity
 		await PointsService.RecalculateMapAsync(map.ID, style);
 
 		stopwatch.Stop();
-		_logger.LogInformation("[{Class}] {Method} -> Finished SaveMapTime for '{Name}' (time {ID}) in {Elapsed}ms",
+		_logger.LogDebug("[{Class}] {Method} -> Finished SaveMapTime for '{Name}' (time {ID}) in {Elapsed}ms",
 			nameof(CurrentRun), methodName, player.Profile.Name, result.TimeId, stopwatch.ElapsedMilliseconds
 		);
 	}
@@ -262,6 +262,7 @@ public class CurrentRun : RunStatsEntity
 				player.Controller.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["stagepb_set",
 					stage, PlayerHud.FormatTime(stage_run_time)]}"
 				);
+				Sounds.Play(player, Sounds.Pb);
 			}
 			else if (player.Stats.StagePB[stage][pStyle] != null && player.Stats.StagePB[stage][pStyle].RunTime > stage_run_time) // Player beating their existing Stage personal best
 			{
@@ -335,6 +336,7 @@ public class CurrentRun : RunStatsEntity
 				player.Controller.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["checkpointpb_set",
 					checkpoint, PlayerHud.FormatTime(checkpoint_run_time)]}"
 				);
+				Sounds.Play(player, Sounds.Pb);
 			}
 			else if (player.Stats.CheckpointPB[checkpoint][pStyle] != null && player.Stats.CheckpointPB[checkpoint][pStyle].RunTime > checkpoint_run_time) // Player beating their existing Checkpoint personal best
 			{
@@ -356,8 +358,10 @@ public class CurrentRun : RunStatsEntity
 	}
 
 
+	/// <summary>Dumps the recorded zone situations of a replay to the console (debug builds only)</summary>
 	public static void PrintSituations(Player player)
 	{
+#if DEBUG
 		Console.WriteLine($"========================== FOUND SITUATIONS ==========================");
 		for (int i = 0; i < player.ReplayRecorder.Frames.Count; i++)
 		{
@@ -394,6 +398,7 @@ public class CurrentRun : RunStatsEntity
 			player.ReplayRecorder.MapSituations.Count,
 			player.ReplayRecorder.MapSituations[0], player.ReplayRecorder.MapSituations[1], player.ReplayRecorder.MapSituations[2]);
 		Console.WriteLine("========================== Total Frames: {0} ==========================", player.ReplayRecorder.Frames.Count);
+#endif
 	}
 
 }
