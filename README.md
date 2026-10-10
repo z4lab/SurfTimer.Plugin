@@ -153,8 +153,9 @@ The HUD uses the [Nord](https://www.nordtheme.com) colors. Its accent (field bor
 | **Keys first** preset | | Keys, Timer, Speed \| Prespeed, Sync |
 | Custom layout › | | Set each field yourself (see below). |
 | Speed | XY | Each press switches: **XY** (horizontal) → **XYZ** (3D) → **Z** (vertical, negative = falling). Applies to the HUD speed, prespeed and split speeds. |
-| Center speed › | Off | Your speed in the middle of the screen, just above the crosshair (custom HUD). **Size** steps through 1–5 and off, **Move up** / **Move down** shift it (10 steps each way, 10px each), **Monospace** keeps the digits in place (on). Uses the speed color below. |
-| Speed color › | Gradient | How the speed, prespeed and center speed are colored: **Gradient** (Nord colors, slow blue → fast red), **Gain / loss** (white, green while gaining speed, red while losing), or one Nord color (snow, frost, teal, blue, deep blue, red, orange, yellow, green, purple). |
+| Center HUD | Off | Your speed in the middle of the screen, just above the crosshair (custom HUD). |
+| Center HUD settings › | | **Center HUD** on / off, **Size** 1–5 (default 3), **Move up** / **Move down** (10 steps each way, 10px each), **Reset position**, **Monospace** (on - digits keep their place), **Color ›**: the same as the HUD speed (default), or its own gradient, gain / loss or Nord color. |
+| Speed color › | Gradient | How the speed and prespeed are colored (the center HUD too, unless it has its own color): **Gradient** (Nord colors, slow blue → fast red), **Gain / loss** (white, green while gaining speed, red while losing), or one Nord color (snow, frost, teal, blue, deep blue, red, orange, yellow, green, purple). |
 | Timer warning | PB | The running timer is green, and turns yellow once your run is slower than your **PB** of it (map, stage or bonus) - or the **WR**. Practice runs stay purple. |
 | Top bar | On | Map, tier and stage, then a smaller row with rank, PB and WR. With [SurfTimer.MapChooser](https://github.com/z4lab/SurfTimer.MapChooser), a third row shows the time left, the running vote and the map's end (needs the HUD addon with four top rows). |
 | Splits panel › | PB | Left-side panel that compares your run against a target (see below). |

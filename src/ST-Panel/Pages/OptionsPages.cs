@@ -216,8 +216,9 @@ public partial class SurfTimer
 				_ => "Speed shows XY (horizontal)",
 			};
 		}));
-		rows.Add(ctx.Nav("Center speed", options.CenterSpeed > 0 ? $"size {options.CenterSpeed}" : "off", "above the crosshair",
-			OptionsCenterSpeedPage));
+		rows.Add(ctx.Toggle("Center HUD", options.CenterHud, "your speed above the crosshair", on => options.CenterHud = on));
+		rows.Add(ctx.Nav("Center HUD settings", options.CenterHud ? $"size {options.CenterSpeed}" : "off", "size, height, font, color",
+			OptionsCenterHudPage));
 		rows.Add(ctx.Nav("Speed color", SpeedColorLabel(options), "gradient, gain / loss or one color", OptionsSpeedColorPage));
 		rows.Add(ctx.Act("Timer warning", options.TimerWarning == TimerWarning.Wr ? "WR" : "PB", "the timer turns yellow once slower", () =>
 		{
@@ -253,10 +254,10 @@ public partial class SurfTimer
 	});
 
 	/// <summary>
-	/// Center speed: the speed in the custom HUD's upper middle slot (above the crosshair) - size (off, 1-5), height and
-	/// font. Uses the speed color below.
+	/// Center HUD settings: the speed in the custom HUD's upper middle slot (above the crosshair) - size, height, font
+	/// and colour (the HUD speed colour unless set here).
 	/// </summary>
-	private PanelPage OptionsCenterSpeedPage() => new("Center speed", ctx =>
+	private PanelPage OptionsCenterHudPage() => new("Center HUD", ctx =>
 	{
 		var options = ctx.Player.Options;
 		string Position() => options.CenterSpeedOffset switch
@@ -268,41 +269,81 @@ public partial class SurfTimer
 
 		var rows = new List<HudMenuItem>();
 		if (!CustomHud.IsActive)
-			rows.Add(PanelContext.Info("Custom HUD is off", "", "the center speed needs it"));
-		rows.Add(ctx.Act("Size", options.CenterSpeed > 0 ? $"{options.CenterSpeed} / {PlayerOptions.CenterSpeedSizes}" : "off",
-			"each press one step bigger, then off", () =>
-			{
-				options.CenterSpeed = (options.CenterSpeed + 1) % (PlayerOptions.CenterSpeedSizes + 1);
-				ctx.Session.Status = options.CenterSpeed > 0 ? $"Center speed: size {options.CenterSpeed}" : "Center speed: off";
-			}));
-		if (options.CenterSpeed <= 0)
-			return rows;
-
+			rows.Add(PanelContext.Info("Custom HUD is off", "", "the center HUD needs it"));
+		rows.Add(ctx.Toggle("Center HUD", options.CenterHud, "speed above the crosshair", on => options.CenterHud = on));
+		rows.Add(ctx.Act("Size", $"{options.CenterSpeed} / {PlayerOptions.CenterSpeedSizes}", "each press one step bigger, then the smallest", () =>
+		{
+			options.CenterSpeed = options.CenterSpeed % PlayerOptions.CenterSpeedSizes + 1;
+			ctx.Session.Status = $"Center HUD: size {options.CenterSpeed}";
+		}));
 		rows.Add(ctx.Act("Move up", Position(), $"up to {PlayerOptions.CenterSpeedMaxOffset} steps", () =>
 		{
 			options.CenterSpeedOffset--;
-			ctx.Session.Status = $"Center speed: {Position()}";
+			ctx.Session.Status = $"Center HUD: {Position()}";
 		}));
 		rows.Add(ctx.Act("Move down", Position(), $"up to {PlayerOptions.CenterSpeedMaxOffset} steps", () =>
 		{
 			options.CenterSpeedOffset++;
-			ctx.Session.Status = $"Center speed: {Position()}";
+			ctx.Session.Status = $"Center HUD: {Position()}";
 		}));
 		rows.Add(ctx.Act("Reset position", "", "just above the crosshair", () =>
 		{
 			options.CenterSpeedOffset = PlayerOptions.DefaultCenterSpeedOffset;
-			ctx.Session.Status = $"Center speed: {Position()}";
+			ctx.Session.Status = $"Center HUD: {Position()}";
 		}));
 		rows.Add(ctx.Toggle("Monospace", options.CenterSpeedMono, "digits keep their place", on => options.CenterSpeedMono = on));
+		rows.Add(ctx.Nav("Color", CenterColorLabel(options), "same as the HUD speed, or its own", OptionsCenterColorPage));
 		return rows;
 	});
 
-	private static string SpeedColorLabel(PlayerOptions options) => options.SpeedColor switch
+	private static string SpeedColorLabel(SpeedColorMode mode, string staticColor) => mode switch
 	{
 		SpeedColorMode.GainLoss => "gain / loss",
-		SpeedColorMode.Static => PlayerOptions.SpeedStaticColors.FirstOrDefault(c => c.Key == options.SpeedColorStatic).Label ?? "static",
+		SpeedColorMode.Static => PlayerOptions.SpeedStaticColors.FirstOrDefault(c => c.Key == staticColor).Label ?? "static",
 		_ => "gradient",
 	};
+
+	private static string SpeedColorLabel(PlayerOptions options) => SpeedColorLabel(options.SpeedColor, options.SpeedColorStatic);
+
+	private static string CenterColorLabel(PlayerOptions options) => options.CenterSpeedColor is SpeedColorMode own
+		? SpeedColorLabel(own, options.CenterSpeedColorStatic)
+		: "as HUD speed";
+
+	/// <summary>Center speed colour: the HUD speed's (default), or its own gradient / gain / loss / Nord colour</summary>
+	private PanelPage OptionsCenterColorPage() => new("Center HUD color", ctx =>
+	{
+		var options = ctx.Player.Options;
+		var own = options.CenterSpeedColor;
+		var rows = new List<HudMenuItem>
+		{
+			ctx.Act("Same as HUD speed", own == null ? "current" : "", $"now: {SpeedColorLabel(options)}", () =>
+			{
+				options.CenterSpeedColor = null;
+				ctx.Session.Status = "Center HUD color: as the HUD speed";
+			}),
+			ctx.Act("Gradient", own == SpeedColorMode.Gradient ? "current" : "", "slow blue to fast red", () =>
+			{
+				options.CenterSpeedColor = SpeedColorMode.Gradient;
+				ctx.Session.Status = "Center HUD color: gradient";
+			}),
+			ctx.Act("Gain / loss", own == SpeedColorMode.GainLoss ? "current" : "", "white, green gaining, red losing", () =>
+			{
+				options.CenterSpeedColor = SpeedColorMode.GainLoss;
+				ctx.Session.Status = "Center HUD color: gain / loss";
+			}),
+		};
+		foreach (var (key, label) in PlayerOptions.SpeedStaticColors)
+		{
+			bool current = own == SpeedColorMode.Static && options.CenterSpeedColorStatic == key;
+			rows.Add(ctx.Act(label, current ? "current" : "", "one color", () =>
+			{
+				options.CenterSpeedColorStatic = key;
+				options.CenterSpeedColor = SpeedColorMode.Static;
+				ctx.Session.Status = $"Center HUD color: {label}";
+			}));
+		}
+		return rows;
+	});
 
 	/// <summary>Speed color of the HUD's speed, prespeed and center speed: Nord gradient, gain / loss, or one Nord color</summary>
 	private PanelPage OptionsSpeedColorPage() => new("Speed color", ctx =>

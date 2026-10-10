@@ -93,8 +93,13 @@ internal sealed class PlayerOptions
 	internal const string KeyZonesShow = "zones_show";
 	internal const string KeySpeedAxes = "speed_axes";
 	internal const string KeySoundVolume = "sound_volume";
-	/// <summary>Speed in the custom HUD's upper middle slot (above the crosshair): 0 off, 1-5 the size</summary>
+	/// <summary>The center HUD (custom HUD middle slots - the speed above the crosshair) on / off</summary>
+	internal const string KeyCenterHud = "center_hud";
+	/// <summary>Size of the center speed, 1-5 (0 meant off before center_hud existed)</summary>
 	internal const string KeyCenterSpeed = "center_speed";
+	/// <summary>The center speed's colour: follow (the HUD speed colour) or a SpeedColorMode of its own</summary>
+	internal const string KeyCenterSpeedColor = "center_speed_color";
+	internal const string KeyCenterSpeedColorStatic = "center_speed_color_static";
 	/// <summary>Its height: steps up (-) / down (+) from the slot's place, 10px each</summary>
 	internal const string KeyCenterSpeedOffset = "center_speed_offset";
 	internal const string KeyCenterSpeedMono = "center_speed_mono";
@@ -103,6 +108,7 @@ internal sealed class PlayerOptions
 	internal const string KeyTimerWarning = "timer_warning";
 
 	internal const int CenterSpeedSizes = 5;
+	internal const int DefaultCenterSpeedSize = 3;
 	internal const int CenterSpeedMaxOffset = 10;
 	internal const int DefaultCenterSpeedOffset = 0;
 
@@ -157,6 +163,9 @@ internal sealed class PlayerOptions
 	private int _soundVolume = DefaultSoundVolume;
 	private int _centerSpeed;
 	private int _centerSpeedOffset = DefaultCenterSpeedOffset;
+	private bool _centerHud;
+	private SpeedColorMode? _centerSpeedColor;
+	private string _centerSpeedColorStatic = "snow";
 	private bool _centerSpeedMono = true;
 	private SpeedColorMode _speedColor = SpeedColorMode.Gradient;
 	private string _speedColorStatic = "snow";
@@ -200,8 +209,16 @@ internal sealed class PlayerOptions
 		_trailColor = _profile.Settings.TryGetValue(KeyTrailColor, out var trailColor) && TrailColors.IsValidCustom(trailColor) ? trailColor : "";
 		_soundVolume = _profile.Settings.TryGetValue(KeySoundVolume, out var volume) && int.TryParse(volume, out int percent)
 			&& percent is >= 0 and <= 100 ? percent : DefaultSoundVolume;
-		_centerSpeed = _profile.Settings.TryGetValue(KeyCenterSpeed, out var centerSize) && int.TryParse(centerSize, out int size)
+		int storedSize = _profile.Settings.TryGetValue(KeyCenterSpeed, out var centerSize) && int.TryParse(centerSize, out int size)
 			&& size is >= 0 and <= CenterSpeedSizes ? size : 0;
+		// Before center_hud existed, size 0 meant off
+		_centerHud = Bool(KeyCenterHud, storedSize > 0);
+		_centerSpeed = storedSize > 0 ? storedSize : DefaultCenterSpeedSize;
+		_centerSpeedColor = _profile.Settings.TryGetValue(KeyCenterSpeedColor, out var centerColor)
+			&& Enum.TryParse(centerColor, ignoreCase: true, out SpeedColorMode parsedCenterColor) && Enum.IsDefined(parsedCenterColor)
+				? parsedCenterColor : null;
+		_centerSpeedColorStatic = _profile.Settings.TryGetValue(KeyCenterSpeedColorStatic, out var centerStatic)
+			&& SpeedStaticColors.Any(c => c.Key == centerStatic) ? centerStatic : "snow";
 		_centerSpeedOffset = _profile.Settings.TryGetValue(KeyCenterSpeedOffset, out var centerOffset) && int.TryParse(centerOffset, out int offset)
 			&& Math.Abs(offset) <= CenterSpeedMaxOffset ? offset : DefaultCenterSpeedOffset;
 		_centerSpeedMono = Bool(KeyCenterSpeedMono, true);
@@ -338,14 +355,41 @@ internal sealed class PlayerOptions
 
 	// ---- Center speed ----
 
-	/// <summary>Speed in the screen centre: 0 off (default), 1-5 its size</summary>
+	/// <summary>The center HUD on / off (off by default)</summary>
+	internal bool CenterHud { get => _centerHud; set { _centerHud = value; Save(KeyCenterHud, value); } }
+
+	/// <summary>Size of the center speed, 1-5</summary>
 	internal int CenterSpeed
 	{
 		get => _centerSpeed;
 		set
 		{
-			_centerSpeed = Math.Clamp(value, 0, CenterSpeedSizes);
+			_centerSpeed = Math.Clamp(value, 1, CenterSpeedSizes);
 			_profile.SetSetting(KeyCenterSpeed, _centerSpeed.ToString());
+		}
+	}
+
+	/// <summary>The center speed's own colour mode - null: the same as the HUD speed (default)</summary>
+	internal SpeedColorMode? CenterSpeedColor
+	{
+		get => _centerSpeedColor;
+		set
+		{
+			_centerSpeedColor = value;
+			_profile.SetSetting(KeyCenterSpeedColor, value?.ToString().ToLowerInvariant() ?? "follow");
+		}
+	}
+
+	/// <summary>Key of SpeedStaticColors for the center speed's own static colour</summary>
+	internal string CenterSpeedColorStatic
+	{
+		get => _centerSpeedColorStatic;
+		set
+		{
+			if (!SpeedStaticColors.Any(c => c.Key == value))
+				return;
+			_centerSpeedColorStatic = value;
+			_profile.SetSetting(KeyCenterSpeedColorStatic, value);
 		}
 	}
 

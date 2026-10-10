@@ -374,7 +374,22 @@ public class PlayerHud
 		var axes = _player.Options.SpeedAxes;
 		float? shownSpeed = subject != null ? Extensions.SpeedOf(subject.Controller, axes)
 			: replay?.Controller != null ? Extensions.SpeedOf(replay.Controller, axes) : null;
-		_speedClass = shownSpeed is float speedNow ? SpeedClassOf(speedNow) : "nc-snow";
+		if (shownSpeed is float speedNow)
+		{
+			_speedDelta = _lastShownSpeed is float before ? Math.Abs(speedNow) - Math.Abs(before) : 0f;
+			_lastShownSpeed = speedNow;
+			var colorOptions = _player.Options;
+			_speedClass = SpeedClassOf(speedNow, colorOptions.SpeedColor, colorOptions.SpeedColorStatic);
+			// The center speed follows the HUD speed colour unless it has its own
+			_centerSpeedClass = colorOptions.CenterSpeedColor is SpeedColorMode own
+				? SpeedClassOf(speedNow, own, colorOptions.CenterSpeedColorStatic)
+				: _speedClass;
+		}
+		else
+		{
+			_lastShownSpeed = null;
+			_speedClass = _centerSpeedClass = "nc-snow";
+		}
 
 		// Panels the viewer turned off in !options (HUD) are sent empty, which collapses them
 		var options = _player.Options;
@@ -562,26 +577,22 @@ public class PlayerHud
 	// ---- Speed colour (!options - HUD - Speed color) ----
 
 	private string _speedClass = "nc-snow";
+	private string _centerSpeedClass = "nc-snow";
 	private float? _lastShownSpeed;
+	/// <summary>How much the shown speed changed since the last update (gain / loss)</summary>
+	private float _speedDelta;
 	/// <summary>Speed changes smaller than this (u/s per HUD update) count as neither gaining nor losing</summary>
 	private const float GainLossDeadZone = 2f;
 
-	/// <summary>The colour class of the shown speed: Nord gradient, gain / loss against the last update, or static</summary>
-	private string SpeedClassOf(float speed)
+	/// <summary>The colour class of the shown speed: Nord gradient, gain / loss since the last update, or static</summary>
+	private string SpeedClassOf(float speed, SpeedColorMode mode, string staticColor) => mode switch
 	{
-		var options = _player.Options;
-		float? last = _lastShownSpeed;
-		_lastShownSpeed = speed;
-		return options.SpeedColor switch
-		{
-			SpeedColorMode.Static => $"nc-{options.SpeedColorStatic}",
-			SpeedColorMode.GainLoss => last is not float before ? "nc-snow"
-				: Math.Abs(speed) - Math.Abs(before) > GainLossDeadZone ? "nc-green"
-				: Math.Abs(before) - Math.Abs(speed) > GainLossDeadZone ? "nc-red"
-				: "nc-snow",
-			_ => CustomHud.SpeedColorClass(speed),
-		};
-	}
+		SpeedColorMode.Static => $"nc-{staticColor}",
+		SpeedColorMode.GainLoss => _speedDelta > GainLossDeadZone ? "nc-green"
+			: _speedDelta < -GainLossDeadZone ? "nc-red"
+			: "nc-snow",
+		_ => CustomHud.SpeedColorClass(speed),
+	};
 
 	/// <summary>Prespeed: like the speed, but a single value has no gain / loss (snow then)</summary>
 	private string PrespeedClassOf(float speed) => _player.Options.SpeedColor switch
@@ -647,10 +658,10 @@ public class PlayerHud
 			else
 			{
 				_midMessages[slot] = null;
-				if (slot == 0 && options.CenterSpeed > 0 && shownSpeed is float speed)
+				if (slot == 0 && options.CenterHud && shownSpeed is float speed)
 				{
 					text = speed.ToString("0", CultureInfo.InvariantCulture);
-					colorClass = _speedClass;
+					colorClass = _centerSpeedClass;
 					size = options.CenterSpeed;
 					mono = options.CenterSpeedMono;
 					offset = options.CenterSpeedOffset;
