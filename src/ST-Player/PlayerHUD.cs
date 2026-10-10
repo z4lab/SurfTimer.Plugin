@@ -790,17 +790,17 @@ public class PlayerHud
 		{
 			new()
 			{
-				new("Pace", (pace.Live ? "" : "~") + FormatTime(pace.PaceTicks), "", Mono: true),
+				new("Pace", (pace.Live ? "" : "~") + FormatTime(pace.PaceTicks), ""),
 				new("", $"{(pace.DeltaTicks <= 0 ? "-" : "+")}{FormatTime(Math.Abs(pace.DeltaTicks))}",
-					pace.DeltaTicks <= 0 ? TimerColorActive : SlowerColor, Size: HudSize.Small, Mono: true),
+					pace.DeltaTicks <= 0 ? TimerColorActive : SlowerColor, Size: HudSize.Small),
 			},
 		};
 		if (options.HudPaceEnergy && pace.EnergyDiff is float energy && pace.SpeedDiff is float speedDiff)
 		{
 			rows.Add(
 			[
-				new("Energy", Signed(energy), energy >= 0 ? TimerColorActive : SlowerColor, Size: HudSize.Small, Mono: true),
-				new("Speed", Signed(speedDiff), speedDiff >= 0 ? TimerColorActive : SlowerColor, Size: HudSize.Small, Mono: true),
+				new("Energy", Signed(energy), energy >= 0 ? TimerColorActive : SlowerColor, Size: HudSize.Small),
+				new("Speed", Signed(speedDiff), speedDiff >= 0 ? TimerColorActive : SlowerColor, Size: HudSize.Small),
 			]);
 		}
 		return rows;
