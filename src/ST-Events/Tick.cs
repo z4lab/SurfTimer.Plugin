@@ -41,6 +41,7 @@ public partial class SurfTimer
 				if (player.Controller.PawnIsAlive && !player.IsPlacementPending)
 				{
 					player.Timer.Tick();
+					Sounds.CheckMissed(player); // Missed PB / WR sounds, once per run
 					player.ReplayRecorder.Tick(player);
 					player.TickIdle();
 					player.TickPendingStartRecording();
@@ -51,7 +52,6 @@ public partial class SurfTimer
 
 				player.HUD.Display(playerList.Values);
 				player.HUD.TickMenuKeys();
-				TickCenterSpeed(player); // Options - HUD - Center speed (CenterSpeed.cs)
 
 				// Playtime / attempts in batches
 				if (Server.TickCount % StatsService.FlushIntervalTicks == 0)

@@ -21,6 +21,24 @@ internal enum SpeedAxes
 	Z,
 }
 
+/// <summary>How speeds are coloured in the HUD (!options - HUD - Speed color)</summary>
+internal enum SpeedColorMode
+{
+	/// <summary>Nord gradient: slow cool blue to fast red</summary>
+	Gradient,
+	/// <summary>White, green while gaining speed, red while losing it</summary>
+	GainLoss,
+	/// <summary>One Nord colour of the player's choice</summary>
+	Static,
+}
+
+/// <summary>What the running timer turns yellow at once it's slower (!options - HUD)</summary>
+internal enum TimerWarning
+{
+	Pb,
+	Wr,
+}
+
 /// <summary>Which zone outlines a player sees (!options - Visibility)</summary>
 internal enum ZoneDisplay
 {
@@ -75,14 +93,25 @@ internal sealed class PlayerOptions
 	internal const string KeyZonesShow = "zones_show";
 	internal const string KeySpeedAxes = "speed_axes";
 	internal const string KeySoundVolume = "sound_volume";
-	/// <summary>Speed in the screen centre (CenterSpeed.cs): 0 off, 1-5 the size</summary>
+	/// <summary>Speed in the custom HUD's upper middle slot (above the crosshair): 0 off, 1-5 the size</summary>
 	internal const string KeyCenterSpeed = "center_speed";
-	/// <summary>Its height: steps above (+) / below (-) the crosshair</summary>
+	/// <summary>Its height: steps up (-) / down (+) from the slot's place, 10px each</summary>
 	internal const string KeyCenterSpeedOffset = "center_speed_offset";
+	internal const string KeyCenterSpeedMono = "center_speed_mono";
+	internal const string KeySpeedColor = "speed_color";
+	internal const string KeySpeedColorStatic = "speed_color_static";
+	internal const string KeyTimerWarning = "timer_warning";
 
 	internal const int CenterSpeedSizes = 5;
-	internal const int CenterSpeedMaxOffset = 12;
-	internal const int DefaultCenterSpeedOffset = -3;
+	internal const int CenterSpeedMaxOffset = 10;
+	internal const int DefaultCenterSpeedOffset = 0;
+
+	/// <summary>Static speed colours (Nord) - the layout's nc-&lt;key&gt; classes</summary>
+	internal static readonly (string Key, string Label)[] SpeedStaticColors =
+	[
+		("snow", "Snow"), ("frost", "Frost"), ("teal", "Teal"), ("blue", "Blue"), ("deep", "Deep blue"),
+		("red", "Red"), ("orange", "Orange"), ("yellow", "Yellow"), ("green", "Green"), ("purple", "Purple"),
+	];
 	/// <summary>Main switch for every sound (!quake)</summary>
 	internal const string KeySounds = "sounds";
 	/// <summary>Per kind of sound: sound_&lt;key&gt; (Sounds.Categories)</summary>
@@ -128,6 +157,10 @@ internal sealed class PlayerOptions
 	private int _soundVolume = DefaultSoundVolume;
 	private int _centerSpeed;
 	private int _centerSpeedOffset = DefaultCenterSpeedOffset;
+	private bool _centerSpeedMono = true;
+	private SpeedColorMode _speedColor = SpeedColorMode.Gradient;
+	private string _speedColorStatic = "snow";
+	private TimerWarning _timerWarning = TimerWarning.Pb;
 	private bool _sounds = true;
 	private readonly Dictionary<string, int> _hudPositions = new();
 
@@ -171,6 +204,13 @@ internal sealed class PlayerOptions
 			&& size is >= 0 and <= CenterSpeedSizes ? size : 0;
 		_centerSpeedOffset = _profile.Settings.TryGetValue(KeyCenterSpeedOffset, out var centerOffset) && int.TryParse(centerOffset, out int offset)
 			&& Math.Abs(offset) <= CenterSpeedMaxOffset ? offset : DefaultCenterSpeedOffset;
+		_centerSpeedMono = Bool(KeyCenterSpeedMono, true);
+		_speedColor = _profile.Settings.TryGetValue(KeySpeedColor, out var speedColor)
+			&& Enum.TryParse(speedColor, ignoreCase: true, out SpeedColorMode parsedColor) && Enum.IsDefined(parsedColor) ? parsedColor : SpeedColorMode.Gradient;
+		_speedColorStatic = _profile.Settings.TryGetValue(KeySpeedColorStatic, out var staticColor)
+			&& SpeedStaticColors.Any(c => c.Key == staticColor) ? staticColor : "snow";
+		_timerWarning = _profile.Settings.TryGetValue(KeyTimerWarning, out var warning)
+			&& Enum.TryParse(warning, ignoreCase: true, out TimerWarning parsedWarning) && Enum.IsDefined(parsedWarning) ? parsedWarning : TimerWarning.Pb;
 		_sounds = Bool(KeySounds, true);
 		_hudPositions.Clear();
 		foreach (string slot in CustomHud.SlotShift.Keys)
@@ -309,7 +349,7 @@ internal sealed class PlayerOptions
 		}
 	}
 
-	/// <summary>Steps above (+) / below (-) the crosshair</summary>
+	/// <summary>Steps up (-) / down (+) from the upper middle slot's place</summary>
 	internal int CenterSpeedOffset
 	{
 		get => _centerSpeedOffset;
@@ -321,6 +361,42 @@ internal sealed class PlayerOptions
 	}
 
 	/// <summary>Axes the HUD, prespeed and split speeds are shown with</summary>
+	/// <summary>The centre speed in the monospace font (digits don't shift)</summary>
+	internal bool CenterSpeedMono { get => _centerSpeedMono; set { _centerSpeedMono = value; Save(KeyCenterSpeedMono, value); } }
+
+	internal SpeedColorMode SpeedColor
+	{
+		get => _speedColor;
+		set
+		{
+			_speedColor = value;
+			_profile.SetSetting(KeySpeedColor, value.ToString().ToLowerInvariant());
+		}
+	}
+
+	/// <summary>Key of SpeedStaticColors used with SpeedColorMode.Static</summary>
+	internal string SpeedColorStatic
+	{
+		get => _speedColorStatic;
+		set
+		{
+			if (!SpeedStaticColors.Any(c => c.Key == value))
+				return;
+			_speedColorStatic = value;
+			_profile.SetSetting(KeySpeedColorStatic, value);
+		}
+	}
+
+	internal TimerWarning TimerWarning
+	{
+		get => _timerWarning;
+		set
+		{
+			_timerWarning = value;
+			_profile.SetSetting(KeyTimerWarning, value.ToString().ToLowerInvariant());
+		}
+	}
+
 	internal SpeedAxes SpeedAxes
 	{
 		get => _speedAxes;

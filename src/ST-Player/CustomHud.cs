@@ -75,6 +75,21 @@ internal static class CustomHud
 	/// </summary>
 	internal static readonly HashSet<string> MapMessageEntities = ["env_hudhint", "game_text"];
 
+	/// <summary>
+	/// Middle: three lines around the crosshair (st_mid_0 above it - the speed, st_mid_1 at it, st_mid_2 below), each
+	/// with msize-1..5 and an mpos-0..40 class (10px per step, MidCenter = at the crosshair).
+	/// </summary>
+	internal const string MidId = "st_mid";
+	internal const int MidSlots = 3;
+	internal const int MidCenter = 20;
+	internal const int MidMaxPosition = 40;
+	/// <summary>Where each middle slot sits by default, in mpos steps from the crosshair</summary>
+	private static readonly int[] MidBase = [-6, 0, 6];
+	internal static string MidSlotId(int slot) => $"st_mid_{slot}";
+
+	/// <summary>The mpos-# class number of a middle slot moved by offset steps (negative = up)</summary>
+	internal static int MidPosition(int slot, int offset) => Math.Clamp(MidCenter + MidBase[slot] + offset, 0, MidMaxPosition);
+
 	internal static string FieldRowId(int row) => $"st_fields_{row}";
 	internal static string FieldId(int row, int field) => $"st_field_{row}_{field}";
 	internal static string FieldLabelId(int row, int field) => $"st_field_{row}_{field}_lbl";
@@ -103,22 +118,22 @@ internal static class CustomHud
 	internal static string MenuItemPartId(int item, string part) => $"{MenuItemPrefix}{item}_{part}";
 
 	/// <summary>
-	/// Colour classes available in the layout's CSS, by the HUD's hex colours. Unknown = default white.
+	/// Colour classes available in the layout's CSS, by the HUD's hex colours (Nord). Unknown = default (snow white).
 	/// </summary>
 	internal static string? ColorClass(string hex) => hex.ToUpperInvariant() switch
 	{
-		"#4FC3F7" => "col-blue",
-		"#BA68C8" => "col-purple",
-		"#43A047" => "col-green",
-		"#7986CB" => "col-indigo",
-		"#FFD700" => "col-gold",
-		"#9E9E9E" => "col-grey",
-		"#E53935" => "col-red",
+		"#88C0D0" => "col-blue",
+		"#B48EAD" => "col-purple",
+		"#A3BE8C" => "col-green",
+		"#81A1C1" => "col-indigo",
+		"#EBCB8B" => "col-gold",
+		"#7B88A1" => "col-grey",
+		"#BF616A" => "col-red",
 		_ => null,
 	};
 
 	/// <summary>
-	/// The speed gradient (Extensions.GetSpeedColorGradient) as 9 fixed steps spd-0..spd-8.
+	/// The speed gradient (Extensions.GetSpeedColorGradient) as 9 fixed steps spd-0..spd-8 - Nord colours in the layout.
 	/// </summary>
 	internal static string SpeedColorClass(float velocity, float minSpeed = 240f, float maxSpeed = 4000f)
 	{

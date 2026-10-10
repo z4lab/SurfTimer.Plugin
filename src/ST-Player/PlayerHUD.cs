@@ -10,13 +10,16 @@ namespace SurfTimer;
 public class PlayerHud
 {
 	private readonly Player _player;
-	private readonly string TimerColor = "#4FC3F7";
-	private readonly string TimerColorPractice = "#BA68C8";
-	private readonly string TimerColorActive = "#43A047";
-	private readonly string RankColorPb = "#7986CB";
-	private readonly string RankColorWr = "#FFD700";
-	private readonly string SpectatorColor = "#9E9E9E";
-	private readonly string SlowerColor = "#E53935";
+	// Nord (nordtheme.com) - CustomHud.ColorClass maps each to the layout's colour class
+	private readonly string TimerColor = "#88C0D0";
+	private readonly string TimerColorPractice = "#B48EAD";
+	private readonly string TimerColorActive = "#A3BE8C";
+	/// <summary>Running, but already slower than the PB (or WR - !options - HUD - Timer warning)</summary>
+	private readonly string TimerColorMissed = "#EBCB8B";
+	private readonly string RankColorPb = "#81A1C1";
+	private readonly string RankColorWr = "#EBCB8B";
+	private readonly string SpectatorColor = "#7B88A1";
+	private readonly string SlowerColor = "#BF616A";
 
 	internal PlayerHud(Player Player)
 	{
@@ -84,8 +87,9 @@ public class PlayerHud
 	/// <param name="ColorClass">Body colour class for the custom HUD - derived from Color when null</param>
 	/// <param name="Size">Value size - the HTML HUD only distinguishes small from the rest</param>
 	/// <param name="Label">Draw the body as a label (small caps, muted) in the custom HUD, e.g. headers</param>
+	/// <param name="Mono">The body in the monospace font (changing numbers, e.g. a countdown)</param>
 	internal readonly record struct HudElement(string Title, string Body, string Color, string Suffix = "",
-		HudSize Size = HudSize.Medium, string? ColorClass = null, bool Label = false);
+		HudSize Size = HudSize.Medium, string? ColorClass = null, bool Label = false, bool Mono = false);
 
 	internal enum HudSize { Small, Medium, Large, XLarge }
 
@@ -123,13 +127,17 @@ public class PlayerHud
 	}
 
 	/// <summary>
-	/// Timer colour: idle, running or running in practice mode.
+	/// Timer colour: idle, running, running in practice mode, or running but already slower than the PB (or WR, the
+	/// viewer's Timer warning option) of this run.
 	/// </summary>
 	private string TimerColorOf(Player p)
 	{
 		if (!p.Timer.IsRunning)
 			return TimerColor;
-		return p.Timer.IsPracticeMode ? TimerColorPractice : TimerColorActive;
+		if (p.Timer.IsPracticeMode)
+			return TimerColorPractice;
+		int target = _player.Options.TimerWarning == TimerWarning.Wr ? RunTargets.WrTicks(p) : RunTargets.PbTicks(p);
+		return RunTargets.Missed(p, target) ? TimerColorMissed : TimerColorActive;
 	}
 
 	/// <summary>
@@ -156,18 +164,9 @@ public class PlayerHud
 
 	// The HUD runs every tick, so a bonus/stage index that's unset (0) or has no data must fall back to
 	// the map values instead of throwing - one exception here aborts the whole tick for everyone.
-	private static bool HasBonusData(Player p, int style) =>
-		HasEntry(p.Stats.BonusPB, p.Timer.Bonus, style)
-		&& HasEntry(SurfTimer.CurrentMap.BonusWR, p.Timer.Bonus, style)
-		&& HasEntry(SurfTimer.CurrentMap.BonusCompletions, p.Timer.Bonus, style);
+	private static bool HasBonusData(Player p, int style) => RunTargets.HasBonusData(p, style);
 
-	private static bool HasStageData(Player p, int style) =>
-		HasEntry(p.Stats.StagePB, p.Timer.Stage, style)
-		&& HasEntry(SurfTimer.CurrentMap.StageWR, p.Timer.Stage, style)
-		&& HasEntry(SurfTimer.CurrentMap.StageCompletions, p.Timer.Stage, style);
-
-	private static bool HasEntry<T>(Dictionary<int, T>[] byIndex, int index, int style) =>
-		index > 0 && index < byIndex.Length && byIndex[index] != null && byIndex[index].ContainsKey(style);
+	private static bool HasStageData(Player p, int style) => RunTargets.HasStageData(p, style);
 
 	/// <summary>
 	/// Rank for the current mode (map / stage / bonus)
@@ -333,7 +332,7 @@ public class PlayerHud
 
 	/// <param name="Kind">lbl (small caps label), val (value) or unit - null for an unused segment</param>
 	/// <param name="Size">sm / md / lg / xl - null for an unused segment</param>
-	private readonly record struct HudSegment(string Text, string? ColorClass, string? Kind, string? Size);
+	private readonly record struct HudSegment(string Text, string? ColorClass, string? Kind, string? Size, bool Mono = false);
 
 	// Slot updates are sent 16x/s at most, and each segment's text/class only when it changed
 	private const int CustomHudUpdateTicks = 4;
@@ -371,9 +370,16 @@ public class PlayerHud
 		// Whose data to show: our own while alive, otherwise whoever we spectate (player or replay bot)
 		var (subject, replay) = ResolveSubject(allPlayers);
 
+		// The shown speed's colour for this update (gain / loss compares with the last update)
+		var axes = _player.Options.SpeedAxes;
+		float? shownSpeed = subject != null ? Extensions.SpeedOf(subject.Controller, axes)
+			: replay?.Controller != null ? Extensions.SpeedOf(replay.Controller, axes) : null;
+		_speedClass = shownSpeed is float speedNow ? SpeedClassOf(speedNow) : "nc-snow";
+
 		// Panels the viewer turned off in !options (HUD) are sent empty, which collapses them
 		var options = _player.Options;
 		SendCenter(subject, replay);
+		SendMid(shownSpeed);
 		SendSlot(CustomHud.Top, options.HudTop ? TopRows(subject, replay) : []);
 		// Left: the run's splits - or, spectating the best segments bot, every segment WR it chains
 		var leftRows = subject != null ? SplitRowsKept(subject, options)
@@ -384,6 +390,11 @@ public class PlayerHud
 		var watched = subject?.Controller ?? replay?.Controller;
 		SendSlot(CustomHud.Right, options.HudSpectators ? SpectatorRows(allPlayers, watched) : []);
 		SendMenu(); // Refreshes live values (e.g. !spec times) - clicks re-render right away
+
+		// Accent colour of every block: the shown player's team (CT blue / T yellow)
+		string team = TeamClassOf(subject, replay);
+		foreach (string id in TeamAccentIds)
+			SendExclusive(id, "team", team);
 
 #if DEBUG
 		if (Server.TickCount >= _debugNextSummaryTick)
@@ -511,11 +522,11 @@ public class PlayerHud
 		var timer = new HudField("Timer",
 			[new FieldSegment(FormatTime(ticks, PlayerTimer.TimeFormatStyle.Full), CustomHud.ColorClass(timerColor), Mono: true)], Wide: true);
 		var speed = new HudField($"Speed {Extensions.SpeedLabel(axes)}",
-			[new FieldSegment(velocity.ToString("0", CultureInfo.InvariantCulture), CustomHud.SpeedColorClass(velocity), Mono: true)]);
+			[new FieldSegment(velocity.ToString("0", CultureInfo.InvariantCulture), _speedClass, Mono: true)]);
 
 		var prespeed = new HudField("Prespeed",
 			[prespeedSpeed != null
-				? new FieldSegment(prespeedSpeed.Value.ToString("0", CultureInfo.InvariantCulture), CustomHud.SpeedColorClass(prespeedSpeed.Value), Mono: true)
+				? new FieldSegment(prespeedSpeed.Value.ToString("0", CultureInfo.InvariantCulture), PrespeedClassOf(prespeedSpeed.Value), Mono: true)
 				: NotAvailable]);
 
 		var held = buttons ?? 0;
@@ -546,6 +557,118 @@ public class PlayerHud
 			for (int f = 0; f < CustomHud.FieldsPerRow; f++)
 				SendField(r, f, f < row.Count ? row[f] : null);
 		}
+	}
+
+	// ---- Speed colour (!options - HUD - Speed color) ----
+
+	private string _speedClass = "nc-snow";
+	private float? _lastShownSpeed;
+	/// <summary>Speed changes smaller than this (u/s per HUD update) count as neither gaining nor losing</summary>
+	private const float GainLossDeadZone = 2f;
+
+	/// <summary>The colour class of the shown speed: Nord gradient, gain / loss against the last update, or static</summary>
+	private string SpeedClassOf(float speed)
+	{
+		var options = _player.Options;
+		float? last = _lastShownSpeed;
+		_lastShownSpeed = speed;
+		return options.SpeedColor switch
+		{
+			SpeedColorMode.Static => $"nc-{options.SpeedColorStatic}",
+			SpeedColorMode.GainLoss => last is not float before ? "nc-snow"
+				: Math.Abs(speed) - Math.Abs(before) > GainLossDeadZone ? "nc-green"
+				: Math.Abs(before) - Math.Abs(speed) > GainLossDeadZone ? "nc-red"
+				: "nc-snow",
+			_ => CustomHud.SpeedColorClass(speed),
+		};
+	}
+
+	/// <summary>Prespeed: like the speed, but a single value has no gain / loss (snow then)</summary>
+	private string PrespeedClassOf(float speed) => _player.Options.SpeedColor switch
+	{
+		SpeedColorMode.Static => $"nc-{_player.Options.SpeedColorStatic}",
+		SpeedColorMode.GainLoss => "nc-snow",
+		_ => CustomHud.SpeedColorClass(speed),
+	};
+
+	// ---- Team accent ----
+
+	private static readonly string[] TeamAccentIds =
+	[
+		CustomHud.SlotId(CustomHud.Top), CustomHud.SlotId(CustomHud.Center), CustomHud.SlotId(CustomHud.Left),
+		CustomHud.SlotId(CustomHud.Right), CustomHud.MidId, CustomHud.MenuId,
+	];
+
+	/// <summary>
+	/// team-t / team-ct for the HUD's accent colour: the shown player's team - our own while alive, the spectated
+	/// player's (replay bots are T) while spectating, CT otherwise.
+	/// </summary>
+	private string TeamClassOf(Player? subject, ReplayPlayer? replay)
+	{
+		var team = subject?.Controller.Team ?? replay?.Controller?.Team ?? _player.Controller.Team;
+		return team == CsTeam.Terrorist ? "team-t" : "team-ct";
+	}
+
+	// ---- Middle slots: above, at and below the crosshair ----
+
+	/// <summary>A message in a middle slot until a tick (later: admin messages)</summary>
+	private readonly record struct MidMessage(string Text, string? ColorClass, int Size, bool Mono, int UntilTick);
+	private readonly MidMessage?[] _midMessages = new MidMessage?[CustomHud.MidSlots];
+
+	/// <summary>
+	/// Shows a message in a middle slot (0 above the crosshair, 1 at it, 2 below) for some seconds - in slot 0 instead
+	/// of the speed. Custom HUD only.
+	/// </summary>
+	internal void ShowCenterMessage(int slot, string text, int seconds, string? colorClass = null, int size = 3, bool mono = false)
+	{
+		if (slot < 0 || slot >= CustomHud.MidSlots)
+			return;
+		_midMessages[slot] = new MidMessage(text, colorClass, Math.Clamp(size, 1, PlayerOptions.CenterSpeedSizes), mono,
+			Server.TickCount + Math.Max(1, seconds) * 64);
+	}
+
+	/// <param name="shownSpeed">The shown player's / replay's speed - null when nothing is shown</param>
+	private void SendMid(float? shownSpeed)
+	{
+		var options = _player.Options;
+		bool any = false;
+		for (int slot = 0; slot < CustomHud.MidSlots; slot++)
+		{
+			string id = CustomHud.MidSlotId(slot);
+			string text = "";
+			string? colorClass = null;
+			int size = 3, offset = 0;
+			bool mono = false;
+
+			if (_midMessages[slot] is MidMessage message && message.UntilTick > Server.TickCount)
+			{
+				(text, colorClass, size, mono) = (message.Text, message.ColorClass, message.Size, message.Mono);
+			}
+			else
+			{
+				_midMessages[slot] = null;
+				if (slot == 0 && options.CenterSpeed > 0 && shownSpeed is float speed)
+				{
+					text = speed.ToString("0", CultureInfo.InvariantCulture);
+					colorClass = _speedClass;
+					size = options.CenterSpeed;
+					mono = options.CenterSpeedMono;
+					offset = options.CenterSpeedOffset;
+				}
+			}
+
+			SendText(id, text);
+			SendClass(id, "hidden", text.Length == 0);
+			if (text.Length == 0)
+				continue;
+
+			any = true;
+			SendExclusive(id, "size", $"msize-{size}");
+			SendExclusive(id, "pos", $"mpos-{CustomHud.MidPosition(slot, offset)}");
+			SendExclusive(id, "color", colorClass);
+			SendExclusive(id, "font", mono ? CustomHud.MonoFontClass : null);
+		}
+		SendClass(CustomHud.MidId, "hidden", !any);
 	}
 
 	/// <param name="field">null hides the field</param>
@@ -597,7 +720,7 @@ public class PlayerHud
 			if (e.Title != "")
 				segments.Add(new HudSegment(e.Title, null, "lbl", "sm"));
 			segments.Add(new HudSegment(e.Body, e.ColorClass ?? CustomHud.ColorClass(e.Color),
-				e.Label ? "lbl" : "val", e.Label ? "sm" : SizeClass(e.Size)));
+				e.Label ? "lbl" : "val", e.Label ? "sm" : SizeClass(e.Size), e.Mono));
 			if (e.Suffix.Trim() != "")
 				segments.Add(new HudSegment(e.Suffix.Trim(), null, "unit", "sm"));
 		}
@@ -640,6 +763,7 @@ public class PlayerHud
 				SendExclusive(id, "kind", segment.Kind);
 				SendExclusive(id, "size", segment.Size);
 				SendExclusive(id, "color", segment.ColorClass);
+				SendExclusive(id, "font", segment.Mono ? CustomHud.MonoFontClass : null);
 			}
 		}
 	}
@@ -1391,7 +1515,7 @@ public class PlayerHud
 		float exitSpeed = Extensions.Speed(exitVelocity, axes);
 
 		// Runs inside zone touch handlers - an unknown segment must not throw and abort the handler
-		if (!HasEntry(_player.Stats.CheckpointPB, checkpoint, style) || !HasEntry(SurfTimer.CurrentMap.CheckpointWR, checkpoint, style))
+		if (!RunTargets.HasEntry(_player.Stats.CheckpointPB, checkpoint, style) || !RunTargets.HasEntry(SurfTimer.CurrentMap.CheckpointWR, checkpoint, style))
 			return;
 
 		string strPbDifference =

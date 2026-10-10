@@ -143,6 +143,8 @@ Everything here is saved to your profile. The menu reopens on the tab and page w
 
 If the server has the custom HUD turned off, a note at the top says so. Your settings take effect once it's turned on.
 
+The HUD uses the [Nord](https://www.nordtheme.com) colors. Its accent (field borders, side panels, menus) is blue on CT and yellow on T - while spectating, the team of who you watch.
+
 | Option | Default | Description |
 |---|---|---|
 | **Default** preset | ✔ | Timer, Speed \| Prespeed, Keys, Sync |
@@ -151,7 +153,9 @@ If the server has the custom HUD turned off, a note at the top says so. Your set
 | **Keys first** preset | | Keys, Timer, Speed \| Prespeed, Sync |
 | Custom layout › | | Set each field yourself (see below). |
 | Speed | XY | Each press switches: **XY** (horizontal) → **XYZ** (3D) → **Z** (vertical, negative = falling). Applies to the HUD speed, prespeed and split speeds. |
-| Center speed › | Off | Your speed in the middle of the screen, at the crosshair, in a monospace font. Works without the custom HUD. **Size** steps through 1–5 and off. **Move up** / **Move down** shift it above or below the crosshair (12 steps each way, default 3 below). It's drawn in the world just in front of you, so it trails your view a little on fast mouse movement, and your weapon and the HUD draw over it. Only you see it. |
+| Center speed › | Off | Your speed in the middle of the screen, just above the crosshair (custom HUD). **Size** steps through 1–5 and off, **Move up** / **Move down** shift it (10 steps each way, 10px each), **Monospace** keeps the digits in place (on). Uses the speed color below. |
+| Speed color › | Gradient | How the speed, prespeed and center speed are colored: **Gradient** (Nord colors, slow blue → fast red), **Gain / loss** (white, green while gaining speed, red while losing), or one Nord color (snow, frost, teal, blue, deep blue, red, orange, yellow, green, purple). |
+| Timer warning | PB | The running timer is green, and turns yellow once your run is slower than your **PB** of it (map, stage or bonus) - or the **WR**. Practice runs stay purple. |
 | Top bar | On | Map, tier and stage, then a smaller row with rank, PB and WR. With [SurfTimer.MapChooser](https://github.com/z4lab/SurfTimer.MapChooser), a third row shows the time left, the running vote and the map's end (needs the HUD addon with four top rows). |
 | Splits panel › | PB | Left-side panel that compares your run against a target (see below). |
 | Keep last splits | On | *Only shown when the splits panel is on.* Keeps the last run's splits after a fail or reset, until your next run starts. |
@@ -226,9 +230,11 @@ Every sound plays only for you, at your volume. Turning a sound on plays a sampl
 | Your record | On | Your WR on the map, a stage, a bonus or a checkpoint. |
 | Others' records | Off | Another player sets a WR. |
 | Reset warning | On | The first `!r` during a run (Options › Gameplay › Confirm !r). |
+| Missed PB | On | Your run (map, stage or bonus) got slower than your PB of it. Once per run. |
+| Missed WR | On | Your run got slower than the WR. Once per run. |
 | Map vote / Vote countdown | On | *Only with [SurfTimer.MapChooser](https://github.com/z4lab/SurfTimer.MapChooser).* A vote starts / its last 3 seconds. Addons add their sounds here. |
 
-The server can change which CS2 sound event each kind plays in `timer_settings.json`: `sound_timer_start`, `sound_ahead_pb`, `sound_pb`, `sound_record`, `sound_others_record`, `sound_reset_confirm` (`""` = no sound).
+The server can change which CS2 sound event each kind plays in `timer_settings.json`: `sound_timer_start`, `sound_ahead_pb`, `sound_pb`, `sound_record`, `sound_others_record`, `sound_reset_confirm`, `sound_missed_pb`, `sound_missed_wr` (`""` = no sound).
 
 </details>
 
@@ -398,8 +404,6 @@ Info rows: SurfTimer version/commit, players and tickrate, memory.
 | Idle threshold | Stops replay recording for idle players (0 = off, max 3600 s). |
 | Resume expiry | Days a player's saved run is kept after they leave (0 = never expires, max 365). Default 3. `resume_expiry_days` |
 | Resume expiry (VIP) | The same for VIPs (VIP, admin or root flag from chat_settings.json). Default 7. `resume_expiry_vip_days` |
-
-The font of Options › HUD › Center speed is set in `timer_settings.json`: `center_speed_font` (default `Consolas`). Use a monospace font your players' PCs have, so the number doesn't shift as its digits change.
 | Replay bots max | How many requested bots can run at a time (1–10). |
 | Saveloc limit | Savelocs per map, all players combined. |
 | Start speed cap | Default for all maps (0 = no cap). |

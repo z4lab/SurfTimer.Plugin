@@ -180,14 +180,16 @@ unsafe static class Extensions
 	{
 		velocity = Math.Abs(velocity); // Z speeds are signed
 		// Key colors (HEX -> RGB)
+		// Nord colours (nordtheme.com), the same stops as the custom HUD's spd-0 .. spd-8
 		(int R, int G, int B)[] gradient = new (int, int, int)[]
 		{
-			(79, 195, 247), // blue #4FC3F7
-            (46, 159, 101), // green #2E9F65
-            (255, 255, 0),  // yellow #FFFF00
-            (255, 165, 0),  // orange #FFA500
-            (255, 0, 0)     // red #FF0000
-        };
+			(94, 129, 172),  // deep blue #5E81AC
+			(136, 192, 208), // frost #88C0D0
+			(163, 190, 140), // green #A3BE8C
+			(235, 203, 139), // yellow #EBCB8B
+			(208, 135, 112), // orange #D08770
+			(191, 97, 106),  // red #BF616A
+		};
 
 		// Limit velocity
 		velocity = Math.Clamp(velocity, minSpeed, maxSpeed);

@@ -125,7 +125,7 @@ public sealed record SurfMapInfo(int Id, string Name, int Tier, bool Ranked, ulo
 public sealed record MapFinish(CCSPlayerController Player, ulong SteamId64, int MapId, int Style, int RunTimeTicks,
 	bool FirstCompletion, bool Improved);
 
-/// <summary>The colours the custom HUD layout has</summary>
+/// <summary>The colours the custom HUD layout has (Nord palette)</summary>
 public enum HudColor
 {
 	Default,
@@ -159,4 +159,6 @@ public enum HudRow
 
 /// <param name="Label">Small label before the value ("Time left"), empty for none</param>
 /// <param name="Value">The value ("12:34")</param>
-public sealed record HudValue(string Label, string Value, HudColor Color = HudColor.Default, HudRow Row = HudRow.Main);
+/// <param name="Monospace">The value in the monospace font - for numbers that keep changing (a countdown)</param>
+public sealed record HudValue(string Label, string Value, HudColor Color = HudColor.Default, HudRow Row = HudRow.Main,
+	bool Monospace = false);

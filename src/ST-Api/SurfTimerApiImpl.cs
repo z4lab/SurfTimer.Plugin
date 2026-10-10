@@ -99,21 +99,21 @@ internal sealed class SurfTimerApiImpl(SurfTimer plugin, ILogger logger) : ISurf
 			if (value == null || value.Value.Length == 0 || value.Row != row)
 				continue;
 			elements.Add(new PlayerHud.HudElement(value.Label, value.Value, HexOf(value.Color),
-				Size: row == HudRow.Main ? PlayerHud.HudSize.Medium : PlayerHud.HudSize.Small));
+				Size: row == HudRow.Main ? PlayerHud.HudSize.Medium : PlayerHud.HudSize.Small, Mono: value.Monospace));
 		}
 		return elements;
 	}
 
-	/// <summary>The HUD's hex colours (CustomHud.ColorClass knows them)</summary>
+	/// <summary>The HUD's hex colours - Nord (CustomHud.ColorClass knows them)</summary>
 	private static string HexOf(HudColor color) => color switch
 	{
-		HudColor.Blue => "#4FC3F7",
-		HudColor.Purple => "#BA68C8",
-		HudColor.Green => "#43A047",
-		HudColor.Indigo => "#7986CB",
-		HudColor.Gold => "#FFD700",
-		HudColor.Grey => "#9E9E9E",
-		HudColor.Red => "#E53935",
+		HudColor.Blue => "#88C0D0",
+		HudColor.Purple => "#B48EAD",
+		HudColor.Green => "#A3BE8C",
+		HudColor.Indigo => "#81A1C1",
+		HudColor.Gold => "#EBCB8B",
+		HudColor.Grey => "#7B88A1",
+		HudColor.Red => "#BF616A",
 		_ => "",
 	};
 

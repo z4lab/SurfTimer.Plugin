@@ -316,7 +316,6 @@ public partial class SurfTimer
 					// Release cursor mode, or whoever gets this slot next could start with it
 					playerData.HUD.CloseMenu();
 					PlayerStateService.SaveFinal(playerData, "disconnect"); // The running run, to resume (any server)
-					RemoveCenterSpeed(playerData.CenterSpeedView);
 					StatsService.Flush(playerData, final: true); // Also closes the session
 					playerList.TryRemove(userId, out _);
 				}

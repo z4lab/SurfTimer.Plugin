@@ -37,7 +37,14 @@ internal static class Sounds
 	internal static readonly SoundCategory ResetConfirm =
 		new("reset_confirm", "Reset warning", "first !r during a run", true, "UIPanorama.generic_button_press", Pitch: 0.7f);
 
-	private static readonly List<SoundCategory> Builtin = [TimerStart, AheadOfPb, Pb, Record, OthersRecord, ResetConfirm];
+	// The moment a running run gets slower than the PB / the WR (once per run) - verify the event in game, servers can
+	// change it (sound_missed_pb / sound_missed_wr)
+	internal static readonly SoundCategory MissedPb =
+		new("missed_pb", "Missed PB", "your run got slower than your PB", true, "UIPanorama.round_report_odds_dn");
+	internal static readonly SoundCategory MissedWr =
+		new("missed_wr", "Missed WR", "your run got slower than the WR", true, "UIPanorama.round_report_odds_dn", Pitch: 0.75f);
+
+	private static readonly List<SoundCategory> Builtin = [TimerStart, AheadOfPb, Pb, Record, OthersRecord, ResetConfirm, MissedPb, MissedWr];
 	private static readonly List<SoundCategory> Addon = [];
 
 	/// <summary>All kinds in !options order: the timer's, then the addons'</summary>
@@ -84,6 +91,34 @@ internal static class Sounds
 
 			controller.EmitSound(sound, new RecipientFilter { controller }, volume / 100f, pitch);
 		});
+	}
+
+	/// <summary>
+	/// Every tick while alive: once per run, the moment the running run (map / stage / bonus) gets slower than the
+	/// player's PB and the WR of it - each its own sound. A new run (the timer reset) can play them again.
+	/// </summary>
+	internal static void CheckMissed(Player player)
+	{
+		var timer = player.Timer;
+		if (!timer.IsRunning || timer.IsPracticeMode || timer.Ticks < player.MissedCheckTicks)
+		{
+			player.MissedPbPlayed = false;
+			player.MissedWrPlayed = false;
+		}
+		player.MissedCheckTicks = timer.IsRunning ? timer.Ticks : 0;
+		if (!timer.IsRunning || timer.IsPracticeMode)
+			return;
+
+		if (!player.MissedWrPlayed && RunTargets.Missed(player, RunTargets.WrTicks(player)))
+		{
+			player.MissedWrPlayed = true;
+			Play(player, MissedWr);
+		}
+		if (!player.MissedPbPlayed && RunTargets.Missed(player, RunTargets.PbTicks(player)))
+		{
+			player.MissedPbPlayed = true;
+			Play(player, MissedPb);
+		}
 	}
 
 	/// <summary>A record: the subject's own sound, and everyone else's "others' records" sound</summary>

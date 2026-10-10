@@ -77,8 +77,10 @@ public class Player
 	/// <summary>The saved in-progress run of this player on this map (PlayerStateService)</summary>
 	internal RunStateTracker RunState { get; } = new();
 
-	/// <summary>Options - HUD - Center speed: the speed text at the crosshair (CenterSpeed.cs)</summary>
-	internal CenterSpeedView CenterSpeedView { get; } = new();
+	// The missed PB / WR sounds were played for the current run (Sounds.CheckMissed) - and its ticks when last checked
+	internal bool MissedPbPlayed { get; set; }
+	internal bool MissedWrPlayed { get; set; }
+	internal int MissedCheckTicks { get; set; }
 
 	internal bool IsOnCourse(ZoneInfo zone) => zone.Type switch
 	{
