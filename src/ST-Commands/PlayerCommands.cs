@@ -449,7 +449,7 @@ public partial class SurfTimer
 				return;
 			}
 
-			MenuPresenter.Show(oPlayer, new HudMenu("Spectate · M or !r to rejoin", [new HudMenuTab("Players", items)]));
+			MenuPresenter.Show(oPlayer, new HudMenu("Spectate · !back or M to rejoin", [new HudMenuTab("Players", items)]));
 			return;
 		}
 
@@ -516,7 +516,7 @@ public partial class SurfTimer
 	}
 
 	/// <summary>
-	/// Moves the spectator to Spectator team (abandoning their run) and points their first-person
+	/// Moves the spectator to Spectator team (their run paused) and points their first-person
 	/// view at target - the CS2 equivalent of SourceMod's ChangeClientTeam + m_hObserverTarget +
 	/// m_iObserverMode. Waits until both the observer pawn exists and the target is alive, so
 	/// callers can invoke it right after requesting/respawning a bot.
@@ -528,12 +528,10 @@ public partial class SurfTimer
 			if (!spectator.IsValid)
 				return;
 
+			// The run is paused like spectating through the M menu (the timer only counts while alive) - coming back
+			// (!rs / !back, joining a team) continues it from its stage / bonus start (RunResume.cs)
 			if (playerList.TryGetValue(spectator.UserId ?? 0, out var oPlayer))
-			{
-				RememberSpecReturn(oPlayer); // Coming back puts them on that stage / bonus again
-				oPlayer.Timer.Reset();
-				oPlayer.Stats.ThisRun.Checkpoints.Clear();
-			}
+				RememberSpecReturn(oPlayer);
 
 			spectator.MoveToSpectator();
 

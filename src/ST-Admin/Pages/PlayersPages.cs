@@ -94,7 +94,7 @@ public partial class SurfTimer
 		if (online != null && IsSpectatable(online.Controller) && !online.Controller.Equals(ctx.Player.Controller))
 		{
 			var target = online.Controller;
-			rows.Add(ctx.Act("Spectate", "", "you leave your run", () => SpectateTarget(ctx.Player.Controller, target), closes: true));
+			rows.Add(ctx.Act("Spectate", "", "your run is paused", () => SpectateTarget(ctx.Player.Controller, target), closes: true));
 		}
 
 		rows.Add(ctx.Nav("Names", "", "name history", () => AdminNamesPage(playerId, name)));

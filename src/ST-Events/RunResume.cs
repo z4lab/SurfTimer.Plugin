@@ -274,9 +274,9 @@ public partial class SurfTimer
 	}
 
 	/// <summary>
-	/// Back from spectator: a paused run (spectator through the M menu - the timer only stops counting) goes on from its
-	/// stage / bonus start like !back. Otherwise (!spec ended the run) the bonus, or on staged maps the stage, they were
-	/// on - its start in stage mode - else the map start.
+	/// Back from spectator: a paused run (spectating only stops the timer counting) goes on from its stage / bonus start
+	/// like !back. Without one (the timer wasn't running) the bonus, or on staged maps the stage, they were on - its start
+	/// in stage mode - else the map start.
 	/// </summary>
 	private void ReturnFromSpectator(Player p, SpecReturn? ret)
 	{

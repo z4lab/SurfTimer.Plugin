@@ -44,7 +44,7 @@ Some menu rows ask you to type something in chat. Type `!cancel` to abort.
   - A saved run is kept for **3 days** (**7 days** for VIPs). The server can change both.
   - It isn't restored if the map's zones changed since. `!r`, `!rs`, `!s`, `!b` or loading a saveloc before it's restored starts you over instead.
   - Practice runs (from a saveloc) come back as practice.
-- **Spectating** through the M menu pauses your run (the time stops). `!rs` / `!back` or joining a team again puts you at the start of the stage or bonus you were on, and the run goes on. `!spec` ends your run: coming back puts you at the start of the bonus you were on, or on staged maps the stage you were on (stage mode). Otherwise the map start.
+- **Spectating** (`!spec` or the M menu) pauses your run: the time stops. `!rs` / `!back` or joining a team again puts you at the start of the stage or bonus you were on, and the run goes on. `!r` starts over instead. Without a running timer, coming back puts you at the start of the bonus you were on, or on staged maps the stage you were on (stage mode). Otherwise the map start.
 
 </details>
 
@@ -81,7 +81,7 @@ Some menu rows ask you to type something in chat. Type `!cancel` to abort.
 | Command | Aliases | What it does |
 |---|---|---|
 | `!replay` | | Replay menu. Tabs: **Map** (WR, best segments, your PB), **Stages**, **Bonuses**, **Checkpoints**, **Your PBs**. |
-| `!spec [name]` | | Spectates a player or bot by (partial) name. Without a name it opens a picker. |
+| `!spec [name]` | | Spectates a player or bot by (partial) name. Without a name it opens a picker. Your run is paused: `!back` continues it. |
 | `!rbpause` | `!replaybotpause` | Pauses the replay bot you're spectating. |
 | `!rbplay` | | Restarts the spectated replay from the beginning. |
 | `!rbflip` | `!replaybotflip` | Plays the spectated replay forwards or backwards. |
