@@ -349,6 +349,9 @@ public partial class SurfTimer
 			() => AdminNumberSettingPage("Replay bots max", "replay_pool_cap", () => Config.ReplayPoolCap, [1], 1, 10, "")));
 		rows.Add(ctx.Nav("Saveloc limit", Config.SavelocLimit.ToString(), "savelocs per map, all players",
 			() => AdminNumberSettingPage("Saveloc limit", "saveloc_limit", () => Config.SavelocLimit, [100, 1000], 1, 100000, "")));
+		rows.Add(ctx.Nav("Ghost orb respawn", Config.GhostOrbTicks == 1 ? "every tick" : $"every {Config.GhostOrbTicks} ticks",
+			"smoother ghost orb (1) or fewer entities",
+			() => AdminNumberSettingPage("Ghost orb respawn", "ghost_orb_ticks", () => Config.GhostOrbTicks, [1], 1, 16, " ticks")));
 
 		rows.Add(ctx.Nav("Start speed cap", Config.StartSpeedCap <= 0 ? "no cap" : $"{Config.StartSpeedCap} u/s", "default for all maps",
 			() => AdminNumberSettingPage("Start speed cap", "start_speed_cap", () => Config.StartSpeedCap, [10, 50], 0, 10000, " u/s")));

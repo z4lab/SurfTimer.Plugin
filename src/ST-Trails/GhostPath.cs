@@ -12,7 +12,8 @@ namespace SurfTimer;
 ///   square where it jumped and a triangle where it crouched (down) / stood up (up) - in a start zone from the start;
 /// - an orb racing them: where the target was at their run time.
 /// Beams can't be moved once spawned (clients draw them where they spawned - Trails.cs), so the path is a rolling set of
-/// static segments and the orb is spawned again when it moves. Updated every GhostUpdateTicks per player.
+/// static segments and the orb is spawned again when it moves. The path is updated every GhostUpdateTicks per player, the
+/// orb every Config.GhostOrbTicks (timer_settings ghost_orb_ticks, Server tab).
 /// </summary>
 public partial class SurfTimer
 {
@@ -115,7 +116,11 @@ public partial class SurfTimer
 		foreach (var p in playerList.Values)
 		{
 			var controller = p.Controller;
-			if (!controller.IsValid || controller.IsBot || (now + controller.Slot) % GhostUpdateTicks != 0)
+			if (!controller.IsValid || controller.IsBot)
+				continue;
+			bool pathTick = (now + controller.Slot) % GhostUpdateTicks == 0;
+			bool orbTick = (now + controller.Slot) % Config.GhostOrbTicks == 0;
+			if (!pathTick && !orbTick)
 				continue;
 
 			var options = p.Options;
@@ -125,11 +130,11 @@ public partial class SurfTimer
 				continue;
 			}
 
-			UpdateGhost(p, now);
+			UpdateGhost(p, now, pathTick, orbTick);
 		}
 	}
 
-	private void UpdateGhost(Player p, int now)
+	private void UpdateGhost(Player p, int now, bool pathTick, bool orbTick)
 	{
 		var controller = p.Controller;
 		var options = p.Options;
@@ -156,18 +161,20 @@ public partial class SurfTimer
 		bool inStart = !running && p.IsTouchingAnyStartZone;
 
 		// The path ahead: from where the player is on it (from its start in a start zone)
-		if (options.GhostPath && (running || inStart))
+		if (pathTick && options.GhostPath && (running || inStart))
 		{
 			int anchor = inStart ? 0 : MatchGhost(state, path, controller, now);
 			if (anchor >= 0)
 				DrawGhostWindow(state, path, anchor, anchor + options.GhostSeconds * 64, options.GhostMarkers);
 		}
-		else
+		else if (pathTick)
 		{
 			ClearGhostPath(state);
 		}
 
 		// The orb: where the target was at the player's run time
+		if (!orbTick)
+			return;
 		if (options.GhostOrb && running)
 			DrawGhostOrb(state, path, Math.Min(p.Timer.Ticks, path.Count - 1));
 		else

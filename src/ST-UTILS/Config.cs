@@ -147,6 +147,7 @@ public static class Config
 		ResumeExpiryDays = Math.Clamp(TimerSettings.GetInt("resume_expiry_days", 3), 0, 365);
 		ResumeExpiryVipDays = Math.Clamp(TimerSettings.GetInt("resume_expiry_vip_days", 7), 0, 365);
 		SavelocLimit = Math.Max(1, TimerSettings.GetInt("saveloc_limit", 10000));
+		GhostOrbTicks = Math.Clamp(TimerSettings.GetInt("ghost_orb_ticks", 1), 1, 16);
 		WorkshopContentPath = TimerSettings.GetString("workshop_content_path", "").Trim();
 		ClanTagsEnabled = TimerSettings.GetBool("clan_tags_enabled", true);
 		CountryClanTag = TimerSettings.GetBool("country_clan_tag", true);
@@ -175,6 +176,12 @@ public static class Config
 	public static string WorkshopContentPath { get; private set; } = TimerSettings.GetString("workshop_content_path", "").Trim();
 
 	public static int SavelocLimit { get; private set; } = Math.Max(1, TimerSettings.GetInt("saveloc_limit", 10000));
+
+	/// <summary>
+	/// Every how many ticks a player's ghost orb is spawned again where it moved (GhostPath.cs) - 1 is smoothest, higher
+	/// spawns fewer entities.
+	/// </summary>
+	public static int GhostOrbTicks { get; private set; } = Math.Clamp(TimerSettings.GetInt("ghost_orb_ticks", 1), 1, 16);
 
 	public static int IdleThresholdSeconds { get; private set; } = Math.Max(0, TimerSettings.GetInt("idle_threshold_seconds", 60));
 
