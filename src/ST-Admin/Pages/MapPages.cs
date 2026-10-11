@@ -325,8 +325,6 @@ public partial class SurfTimer
 					ctx.Session.Status = "Runs start without a name";
 				}));
 		}
-		if (ctx.Player.Controller.PlayerPawn.Value is { IsValid: true } pawn)
-			rows.Add(ctx.Act("Your state", FilterState.Capture(pawn).Describe(), "what filters see on you now", () => { }));
 		return rows;
 	});
 

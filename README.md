@@ -76,9 +76,8 @@ The timer keeps that in line:
 - Walking into a start zone changes nothing (the map handles that).
 - On maps with a start name set, a run that starts with another name gets the start name (logged).
 
-Map admins: `!mapfilters` prints your contexts and name, the map's filters and the triggers using them (to your
-console and the server log). What the triggers do (e.g. `AddContext`) shows in a map source viewer. Not covered: attributes (`filter_activator_attribute_int`), classnames, context
-expiry times and the map's delayed outputs still pending when you teleport.
+Not covered: attributes (`filter_activator_attribute_int`), classnames, context expiry times and the map's delayed
+outputs still pending when you teleport.
 
 </details>
 
@@ -275,7 +274,7 @@ Permissions are granted through CounterStrikeSharp (`admins.json` / admin groups
 | Permission | Grants |
 |---|---|
 | `@css/root` | Every admin panel tab, `!changemap`, the root name and trail color |
-| `@surftimer/map` | Admin panel › **Map** tab (map data, zones, map settings), `!mapfilters` |
+| `@surftimer/map` | Admin panel › **Map** tab (map data, zones, map settings) |
 | `@surftimer/records` | Admin panel › **Records** tab |
 | `@surftimer/players` | Admin panel › **Players** tab |
 | `@surftimer/server` | Admin panel › **Server** tab (timer settings, chat, trails, bots) |
@@ -332,7 +331,7 @@ Every change made in the panel is written to the **Audit** log.
 | Exit speed limit | Caps your speed when you leave a run start. |
 | Exit limit value › | ±10 / ±50, or Use default. |
 | Record replays | Stores replays of new PBs. |
-| Filters › | Map filter names (see **Map filters**). **Reset on start teleports**: `!r` / `!s` / `!b` clear your contexts and set the start name (default). Turn it off for maps that give the state only once at the very start. **Start name**: the name runs start with, also checked when a run starts. Per stage / bonus as custom keys `filter_start_name_s3`, `filter_start_name_b1`. **Your state** shows your contexts and name right now. |
+| Filters › | Map filter names (see **Map filters**). **Reset on start teleports**: `!r` / `!s` / `!b` clear your contexts and set the start name (default). Turn it off for maps that give the state only once at the very start. **Start name**: the name runs start with, also checked when a run starts. Per stage / bonus as custom keys `filter_start_name_s3`, `filter_start_name_b1`. |
 | Cvars › | Movement cvars for this map only. Each one shows its current and server value. You can **Set for this map** or **Remove override**. Server values come back at map end. |
 | Custom keys › | Free key/value notes. Add (`key value` in chat), change or remove. |
 

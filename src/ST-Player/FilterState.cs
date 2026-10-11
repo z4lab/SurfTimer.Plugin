@@ -8,7 +8,7 @@ namespace SurfTimer;
 /// What map filters check on a player: their response contexts (filter_activator_context - the CS2 way, e.g.
 /// "!activator AddContext pass:1" and "ClearContext") and their targetname (filter_activator_name - CS:GO maps gave it
 /// with AddOutput, which does nothing in CS2). Maps gate later parts with it so they can't be skipped - savelocs, resumed
-/// runs and the timer's start teleports carry or reset it (README: Map filters). !mapfilters shows what a map checks.
+/// runs and the timer's start teleports carry or reset it (README: Map filters).
 /// </summary>
 internal sealed class FilterState(string name, IReadOnlyList<(string Name, string Value)> contexts)
 {
