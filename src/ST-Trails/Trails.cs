@@ -229,7 +229,8 @@ public partial class SurfTimer
 	/// A new beam for one segment. Beams are never moved after they spawn - clients cull and draw them by
 	/// where they spawned, so a moved beam vanishes or shows in pieces.
 	/// </summary>
-	private static CBeam? CreateBeam(Vector start, Vector end, Color color, float width)
+	/// <param name="brightness">HDR colour scale - above 1 glows brighter (the ghost path on dark maps)</param>
+	private static CBeam? CreateBeam(Vector start, Vector end, Color color, float width, float brightness = 1f)
 	{
 		var beam = Utilities.CreateEntityByName<CBeam>("beam");
 		if (beam == null)
@@ -238,6 +239,8 @@ public partial class SurfTimer
 		beam.Render = color;
 		beam.Width = width;
 		beam.EndWidth = width;
+		if (brightness != 1f)
+			beam.HDRColorScale = brightness;
 		beam.Teleport(start, new QAngle(0, 0, 0), new Vector(0, 0, 0));
 		beam.EndPos.X = end.X;
 		beam.EndPos.Y = end.Y;

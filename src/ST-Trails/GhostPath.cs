@@ -20,6 +20,10 @@ public partial class SurfTimer
 	private const int GhostMaxSegments = 160;
 	private const int GhostMaxMarkers = 40;
 	private const float GhostPathWidth = 1.5f;
+	/// <summary>The path itself: wider and glowing (HDR scale), its colours lifted towards white - most maps are dark</summary>
+	private const float GhostLineWidth = 2.5f;
+	private const float GhostLineBrightness = 4f;
+	private const float GhostLineLift = 0.35f;
 	private const float GhostPathLift = 2f;
 	private const float GhostOrbHeight = 36f; // About the middle of a standing player
 	private const float GhostOrbSize = 7f;
@@ -238,8 +242,9 @@ public partial class SurfTimer
 				continue;
 			var a = path.PositionAt(starts[k]);
 			var b = path.PositionAt(starts[k + 1]);
-			var color = ColorTranslator.FromHtml(Extensions.GetSpeedColorGradient(path.Speeds[starts[k]]));
-			var beam = CreateBeam(new Vector(a.X, a.Y, a.Z + GhostPathLift), new Vector(b.X, b.Y, b.Z + GhostPathLift), color, GhostPathWidth);
+			var color = Lighten(ColorTranslator.FromHtml(Extensions.GetSpeedColorGradient(path.Speeds[starts[k]])), GhostLineLift);
+			var beam = CreateBeam(new Vector(a.X, a.Y, a.Z + GhostPathLift), new Vector(b.X, b.Y, b.Z + GhostPathLift), color,
+				GhostLineWidth, GhostLineBrightness);
 			if (beam != null)
 			{
 				state.Segments[k] = beam;
@@ -275,6 +280,10 @@ public partial class SurfTimer
 			state.IndexesDirty = true;
 		}
 	}
+
+	/// <summary>A colour moved part of the way towards white</summary>
+	private static Color Lighten(Color color, float amount) => Color.FromArgb(
+		(int)(color.R + (255 - color.R) * amount), (int)(color.G + (255 - color.G) * amount), (int)(color.B + (255 - color.B) * amount));
 
 	/// <summary>A flat square (jump), a triangle pointing down (crouch) or up (stand up) across the path</summary>
 	private static List<CBeam> MarkerShape(ReferencePath path, int frame, PathMarker kind)
