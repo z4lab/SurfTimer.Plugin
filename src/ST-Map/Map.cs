@@ -473,6 +473,9 @@ public class Map : MapEntity
 
 		this.Settings = await MapRepository.GetSettingsAsync(this.ID);
 		ApplySettings();
+		// No stored sv_maxvelocity yet: what's active once the map has loaded becomes the map's (MapCvars.cs)
+		var loaded = this;
+		Server.NextFrame(() => SurfTimer.ScheduleMaxVelocityCapture(loaded));
 
 		// First load of this map: its trigger zones become its stored zones
 		if (_exportZones)

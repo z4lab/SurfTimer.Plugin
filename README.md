@@ -396,7 +396,7 @@ Every change made in the panel is written to the **Audit** log.
 | Exit limit value › | ±10 / ±50, or Use default. |
 | Record replays | Stores replays of new PBs. |
 | Filters › | Map filter names (see **Map filters**). **Reset on start teleports**: `!r` / `!s` / `!b` clear your contexts and set the start name (default). Turn it off for maps that give the state only once at the very start. **Start name**: the name runs start with, also checked when a run starts. Per stage / bonus as custom keys `filter_start_name_s3`, `filter_start_name_b1`. |
-| Cvars › | Movement cvars for this map only. Each one shows its current and server value. You can **Set for this map** or **Remove override**. Server values come back at map end. |
+| Cvars › | Movement cvars for this map only. Each one shows its current and server value. You can **Set for this map** or **Remove override**. Server values come back at map end. A map without a stored `sv_maxvelocity` gets the one active 10 seconds after it loaded (after its settings came from the database), stored as its override. |
 | Custom keys › | Free key/value notes. Add (`key value` in chat), change or remove. |
 
 </details>

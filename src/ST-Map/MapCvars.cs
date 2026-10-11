@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.RegularExpressions;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Modules.Cvars;
+using Microsoft.Extensions.Logging;
 
 namespace SurfTimer;
 
@@ -83,4 +84,40 @@ internal static class MapCvars
 	}
 
 	internal static string Format(float value) => value.ToString("0.####", CultureInfo.InvariantCulture);
+}
+
+public partial class SurfTimer
+{
+	/// <summary>Seconds after the map's settings loaded - its scripts and the server's cfgs have run by then</summary>
+	private const float MaxVelocityCaptureDelay = 10f;
+	private const string MaxVelocityCvar = "sv_maxvelocity";
+
+	internal static void ScheduleMaxVelocityCapture(Map map) =>
+		_instance?.AddTimer(MaxVelocityCaptureDelay, () => _instance?.CaptureMaxVelocity(map),
+			CounterStrikeSharp.API.Modules.Timers.TimerFlags.STOP_ON_MAPCHANGE);
+
+	/// <summary>
+	/// A map without a stored sv_maxvelocity gets the one active after it loaded - from then on it's the map's cvar
+	/// override (!surfadmin - Map settings - Cvars), kept even when the server's own changes.
+	/// </summary>
+	private void CaptureMaxVelocity(Map map)
+	{
+		if (!ReferenceEquals(CurrentMap, map) || map.ID <= 0)
+			return;
+
+		string key = MapCvars.SettingKey(MaxVelocityCvar);
+		if (map.Settings.ContainsKey(key))
+			return;
+		if (!float.TryParse(MapCvars.Current(MaxVelocityCvar), NumberStyles.Float, CultureInfo.InvariantCulture, out float current))
+			return;
+
+		string value = MapCvars.Format(current);
+		if (!MapCvars.IsValidValue(value))
+			return;
+
+		map.Settings[key] = value;
+		int mapId = map.ID;
+		_ = Task.Run(() => MapRepository.SetSettingAsync(mapId, key, value));
+		_logger.LogInformation("[MapCvars] {Map} had no {Cvar} stored - stored the active one: {Value}", map.Name, MaxVelocityCvar, value);
+	}
 }
