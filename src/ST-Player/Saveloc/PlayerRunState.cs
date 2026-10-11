@@ -33,8 +33,6 @@ internal sealed class PlayerRunState
 	[JsonPropertyName("course")] public short CourseBonus { get; set; }
 	/// <summary>Map filter state (FilterState) - null in states saved before it was stored: the name is left as is</summary>
 	[JsonPropertyName("targetname")] public string? FilterName { get; set; }
-	/// <summary>Response contexts as "name:value"</summary>
-	[JsonPropertyName("contexts")] public List<string>? FilterContexts { get; set; }
 
 	// ---- Run ----
 	[JsonPropertyName("ticks")] public int Ticks { get; set; }
@@ -101,7 +99,6 @@ internal sealed class PlayerRunState
 			Gravity = saveloc.GravityScale,
 			CourseBonus = saveloc.CourseBonus,
 			FilterName = saveloc.Filter?.Name,
-			FilterContexts = saveloc.Filter?.Contexts.Select(c => $"{c.Name}:{c.Value}").ToList(),
 
 			Ticks = run.Ticks,
 			Style = run.Style,
@@ -151,10 +148,7 @@ internal sealed class PlayerRunState
 		DuckAmount = DuckAmount,
 		MoveType = Ladder ? MoveType_t.MOVETYPE_LADDER : MoveType_t.MOVETYPE_WALK,
 		GravityScale = Gravity,
-		Filter = FilterName == null ? null : new FilterState(FilterName, (FilterContexts ?? new())
-			.Select(c => c.Split(':', 2))
-			.Select(parts => (parts[0], parts.Length > 1 ? parts[1] : ""))
-			.ToList()),
+		Filter = FilterName == null ? null : new FilterState(FilterName),
 		CourseBonus = CourseBonus,
 		Run = ToRun(),
 	};
