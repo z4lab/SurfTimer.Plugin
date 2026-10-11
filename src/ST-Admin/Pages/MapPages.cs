@@ -284,7 +284,7 @@ public partial class SurfTimer
 				ctx.Session.Status = on ? "Replays are recorded again" : "No replays are stored on this map";
 			}),
 			ctx.Nav("Filters", !map.FilterResets ? "keep" : map.Settings.TryGetValue(Map.SettingFilterStartName, out var startName) ? startName : "reset",
-				"player names on start teleports", AdminFiltersPage),
+				"player filter state on start teleports", AdminFiltersPage),
 			ctx.Nav("Cvars", cvars == 0 ? "none" : $"{cvars} set", "movement cvars for this map", AdminCvarsPage),
 			ctx.Nav("Custom keys", custom.ToString(), "free key / value notes", AdminCustomKeysPage),
 		]);
@@ -300,10 +300,10 @@ public partial class SurfTimer
 		var map = CurrentMap;
 		var rows = new List<HudMenuItem>
 		{
-			ctx.Toggle("Reset on start teleports", map.FilterResets, "!r / !s / !b set the start name - off: keep", on =>
+			ctx.Toggle("Reset on start teleports", map.FilterResets, "!r / !s / !b clear contexts, set the start name - off: keep", on =>
 			{
 				AdminSetMapSetting(ctx, Map.SettingFilterReset, on ? null : "0");
-				ctx.Session.Status = on ? "Start teleports set the start name" : "Players keep their filter name on this map";
+				ctx.Session.Status = on ? "Start teleports reset the filter state" : "Players keep their filter state on this map";
 			}),
 		};
 		if (map.FilterResets)

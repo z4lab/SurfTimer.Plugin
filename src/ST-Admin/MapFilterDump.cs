@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Core.Attributes.Registration;
@@ -54,7 +53,7 @@ public partial class SurfTimer
 		if (player?.PlayerPawn.Value is { IsValid: true } pawn)
 		{
 			lines.Add($"you: targetname '{pawn.Entity?.Name}', classname '{pawn.DesignerName}', response context '{pawn.ResponseContext}'");
-			lines.Add($"you: contexts [{string.Join(", ", ReadContexts(pawn).Select(c => $"{c.Name}:{c.Value}"))}]");
+			lines.Add($"you: contexts [{string.Join(", ", FilterState.ReadContexts(pawn).Select(c => $"{c.Name}:{c.Value}"))}]");
 		}
 
 		// Filters
@@ -144,31 +143,6 @@ public partial class SurfTimer
 		var c = io.Connections;
 		for (int i = 0; i < 64 && c != null && c.Handle != IntPtr.Zero; i++, c = c.Next)
 			result.Add(new Connection(c.TargetDesc ?? "", c.TargetInput ?? "", c.ValueOverride ?? "", c.Delay));
-		return result;
-	}
-
-	/// <summary>
-	/// The pawn's response contexts. CounterStrikeSharp's NetworkedVector only reads handles, so the CUtlVector is read
-	/// directly: size at +0, element pointer at +8, ResponseContext_t elements.
-	/// </summary>
-	internal static List<(string Name, string Value)> ReadContexts(CBaseEntity entity)
-	{
-		var result = new List<(string, string)>();
-		var vector = entity.ResponseContexts;
-		int count = vector.Count;
-		if (count <= 0 || count > 64)
-			return result;
-
-		IntPtr elements = Marshal.ReadIntPtr(vector.Handle + 8);
-		int size = Schema.GetClassSize("ResponseContext_t");
-		if (elements == IntPtr.Zero || size <= 0)
-			return result;
-
-		for (int i = 0; i < count; i++)
-		{
-			var context = new ResponseContext_t(elements + i * size);
-			result.Add((context.Name ?? "", context.Value ?? ""));
-		}
 		return result;
 	}
 }

@@ -391,11 +391,11 @@ public class Map : MapEntity
 	internal bool HasFilterStartName(ZoneType type, short number) => FilterStartNameSetting(type, number) != null;
 
 	/// <summary>
-	/// The filter state a run from this start begins with: the configured start name (else none). Null when
+	/// The filter state a run from this start begins with: the configured start name (else none), no contexts. Null when
 	/// the map keeps names (filter_reset 0).
 	/// </summary>
 	internal FilterState? FilterStartState(ZoneType type, short number) =>
-		FilterResets ? new FilterState(FilterStartNameSetting(type, number) ?? "") : null;
+		FilterResets ? new FilterState(FilterStartNameSetting(type, number) ?? "", []) : null;
 
 	/// <summary>The map turns the hard limit on leaving run starts on (exit_speed_limit)</summary>
 	internal bool ExitLimitEnabled { get; private set; }

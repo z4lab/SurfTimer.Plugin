@@ -63,22 +63,22 @@ Some menu rows ask you to type something in chat. Type `!cancel` to abort.
 <details>
 <summary><b>Map filters</b></summary>
 
-Some maps only let you through a teleport or push after you passed an earlier part: a trigger gives you a name
-(targetname), and a filter checks for it later. The timer keeps that in line:
+Some maps only let you through a teleport or push after you passed an earlier part: a trigger gives you a context
+(`!activator AddContext pass:1`, the CS2 way) or a name (targetname, CS:GO ports), and a filter checks for it later.
+The timer keeps that in line:
 
-- **Savelocs** store the name of the saved player (when spectating: the player you watch). Loading one
+- **Savelocs** store the contexts and name of the saved player (when spectating: the player you watch). Loading one
   gives you exactly that state. Replay savelocs have none and give you the course's start state.
 - **Resumed runs** come back with the state they were saved with.
-- **`!r`, `!s`, `!b`** and coming back from spectator put you at a start with the start state: no name, or the
-  map's start name (see the admin panel). The map's own triggers in the start zone still give theirs.
+- **`!r`, `!s`, `!b`** and coming back from spectator put you at a start with the start state: no contexts and
+  no name, or the map's start name (see the admin panel). The map's own triggers in the start zone still give theirs.
 - **`!rs` / `!back`** during a map run gives the state you left that stage start with.
 - Walking into a start zone changes nothing (the map handles that).
 - On maps with a start name set, a run that starts with another name gets the start name (logged).
 
-Only the name is handled. CS2 maps can't set names with `AddOutput targetname` any more, so many CS2 maps use other
-filters (contexts, attributes) that the timer doesn't carry yet. Map admins: `!mapfilters` prints the map's filters,
-the triggers using them and what the map's triggers do to players (to your console and the server log). Not covered:
-contexts, attributes, classnames and the map's delayed outputs still pending when you teleport.
+Map admins: `!mapfilters` prints the map's filters, the triggers using them and what the map's triggers do to players
+(to your console and the server log). Not covered: attributes (`filter_activator_attribute_int`), classnames, context
+expiry times and the map's delayed outputs still pending when you teleport.
 
 </details>
 
@@ -332,7 +332,7 @@ Every change made in the panel is written to the **Audit** log.
 | Exit speed limit | Caps your speed when you leave a run start. |
 | Exit limit value › | ±10 / ±50, or Use default. |
 | Record replays | Stores replays of new PBs. |
-| Filters › | Map filter names (see **Map filters**). **Reset on start teleports**: `!r` / `!s` / `!b` set the start name (default). Turn it off for maps that give the name only once at the very start. **Start name**: the name runs start with, also checked when a run starts. Per stage / bonus as custom keys `filter_start_name_s3`, `filter_start_name_b1`. **Your state** shows your name right now. |
+| Filters › | Map filter names (see **Map filters**). **Reset on start teleports**: `!r` / `!s` / `!b` clear your contexts and set the start name (default). Turn it off for maps that give the state only once at the very start. **Start name**: the name runs start with, also checked when a run starts. Per stage / bonus as custom keys `filter_start_name_s3`, `filter_start_name_b1`. **Your state** shows your contexts and name right now. |
 | Cvars › | Movement cvars for this map only. Each one shows its current and server value. You can **Set for this map** or **Remove override**. Server values come back at map end. |
 | Custom keys › | Free key/value notes. Add (`key value` in chat), change or remove. |
 
