@@ -25,10 +25,10 @@ public partial class SurfTimer
 			short next = (short)(stage + 1);
 			return map.HasZone(ZoneType.StageStart, next)
 				? (start, stage, ZoneType.StageStart, next, $"stage {stage}")
-				: (start, stage, ZoneType.MapEnd, (short)1, $"stage {stage}");
+				: (start, stage, ZoneType.MapEnd, (short)0, $"stage {stage}");
 		}
 
-		return (ZoneType.MapStart, 1, ZoneType.MapEnd, 1, "the map");
+		return (ZoneType.MapStart, 1, ZoneType.MapEnd, 0, "the map"); // Map end zones have number 0 (ZoneName.cs)
 	}
 
 	[ConsoleCommand("css_end", "Teleport to the end of your course - from its start zone")]
