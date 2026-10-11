@@ -89,8 +89,6 @@ internal sealed class PlayerOptions
 	internal const string KeyCenterFields = "center_fields";
 	/// <summary>Center fields with their labels ("Speed 1234") instead of only the values</summary>
 	internal const string KeyCenterLabels = "center_labels";
-	/// <summary>The timer's own short messages (Map Start, Run restored, prespeed ...) in a center line</summary>
-	internal const string KeyCenterNotify = "center_notify";
 	/// <summary>Lines 1 and 2: center_size_N / center_offset_N - line 0 keeps the old center_speed / center_speed_offset</summary>
 	internal const string KeyCenterSizePrefix = "center_size_";
 	internal const string KeyCenterOffsetPrefix = "center_offset_";
@@ -161,7 +159,7 @@ internal sealed class PlayerOptions
 	private string _centerFields = DefaultCenterFields;
 	private readonly int[] _centerSizes = new int[CustomHud.MidSlots];
 	private readonly int[] _centerOffsets = new int[CustomHud.MidSlots];
-	private bool _centerHud, _centerLabels, _centerNotify;
+	private bool _centerHud, _centerLabels;
 	private bool _hudPace, _hudPaceEnergy;
 	private SpeedColorMode? _centerSpeedColor;
 	private string _centerSpeedColorStatic = "snow";
@@ -213,7 +211,6 @@ internal sealed class PlayerOptions
 		// Before center_hud existed, size 0 meant off
 		_centerHud = Bool(KeyCenterHud, storedSize > 0);
 		_centerLabels = Bool(KeyCenterLabels, false);
-		_centerNotify = Bool(KeyCenterNotify, true);
 		for (int line = 0; line < CustomHud.MidSlots; line++)
 		{
 			_centerSizes[line] = _profile.Settings.TryGetValue(CenterSizeKey(line), out var lineSize) && int.TryParse(lineSize, out int parsedSize)
@@ -381,9 +378,6 @@ internal sealed class PlayerOptions
 
 	/// <summary>Center fields with their labels</summary>
 	internal bool CenterLabels { get => _centerLabels; set { _centerLabels = value; Save(KeyCenterLabels, value); } }
-
-	/// <summary>The timer's own short messages in a center line (on by default)</summary>
-	internal bool CenterNotify { get => _centerNotify; set { _centerNotify = value; Save(KeyCenterNotify, value); } }
 
 	/// <summary>Size of a center line, 1-5</summary>
 	internal int CenterSize(int line) => _centerSizes[line];

@@ -210,7 +210,7 @@ public partial class SurfTimer
 		}));
 		rows.Add(ctx.Toggle("Center HUD", options.CenterHud, "fields around the crosshair", on => options.CenterHud = on));
 		rows.Add(ctx.Nav("Center HUD settings", options.CenterHud ? $"{options.CenterLines.Sum(l => l.Count)} fields" : "off",
-			"fields, lines, size, height, messages", OptionsCenterHudPage));
+			"fields, lines, size, height", OptionsCenterHudPage));
 		rows.Add(ctx.Nav("Speed color", SpeedColorLabel(options), "gradient, gain / loss or one color", OptionsSpeedColorPage));
 		rows.Add(ctx.Act("Timer warning", options.TimerWarning == TimerWarning.Wr ? "WR" : "PB", "the timer turns yellow once slower", () =>
 		{
@@ -472,7 +472,7 @@ public partial class SurfTimer
 
 	/// <summary>
 	/// Center HUD settings: fields in three lines around the crosshair (the speed above it by default) - per line size and
-	/// height, labels, font, the speed's colour and the timer's own messages.
+	/// height, labels, font and the speed's colour.
 	/// </summary>
 	private PanelPage OptionsCenterHudPage() => new("Center HUD", ctx =>
 	{
@@ -492,8 +492,6 @@ public partial class SurfTimer
 		rows.Add(ctx.Toggle("Labels", options.CenterLabels, "\"Speed 1234\" instead of \"1234\"", on => options.CenterLabels = on));
 		rows.Add(ctx.Toggle("Monospace", options.CenterSpeedMono, "digits keep their place", on => options.CenterSpeedMono = on));
 		rows.Add(ctx.Nav("Speed color", CenterColorLabel(options), "same as the HUD speed, or its own", OptionsCenterColorPage));
-		rows.Add(ctx.Toggle("Timer messages", options.CenterNotify, "Map Start, prespeed, run restored ... for 2s",
-			on => options.CenterNotify = on));
 		return rows;
 	});
 

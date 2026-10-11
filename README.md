@@ -242,7 +242,6 @@ Three lines around the crosshair: **line 1** above it, **line 2** at it, **line 
 | Labels | Off: only the values. On: `Speed 1234`. |
 | Monospace | On: digits keep their place. |
 | Speed color › | The same as the HUD speed (default), or its own gradient, gain / loss or Nord color. |
-| Timer messages | On: Map Start, prespeed, Run restored, Timer stopped ... show for 2 seconds in a free line, below the crosshair first. |
 
 Addons can show a message in a line for a few seconds (e.g. a kick notice from Admin.Plugin). The line shows the message instead of its fields, then goes back to them.
 

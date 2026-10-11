@@ -101,23 +101,29 @@ public class PlayerHud
 	// ---- Center notifications (zone messages) ----
 
 	/// <summary>
-	/// Short info messages ("Map Start", "Run restored", ...): CS2's center print with the classic HUD, a center line with
-	/// the custom HUD (unless the player turned them off - !options - HUD - Center HUD settings).
+	/// Zone info messages ("Map Start", ...). Shown in CS2's center print with the classic HUD; the
+	/// custom HUD drops them - its top bar already shows where the player is.
 	/// </summary>
-	internal void Notify(string text) => ShowOwnMessage(text);
+	internal void Notify(string text)
+	{
+		if (!CustomHud.IsActive)
+			_player.Controller.PrintToCenter(text);
+	}
 
 	/// <summary>
-	/// Prespeed when leaving a start zone - kept for the prespeed field, and shown like Notify.
+	/// Prespeed when leaving a start zone - kept for the custom HUD's prespeed field, and center printed
+	/// with the classic HUD.
 	/// </summary>
 	/// <param name="context">"Stage 2", "Checkpoint 3", ... or empty</param>
 	internal void NotifyPrespeed(string context, VectorT velocity)
 	{
 		_player.LastPrespeed = velocity;
 
-		var axes = _player.Options.SpeedAxes;
-		ShowOwnMessage(CustomHud.IsActive
-			? $"{(context != "" ? context + " · " : "")}{Extensions.Speed(velocity, axes):0} u/s"
-			: $"{(context != "" ? context + " - " : "")}Prespeed {Extensions.SpeedLabel(axes)}: {Extensions.Speed(velocity, axes):0} u/s");
+		if (!CustomHud.IsActive)
+		{
+			var axes = _player.Options.SpeedAxes;
+			_player.Controller.PrintToCenter($"{(context != "" ? context + " - " : "")}Prespeed {Extensions.SpeedLabel(axes)}: {Extensions.Speed(velocity, axes):0} u/s");
+		}
 	}
 
 	/// <summary>
@@ -766,15 +772,11 @@ public class PlayerHud
 	private sealed record MidMessage(long Id, string Text, string? ColorClass, int Size, int UntilTick);
 	private readonly List<MidMessage>[] _midMessages = Enumerable.Range(0, CustomHud.MidSlots).Select(_ => new List<MidMessage>()).ToArray();
 	private static long _nextCenterMessageId;
-	/// <summary>The timer's own last message (Notify) - a new one replaces it</summary>
-	private long _ownMessageId;
-	private const int OwnMessageTicks = 2 * 64;
-	private const int OwnMessageSize = 2;
 
 	internal static long NewCenterMessageId() => ++_nextCenterMessageId;
 
 	/// <summary>
-	/// Shows a text in a center line for some ticks (SurfTimer.Api ShowCenterMessage, the timer's own messages). line null:
+	/// Shows a text in a center line for some ticks (SurfTimer.Api ShowCenterMessage). line null:
 	/// a line without fields (at, below, above the crosshair), else the one at the crosshair. Without the custom HUD it's
 	/// CS2's center print.
 	/// </summary>
@@ -786,7 +788,7 @@ public class PlayerHud
 			return;
 		}
 
-		int target = line is int fixedLine && fixedLine >= 0 && fixedLine < CustomHud.MidSlots ? fixedLine : AutoCenterLine(AutoLineOrder);
+		int target = line is int fixedLine && fixedLine >= 0 && fixedLine < CustomHud.MidSlots ? fixedLine : AutoCenterLine();
 		_midMessages[target].Add(new MidMessage(id, text, colorClass, Math.Clamp(size, 1, PlayerOptions.CenterSizes),
 			Server.TickCount + Math.Max(1, ticks)));
 	}
@@ -797,12 +799,11 @@ public class PlayerHud
 			messages.RemoveAll(m => m.Id == id);
 	}
 
-	// Addon messages: at the crosshair first, then below, then above - the timer's own: below the crosshair first
+	// At the crosshair first, then below, then above
 	private static readonly int[] AutoLineOrder = [1, 2, 0];
-	private static readonly int[] OwnLineOrder = [2, 0, 1];
 
-	/// <summary>The first line in this order without fields or a message - else the first one</summary>
-	private int AutoCenterLine(int[] order)
+	/// <summary>The first line without fields or a message - else the one at the crosshair</summary>
+	private int AutoCenterLine()
 	{
 		var options = _player.Options;
 		foreach (int line in AutoLineOrder)
@@ -811,7 +812,7 @@ public class PlayerHud
 			if (!fields && ActiveMessage(line) == null)
 				return line;
 		}
-		return order[0];
+		return 1;
 	}
 
 	/// <summary>The newest message of a line that still has time left - expired ones are dropped</summary>
@@ -820,25 +821,6 @@ public class PlayerHud
 		var messages = _midMessages[line];
 		messages.RemoveAll(m => m.UntilTick <= Server.TickCount);
 		return messages.Count > 0 ? messages[^1] : null;
-	}
-
-	/// <summary>
-	/// The timer's own short messages ("Map Start", "Run restored", prespeed ...) - in a center line with the custom HUD
-	/// (unless the viewer turned them off), else CS2's center print.
-	/// </summary>
-	private void ShowOwnMessage(string text)
-	{
-		if (!CustomHud.IsActive)
-		{
-			_player.Controller.PrintToCenter(text);
-			return;
-		}
-		if (!_player.Options.CenterNotify)
-			return;
-
-		ClearCenterMessage(_ownMessageId);
-		_ownMessageId = NewCenterMessageId();
-		ShowCenterMessage(_ownMessageId, AutoCenterLine(OwnLineOrder), text, OwnMessageTicks, "nc-frost", OwnMessageSize);
 	}
 
 	/// <summary>A field as center text: its values (keys: the held ones), with its label when the viewer wants labels</summary>
