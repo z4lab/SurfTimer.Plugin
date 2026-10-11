@@ -43,6 +43,7 @@ internal sealed class SurfTimerApiImpl(SurfTimer plugin, ILogger logger) : ISurf
 		ForcedCvars.Clear();
 		Sounds.ClearAddons();
 		AddonPrefixes.Clear();
+		HudFieldCatalog.ClearAddons();
 	}
 
 	// ---- Map ----
@@ -102,6 +103,45 @@ internal sealed class SurfTimerApiImpl(SurfTimer plugin, ILogger logger) : ISurf
 				Size: row == HudRow.Main ? PlayerHud.HudSize.Medium : PlayerHud.HudSize.Small, Mono: value.Monospace));
 		}
 		return elements;
+	}
+
+	/// <summary>The layout's colour class of an addon colour - null for the default</summary>
+	internal static string? ColorClassOf(HudColor color) => color == HudColor.Default ? null : CustomHud.ColorClass(HexOf(color));
+
+	// ---- HUD fields and center messages ----
+
+	public void RegisterHudField(string key, string label, string description, Func<CCSPlayerController, HudValue?> value)
+	{
+		if (!HudFieldCatalog.Register(new HudFieldCatalog.AddonField(key, label, description, value)))
+			logger.LogWarning("[Api] HUD field key '{Key}' isn't \"addon.name\" (lowercase letters, digits, _) - not registered", key);
+	}
+
+	public void UnregisterHudField(string key) => HudFieldCatalog.Unregister(key);
+
+	public CenterMessage ShowCenterMessage(CCSPlayerController? player, string text, float seconds, CenterLine line = CenterLine.Auto,
+		HudColor color = HudColor.Default, int size = 3)
+	{
+		var message = new CenterMessage(PlayerHud.NewCenterMessageId());
+		int ticks = (int)(Math.Clamp(seconds, 0.5f, 30f) * 64);
+		int? fixedLine = line switch
+		{
+			CenterLine.Above => 0,
+			CenterLine.Crosshair => 1,
+			CenterLine.Below => 2,
+			_ => null,
+		};
+
+		List<Player> targets = player == null ? SurfTimer.OnlinePlayers.ToList()
+			: plugin.PlayerOf(player) is { } one ? [one] : [];
+		foreach (var target in targets)
+			target.HUD.ShowCenterMessage(message.Id, fixedLine, text, ticks, ColorClassOf(color), size);
+		return message;
+	}
+
+	public void ClearCenterMessage(CenterMessage message)
+	{
+		foreach (var target in SurfTimer.OnlinePlayers)
+			target.HUD.ClearCenterMessage(message.Id);
 	}
 
 	/// <summary>The HUD's hex colours - Nord (CustomHud.ColorClass knows them)</summary>

@@ -174,8 +174,8 @@ The HUD uses the [Nord](https://www.nordtheme.com) colors. Its accent (field bor
 | **Keys first** preset | | Keys, Timer, Speed \| Prespeed, Sync |
 | Custom layout › | | Set each field yourself (see below). |
 | Speed | XY | Each press switches: **XY** (horizontal) → **XYZ** (3D) → **Z** (vertical, negative = falling). Applies to the HUD speed, prespeed and split speeds. |
-| Center HUD | Off | Your speed in the middle of the screen, just above the crosshair (custom HUD). |
-| Center HUD settings › | | **Center HUD** on / off, **Size** 1–5 (default 3), **Move up** / **Move down** (10 steps each way, 10px each), **Reset position**, **Monospace** (on - digits keep their place), **Color ›**: the same as the HUD speed (default), or its own gradient, gain / loss or Nord color. |
+| Center HUD | Off | Fields in three lines around the crosshair (custom HUD): by default your speed just above it. |
+| Center HUD settings › | | See below. |
 | Speed color › | Gradient | How the speed and prespeed are colored (the center HUD too, unless it has its own color): **Gradient** (Nord colors, slow blue → fast red), **Gain / loss** (white, green while gaining speed, red while losing), or one Nord color (snow, frost, teal, blue, deep blue, red, orange, yellow, green, purple). |
 | Timer warning | PB | The running timer is green, and turns yellow once your run is slower than your **PB** of it (map, stage or bonus) - or the **WR**. Practice runs stay purple. |
 | Top bar | On | Map, tier and stage, then a smaller row with rank, PB and WR. With [SurfTimer.MapChooser](https://github.com/z4lab/SurfTimer.MapChooser), a third row shows the time left, the running vote and the map's end (needs the HUD addon with four top rows). |
@@ -190,17 +190,61 @@ The HUD uses the [Nord](https://www.nordtheme.com) colors. Its accent (field bor
 | Spectators position | default (5) | Same for the spectator list on the right: 0-10, 200-600px from the top. |
 
 <details>
+<summary>HUD fields</summary>
+
+Every field below can go into the bottom HUD and the center HUD:
+
+| Field | Shows |
+|---|---|
+| Timer | Run time. Green running, yellow once slower than your PB / WR (Timer warning), purple in practice. |
+| Segment time | Time in the current stage / checkpoint. |
+| Speed / Prespeed | On your speed axes. Prespeed: live in a start zone, then the speed you left it with. |
+| Keys | W A S D, jump (J), crouch (C). The center shows held keys, `_` for released ones. |
+| Sync / Segment sync | Strafe sync of the run / of the current stage or checkpoint. |
+| Energy | See below. |
+| Pace / Pace delta | Projected finish and how far ahead (green) or behind (red), against the splits panel's target (see Pace above). |
+| Energy vs ref / Speed vs ref | Your energy / speed compared to the target run at the same spot. |
+| Last split | Your last checkpoint / stage and its difference to the splits panel's target. |
+| Stage / CP | Stage 3/7, CP 4/12 or Bonus 2. |
+| PB / WR / Rank | For the run you're on (map, stage or bonus). |
+| Jumps / Strafes | In the current run. A strafe is switching to the other strafe key in the air. |
+| Addon fields | Added by addons, e.g. **Time left** from [SurfTimer.MapChooser](https://github.com/z4lab/SurfTimer.MapChooser). |
+
+A field without a value (no PB yet, no target run, spectating a replay) shows N/A in the bottom HUD and is left out in the center.
+
+</details>
+
+<details>
 <summary>HUD › Custom layout</summary>
 
 The bottom HUD has up to **2 rows** of **4 slots** each. The **Timer takes 2 slots**. Each field can be used once.
 
-For each field (**Timer, Speed, Prespeed, Keys, Sync, Energy**):
+For each field:
 - **Show**: turn the field on or off. It goes into the first row with room.
 - **Move earlier / Move later**: moves it left or right. At the end of a row it wraps to the row above or below.
 - **Move to row 1 / 2**
 - **Reset to default**: restores the default layout.
 
 **Energy** (not in the presets) is your mechanical energy, as in Momentum Mod: the height your speed could carry you to plus how high you are above where the run started - `speed² / (2 · gravity) + height`. Air strafing raises it; ramp hits, walls and friction lower it, so it shows how clean your surf is. Green while it rises, red while it drops.
+
+</details>
+
+<details>
+<summary>HUD › Center HUD settings</summary>
+
+Three lines around the crosshair: **line 1** above it, **line 2** at it, **line 3** below it. Each line shows up to **3 fields** in one text (`1234 · 01:23.456`), colored like its first field.
+
+| Row | Description |
+|---|---|
+| Center HUD | On / off. |
+| Fields › | Which fields, on which line - the same pages as the custom layout (**Show**, **Move earlier / later**, **Move to line N**). Default: Speed on line 1. |
+| Line 1 / 2 / 3 › | **Size** 1–5 (default 3), **Move up** / **Move down** (10 steps each way, 10px each), **Reset position**. |
+| Labels | Off: only the values. On: `Speed 1234`. |
+| Monospace | On: digits keep their place. |
+| Speed color › | The same as the HUD speed (default), or its own gradient, gain / loss or Nord color. |
+| Timer messages | On: Map Start, prespeed, Run restored, Timer stopped ... show for 2 seconds in a free line, below the crosshair first. |
+
+Addons can show a message in a line for a few seconds (e.g. a kick notice from Admin.Plugin). The line shows the message instead of its fields, then goes back to them.
 
 </details>
 

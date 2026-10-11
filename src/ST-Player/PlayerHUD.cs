@@ -101,29 +101,23 @@ public class PlayerHud
 	// ---- Center notifications (zone messages) ----
 
 	/// <summary>
-	/// Zone info messages ("Map Start", ...). Shown in CS2's center print with the classic HUD; the
-	/// custom HUD drops them - its top bar already shows where the player is.
+	/// Short info messages ("Map Start", "Run restored", ...): CS2's center print with the classic HUD, a center line with
+	/// the custom HUD (unless the player turned them off - !options - HUD - Center HUD settings).
 	/// </summary>
-	internal void Notify(string text)
-	{
-		if (!CustomHud.IsActive)
-			_player.Controller.PrintToCenter(text);
-	}
+	internal void Notify(string text) => ShowOwnMessage(text);
 
 	/// <summary>
-	/// Prespeed when leaving a start zone - kept for the custom HUD's prespeed field, and center printed
-	/// with the classic HUD.
+	/// Prespeed when leaving a start zone - kept for the prespeed field, and shown like Notify.
 	/// </summary>
 	/// <param name="context">"Stage 2", "Checkpoint 3", ... or empty</param>
 	internal void NotifyPrespeed(string context, VectorT velocity)
 	{
 		_player.LastPrespeed = velocity;
 
-		if (!CustomHud.IsActive)
-		{
-			var axes = _player.Options.SpeedAxes;
-			_player.Controller.PrintToCenter($"{(context != "" ? context + " - " : "")}Prespeed {Extensions.SpeedLabel(axes)}: {Extensions.Speed(velocity, axes):0} u/s");
-		}
+		var axes = _player.Options.SpeedAxes;
+		ShowOwnMessage(CustomHud.IsActive
+			? $"{(context != "" ? context + " · " : "")}{Extensions.Speed(velocity, axes):0} u/s"
+			: $"{(context != "" ? context + " - " : "")}Prespeed {Extensions.SpeedLabel(axes)}: {Extensions.Speed(velocity, axes):0} u/s");
 	}
 
 	/// <summary>
@@ -394,8 +388,10 @@ public class PlayerHud
 
 		// Panels the viewer turned off in !options (HUD) are sent empty, which collapses them
 		var options = _player.Options;
-		SendCenter(subject, replay);
-		SendMid(shownSpeed);
+		_fieldsThisUpdate.Clear();
+		var source = FieldSourceOf(subject, replay);
+		SendCenter(source);
+		SendMid(source);
 		SendSlot(CustomHud.Top, options.HudTop ? TopRows(subject, replay) : []);
 		// Left: the run's splits - or, spectating the best segments bot, every segment WR it chains
 		var leftRows = subject != null ? SplitRowsKept(subject, options)
@@ -493,87 +489,221 @@ public class PlayerHud
 	private readonly record struct HudField(string Label, List<FieldSegment> Segments, bool Wide = false);
 
 	/// <summary>
+	/// What one HUD update shows - a live player or a replay bot. Both layouts' fields are built from it.
+	/// </summary>
+	private sealed record FieldSource(Player? Subject, ReplayPlayer? Replay, int Ticks, string TimerColor, float Velocity,
+		float? Prespeed, PlayerButtons? Buttons, float? Sync);
+
+	/// <summary>The shown values for this update - null when there's nothing to show (no subject, unknown replay type)</summary>
+	private FieldSource? FieldSourceOf(Player? subject, ReplayPlayer? replay)
+	{
+		// Speeds on the viewer's axes (!options - HUD), also for whoever they spectate
+		var axes = _player.Options.SpeedAxes;
+		if (subject != null)
+		{
+			float velocity = Extensions.SpeedOf(subject.Controller, axes);
+			// Prespeed: live while in a start zone, then the exit speed
+			float? prespeed = subject.IsTouchingAnyStartZone ? velocity
+				: subject.LastPrespeed is VectorT exit ? Extensions.Speed(exit, axes) : null;
+			return new FieldSource(subject, null, subject.Timer.Ticks, TimerColorOf(subject), velocity, prespeed,
+				subject.Controller.Buttons, subject.SyncPercent);
+		}
+
+		if (replay?.Controller == null || ReplayTypeLabel(replay) == "")
+			return null;
+		float replayVelocity = Extensions.SpeedOf(replay.Controller, axes);
+		// Replays recorded before buttons were stored: keys stay released, sync N/A
+		return new FieldSource(null, replay, replay.ReplayCurrentRunTime, ReplayTimerColor(replay), replayVelocity,
+			replay.Prespeed(replayVelocity, axes), replay.CurrentButtons(), replay.CurrentSync());
+	}
+
+	// Fields built in this update, by key - the bottom and the center HUD can show the same one
+	private readonly Dictionary<string, HudField> _fieldsThisUpdate = new();
+
+	private HudField FieldOf(string key, FieldSource source)
+	{
+		if (!_fieldsThisUpdate.TryGetValue(key, out var field))
+			_fieldsThisUpdate[key] = field = BuildField(key, source);
+		return field;
+	}
+
+	private static bool IsAvailable(HudField field) => !(field.Segments.Count == 1 && field.Segments[0] == NotAvailable);
+
+	private static string Signed(float value) => $"{(value >= 0 ? "+" : "-")}{Math.Abs(value).ToString("0", CultureInfo.InvariantCulture)}";
+
+	private static string SignedTime(int ticks) => $"{(ticks <= 0 ? "-" : "+")}{FormatTime(Math.Abs(ticks))}";
+
+	private static HudField Unavailable(string label) => new(label, [NotAvailable]);
+
+	/// <summary>One field's label and value segments (HudFields.cs) - N/A when the shown player / replay has no such value</summary>
+	private HudField BuildField(string key, FieldSource s)
+	{
+		var p = s.Subject;
+		string label = HudFieldCatalog.Label(key);
+		if (HudFieldCatalog.KindOf(key) is not HudFieldKind kind)
+			return AddonField(key, label);
+
+		string ahead = CustomHud.ColorClass(TimerColorActive) ?? "nc-green";
+		string behind = CustomHud.ColorClass(SlowerColor) ?? "nc-red";
+		FieldSegment Value(string text, string? colorClass = null) => new(text, colorClass, Mono: true);
+		HudField One(string text, string? colorClass = null) => new(label, [Value(text, colorClass)]);
+
+		switch (kind)
+		{
+			case HudFieldKind.Timer:
+				return new HudField(label, [Value(FormatTime(s.Ticks, PlayerTimer.TimeFormatStyle.Full), CustomHud.ColorClass(s.TimerColor))], Wide: true);
+
+			case HudFieldKind.SegmentTime:
+				return p != null && p.Timer.IsRunning
+					? One(FormatTime(Math.Max(0, p.Timer.Ticks - p.Stats.ThisRun.RunTime)), CustomHud.ColorClass(s.TimerColor))
+					: Unavailable(label);
+
+			case HudFieldKind.Speed:
+				return new HudField($"Speed {Extensions.SpeedLabel(_player.Options.SpeedAxes)}",
+					[Value(s.Velocity.ToString("0", CultureInfo.InvariantCulture), _speedClass)]);
+
+			case HudFieldKind.Prespeed:
+				return s.Prespeed is float prespeed
+					? One(prespeed.ToString("0", CultureInfo.InvariantCulture), PrespeedClassOf(prespeed))
+					: Unavailable(label);
+
+			case HudFieldKind.Keys:
+				var held = s.Buttons ?? 0;
+				return new HudField(label, Keys.Select(k => new FieldSegment(k.Letter, Dim: !held.HasFlag(k.Button), Key: true)).ToList());
+
+			case HudFieldKind.Sync:
+				return s.Sync is float sync ? One(sync.ToString("00.00", CultureInfo.InvariantCulture) + "%") : Unavailable(label);
+
+			case HudFieldKind.SegmentSync:
+				return p != null && p.Timer.IsRunning
+					? One(p.SegmentSyncPercent.ToString("00.00", CultureInfo.InvariantCulture) + "%")
+					: Unavailable(label);
+
+			case HudFieldKind.Energy:
+				return p != null ? One(p.Energy.Value.ToString("0", CultureInfo.InvariantCulture), EnergyClassOf(p.Energy.Value)) : Unavailable(label);
+
+			case HudFieldKind.Pace:
+				return p != null && PaceOf(p) is PaceResult pace
+					? One((pace.Live ? "" : "~") + FormatTime(pace.PaceTicks))
+					: Unavailable(label);
+
+			case HudFieldKind.PaceDelta:
+				return p != null && PaceOf(p) is PaceResult paceDelta
+					? One(SignedTime(paceDelta.DeltaTicks), paceDelta.DeltaTicks <= 0 ? ahead : behind)
+					: Unavailable(label);
+
+			case HudFieldKind.EnergyDiff:
+				return p != null && PaceOf(p) is { EnergyDiff: float energyDiff }
+					? One(Signed(energyDiff), energyDiff >= 0 ? ahead : behind)
+					: Unavailable(label);
+
+			case HudFieldKind.SpeedDiff:
+				return p != null && PaceOf(p) is { SpeedDiff: float speedDiff }
+					? One(Signed(speedDiff), speedDiff >= 0 ? ahead : behind)
+					: Unavailable(label);
+
+			case HudFieldKind.LastSplit:
+				return p != null ? LastSplitField(p, label) : Unavailable(label);
+
+			case HudFieldKind.Progress:
+				return p != null ? ProgressField(p) : Unavailable(label);
+
+			case HudFieldKind.Pb:
+				return p != null && RunTargets.PbTicks(p) is > 0 and var pb
+					? One(FormatTime(pb, PlayerTimer.TimeFormatStyle.Full), CustomHud.ColorClass(RankColorPb))
+					: Unavailable(label);
+
+			case HudFieldKind.Wr:
+				return p != null && RunTargets.WrTicks(p) is > 0 and var wr
+					? One(FormatTime(wr, PlayerTimer.TimeFormatStyle.Full), CustomHud.ColorClass(RankColorWr))
+					: Unavailable(label);
+
+			case HudFieldKind.Rank:
+				return p != null ? One(RankElement(p).Body, CustomHud.ColorClass(RankColorPb)) : Unavailable(label);
+
+			case HudFieldKind.Jumps:
+				return p != null ? One(p.RunJumps.ToString(CultureInfo.InvariantCulture)) : Unavailable(label);
+
+			case HudFieldKind.Strafes:
+				return p != null ? One(p.RunStrafes.ToString(CultureInfo.InvariantCulture)) : Unavailable(label);
+
+			default:
+				return Unavailable(label);
+		}
+	}
+
+	/// <summary>An addon's field (SurfTimer.Api RegisterHudField) - N/A while it isn't registered or has no value</summary>
+	private HudField AddonField(string key, string label)
+	{
+		var addon = HudFieldCatalog.Addon(key);
+		if (addon == null)
+			return Unavailable(label);
+
+		HudValue? value;
+		try
+		{
+			value = addon.Value(_player.Controller);
+		}
+		catch (Exception)
+		{
+			return Unavailable(label); // An addon's failure must not break the HUD
+		}
+		return value == null || value.Value.Length == 0
+			? Unavailable(label)
+			: new HudField(label, [new FieldSegment(value.Value, SurfTimerApiImpl.ColorClassOf(value.Color), Mono: value.Monospace)]);
+	}
+
+	/// <summary>The map run's last checkpoint / stage split and its difference to the splits panel's target</summary>
+	private HudField LastSplitField(Player p, string label)
+	{
+		var splits = p.Stats.ThisRun.Checkpoints;
+		if (!p.Timer.IsRunning || p.Timer.IsStageMode || p.Timer.IsBonusMode || splits.Count == 0)
+			return Unavailable(label);
+
+		int number = splits.Keys.Max();
+		var split = splits[number];
+		string name = SurfTimer.CurrentMap.Stages > 0 ? $"S{number}" : $"CP{number}";
+		var (_, targetSplits, _) = ResolveSplitTarget(p, _player.Options.HudSplitTarget);
+		if (targetSplits == null || !targetSplits.TryGetValue(number, out var target) || target.RunTime <= 0)
+			return new HudField(label, [new FieldSegment(name, Dim: true), new FieldSegment(FormatTime(split.RunTime), Mono: true)]);
+
+		int diff = split.RunTime - target.RunTime;
+		return new HudField(label,
+		[
+			new FieldSegment(name, Dim: true),
+			new FieldSegment(SignedTime(diff), CustomHud.ColorClass(diff <= 0 ? TimerColorActive : SlowerColor), Mono: true),
+		]);
+	}
+
+	/// <summary>"Stage 3/7", "CP 4/12", "Bonus 2" - where the shown player is</summary>
+	private HudField ProgressField(Player p)
+	{
+		var map = SurfTimer.CurrentMap;
+		string color = CustomHud.ColorClass(TimerColor) ?? "";
+		if (p.Timer.IsBonusMode && p.Timer.Bonus > 0)
+			return new HudField("Bonus", [new FieldSegment($"{p.Timer.Bonus}/{map.Bonuses}", color, Mono: true)]);
+		if (map.Stages > 0)
+			return new HudField("Stage", [new FieldSegment($"{Math.Max((short)1, p.Timer.Stage)}/{map.Stages}", color, Mono: true)]);
+		if (map.TotalCheckpoints > 0)
+			return new HudField("CP", [new FieldSegment($"{p.Timer.Checkpoint}/{map.TotalCheckpoints}", color, Mono: true)]);
+		return new HudField("Map", [new FieldSegment("linear", color)]);
+	}
+
+	/// <summary>
 	/// Bottom center, as rows of fields in the viewer's layout (!options - HUD; by default timer (wide) and
 	/// speed, then prespeed, keys and sync).
 	/// </summary>
-	private void SendCenter(Player? subject, ReplayPlayer? replay)
+	private void SendCenter(FieldSource? source)
 	{
 		string slotId = CustomHud.SlotId(CustomHud.Center);
-		bool visible = (subject != null || (replay != null && ReplayTypeLabel(replay) != ""))
-			&& _player.Options.HudRows.Count > 0; // A layout without fields hides the block
+		bool visible = source != null && _player.Options.HudRows.Count > 0; // A layout without fields hides the block
 
 		SendClass(slotId, "hidden", !visible);
 		SendExclusive(slotId, "shift", $"shift-{_player.Options.HudPosition(CustomHud.Center)}");
 		if (!visible)
 			return; // Keep the last texts - they're hidden anyway
 
-		// The same values from a live player or a replay - the fields below don't care which
-		int ticks;
-		string timerColor;
-		float velocity;
-		float? prespeedSpeed;
-		PlayerButtons? buttons;
-		float? syncPercent;
-		// Speeds on the viewer's axes (!options - HUD), also for whoever they spectate
-		var axes = _player.Options.SpeedAxes;
-		if (subject != null)
-		{
-			ticks = subject.Timer.Ticks;
-			timerColor = TimerColorOf(subject);
-			velocity = Extensions.SpeedOf(subject.Controller, axes);
-			// Prespeed: live while in a start zone, then the exit speed
-			prespeedSpeed = subject.IsTouchingAnyStartZone ? velocity
-				: subject.LastPrespeed is VectorT exit ? Extensions.Speed(exit, axes) : null;
-			buttons = subject.Controller.Buttons;
-			syncPercent = subject.SyncPercent;
-		}
-		else
-		{
-			ticks = replay!.ReplayCurrentRunTime;
-			timerColor = ReplayTimerColor(replay);
-			velocity = Extensions.SpeedOf(replay.Controller!, axes);
-			prespeedSpeed = replay.Prespeed(velocity, axes);
-			// Replays recorded before buttons were stored: keys stay released, sync N/A
-			buttons = replay.CurrentButtons();
-			syncPercent = replay.CurrentSync();
-		}
-
-		var timer = new HudField("Timer",
-			[new FieldSegment(FormatTime(ticks, PlayerTimer.TimeFormatStyle.Full), CustomHud.ColorClass(timerColor), Mono: true)], Wide: true);
-		var speed = new HudField($"Speed {Extensions.SpeedLabel(axes)}",
-			[new FieldSegment(velocity.ToString("0", CultureInfo.InvariantCulture), _speedClass, Mono: true)]);
-
-		var prespeed = new HudField("Prespeed",
-			[prespeedSpeed != null
-				? new FieldSegment(prespeedSpeed.Value.ToString("0", CultureInfo.InvariantCulture), PrespeedClassOf(prespeedSpeed.Value), Mono: true)
-				: NotAvailable]);
-
-		var held = buttons ?? 0;
-		var keys = new HudField("Keys",
-			Keys.Select(k => new FieldSegment(k.Letter, Dim: !held.HasFlag(k.Button), Key: true)).ToList());
-
-		var sync = new HudField("Sync",
-			[syncPercent != null
-				? new FieldSegment(syncPercent.Value.ToString("00.00", CultureInfo.InvariantCulture) + "%", Mono: true)
-				: NotAvailable]);
-
-		var energy = new HudField("Energy",
-			[subject != null
-				? new FieldSegment(subject.Energy.Value.ToString("0", CultureInfo.InvariantCulture), EnergyClassOf(subject.Energy.Value), Mono: true)
-				: NotAvailable]);
-
-		HudField FieldOf(HudFieldKind kind) => kind switch
-		{
-			HudFieldKind.Energy => energy,
-			HudFieldKind.Timer => timer,
-			HudFieldKind.Speed => speed,
-			HudFieldKind.Prespeed => prespeed,
-			HudFieldKind.Keys => keys,
-			_ => sync,
-		};
-
-		var rows = _player.Options.HudRows.Select(row => row.Select(FieldOf).ToList()).ToList();
-
+		var rows = _player.Options.HudRows.Select(row => row.Select(key => FieldOf(key, source!)).ToList()).ToList();
 		for (int r = 0; r < CustomHud.FieldRows; r++)
 		{
 			List<HudField> row = r < rows.Count ? rows[r] : [];
@@ -630,52 +760,131 @@ public class PlayerHud
 		return team == CsTeam.Terrorist ? "team-t" : "team-ct";
 	}
 
-	// ---- Middle slots: above, at and below the crosshair ----
+	// ---- Center HUD: three lines above, at and below the crosshair ----
 
-	/// <summary>A message in a middle slot until a tick (later: admin messages)</summary>
-	private readonly record struct MidMessage(string Text, string? ColorClass, int Size, bool Mono, int UntilTick);
-	private readonly MidMessage?[] _midMessages = new MidMessage?[CustomHud.MidSlots];
+	/// <summary>A text shown in a center line instead of its fields until a tick (center messages)</summary>
+	private sealed record MidMessage(long Id, string Text, string? ColorClass, int Size, int UntilTick);
+	private readonly List<MidMessage>[] _midMessages = Enumerable.Range(0, CustomHud.MidSlots).Select(_ => new List<MidMessage>()).ToArray();
+	private static long _nextCenterMessageId;
+	/// <summary>The timer's own last message (Notify) - a new one replaces it</summary>
+	private long _ownMessageId;
+	private const int OwnMessageTicks = 2 * 64;
+	private const int OwnMessageSize = 2;
+
+	internal static long NewCenterMessageId() => ++_nextCenterMessageId;
 
 	/// <summary>
-	/// Shows a message in a middle slot (0 above the crosshair, 1 at it, 2 below) for some seconds - in slot 0 instead
-	/// of the speed. Custom HUD only.
+	/// Shows a text in a center line for some ticks (SurfTimer.Api ShowCenterMessage, the timer's own messages). line null:
+	/// a line without fields (at, below, above the crosshair), else the one at the crosshair. Without the custom HUD it's
+	/// CS2's center print.
 	/// </summary>
-	internal void ShowCenterMessage(int slot, string text, int seconds, string? colorClass = null, int size = 3, bool mono = false)
+	internal void ShowCenterMessage(long id, int? line, string text, int ticks, string? colorClass, int size)
 	{
-		if (slot < 0 || slot >= CustomHud.MidSlots)
+		if (!CustomHud.IsActive)
+		{
+			_player.Controller.PrintToCenter(text);
 			return;
-		_midMessages[slot] = new MidMessage(text, colorClass, Math.Clamp(size, 1, PlayerOptions.CenterSpeedSizes), mono,
-			Server.TickCount + Math.Max(1, seconds) * 64);
+		}
+
+		int target = line is int fixedLine && fixedLine >= 0 && fixedLine < CustomHud.MidSlots ? fixedLine : AutoCenterLine(AutoLineOrder);
+		_midMessages[target].Add(new MidMessage(id, text, colorClass, Math.Clamp(size, 1, PlayerOptions.CenterSizes),
+			Server.TickCount + Math.Max(1, ticks)));
 	}
 
-	/// <param name="shownSpeed">The shown player's / replay's speed - null when nothing is shown</param>
-	private void SendMid(float? shownSpeed)
+	internal void ClearCenterMessage(long id)
+	{
+		foreach (var messages in _midMessages)
+			messages.RemoveAll(m => m.Id == id);
+	}
+
+	// Addon messages: at the crosshair first, then below, then above - the timer's own: below the crosshair first
+	private static readonly int[] AutoLineOrder = [1, 2, 0];
+	private static readonly int[] OwnLineOrder = [2, 0, 1];
+
+	/// <summary>The first line in this order without fields or a message - else the first one</summary>
+	private int AutoCenterLine(int[] order)
+	{
+		var options = _player.Options;
+		foreach (int line in AutoLineOrder)
+		{
+			bool fields = options.CenterHud && line < options.CenterLines.Count && options.CenterLines[line].Count > 0;
+			if (!fields && ActiveMessage(line) == null)
+				return line;
+		}
+		return order[0];
+	}
+
+	/// <summary>The newest message of a line that still has time left - expired ones are dropped</summary>
+	private MidMessage? ActiveMessage(int line)
+	{
+		var messages = _midMessages[line];
+		messages.RemoveAll(m => m.UntilTick <= Server.TickCount);
+		return messages.Count > 0 ? messages[^1] : null;
+	}
+
+	/// <summary>
+	/// The timer's own short messages ("Map Start", "Run restored", prespeed ...) - in a center line with the custom HUD
+	/// (unless the viewer turned them off), else CS2's center print.
+	/// </summary>
+	private void ShowOwnMessage(string text)
+	{
+		if (!CustomHud.IsActive)
+		{
+			_player.Controller.PrintToCenter(text);
+			return;
+		}
+		if (!_player.Options.CenterNotify)
+			return;
+
+		ClearCenterMessage(_ownMessageId);
+		_ownMessageId = NewCenterMessageId();
+		ShowCenterMessage(_ownMessageId, AutoCenterLine(OwnLineOrder), text, OwnMessageTicks, "nc-frost", OwnMessageSize);
+	}
+
+	/// <summary>A field as center text: its values (keys: the held ones), with its label when the viewer wants labels</summary>
+	private string CenterTextOf(HudField field, bool labels)
+	{
+		string value = field.Segments.Any(s => s.Key)
+			? string.Join(" ", field.Segments.Select(s => s.Dim ? "_" : s.Text))
+			: string.Join(" ", field.Segments.Where(s => s.Text.Length > 0).Select(s => s.Text));
+		return labels ? $"{field.Label} {value}" : value;
+	}
+
+	private const string CenterSeparator = "  ·  ";
+
+	/// <summary>
+	/// The center HUD: each line a message if one is shown there, else its fields in one text (the HUD addon's middle slots
+	/// are single labels) - coloured like its first field, the speed in the center speed colour.
+	/// </summary>
+	private void SendMid(FieldSource? source)
 	{
 		var options = _player.Options;
 		bool any = false;
-		for (int slot = 0; slot < CustomHud.MidSlots; slot++)
+		for (int line = 0; line < CustomHud.MidSlots; line++)
 		{
-			string id = CustomHud.MidSlotId(slot);
+			string id = CustomHud.MidSlotId(line);
 			string text = "";
 			string? colorClass = null;
-			int size = 3, offset = 0;
-			bool mono = false;
+			int size = options.CenterSize(line);
+			bool mono = options.CenterSpeedMono;
 
-			if (_midMessages[slot] is MidMessage message && message.UntilTick > Server.TickCount)
+			if (ActiveMessage(line) is MidMessage message)
 			{
-				(text, colorClass, size, mono) = (message.Text, message.ColorClass, message.Size, message.Mono);
+				(text, colorClass, size, mono) = (message.Text, message.ColorClass, message.Size, false);
 			}
-			else
+			else if (options.CenterHud && source != null && line < options.CenterLines.Count)
 			{
-				_midMessages[slot] = null;
-				if (slot == 0 && options.CenterHud && shownSpeed is float speed)
+				var parts = new List<string>();
+				foreach (string key in options.CenterLines[line])
 				{
-					text = speed.ToString("0", CultureInfo.InvariantCulture);
-					colorClass = _centerSpeedClass;
-					size = options.CenterSpeed;
-					mono = options.CenterSpeedMono;
-					offset = options.CenterSpeedOffset;
+					var field = FieldOf(key, source);
+					if (!IsAvailable(field))
+						continue; // Nothing to show - the center leaves it out instead of N/A
+					parts.Add(CenterTextOf(field, options.CenterLabels));
+					colorClass ??= HudFieldCatalog.KindOf(key) == HudFieldKind.Speed ? _centerSpeedClass
+						: field.Segments.FirstOrDefault(s => s.ColorClass != null).ColorClass ?? "nc-snow";
 				}
+				text = string.Join(CenterSeparator, parts);
 			}
 
 			SendText(id, text);
@@ -685,7 +894,7 @@ public class PlayerHud
 
 			any = true;
 			SendExclusive(id, "size", $"msize-{size}");
-			SendExclusive(id, "pos", $"mpos-{CustomHud.MidPosition(slot, offset)}");
+			SendExclusive(id, "pos", $"mpos-{CustomHud.MidPosition(line, options.CenterOffset(line))}");
 			SendExclusive(id, "color", colorClass);
 			SendExclusive(id, "font", mono ? CustomHud.MonoFontClass : null);
 		}
@@ -708,6 +917,28 @@ public class PlayerHud
 			: energy - before > EnergyDeadZone ? "nc-green"
 			: before - energy > EnergyDeadZone ? "nc-red"
 			: "nc-snow";
+	}
+
+	// The pace of this update - the splits panel and the pace fields share it (one tracker step per update)
+	private int _paceTick = -1;
+	private Player? _paceSubject;
+	private PaceResult? _paceResult;
+
+	/// <summary>The shown player's live pace against the splits panel's target - null without a reference / match</summary>
+	private PaceResult? PaceOf(Player subject)
+	{
+		if (_paceTick == Server.TickCount && ReferenceEquals(_paceSubject, subject))
+			return _paceResult;
+
+		_paceTick = Server.TickCount;
+		_paceSubject = subject;
+		_paceResult = null;
+		if (subject.Controller.PawnIsAlive && PaceReferenceOf(subject, _player.Options.HudSplitTarget) is { } reference)
+		{
+			float speed = Extensions.SpeedOf(subject.Controller, SpeedAxes.XYZ);
+			_paceResult = _pace.Update(subject, reference, speed, Gravity.Current, Server.TickCount);
+		}
+		return _paceResult;
 	}
 
 	/// <summary>
@@ -775,17 +1006,9 @@ public class PlayerHud
 	/// </summary>
 	private List<List<HudElement>> PaceRows(Player subject, PlayerOptions options)
 	{
-		if (!subject.Controller.PawnIsAlive)
-			return [];
-		var reference = PaceReferenceOf(subject, options.HudSplitTarget);
-		if (reference == null)
+		if (PaceOf(subject) is not PaceResult pace)
 			return [];
 
-		float speed = Extensions.SpeedOf(subject.Controller, SpeedAxes.XYZ);
-		if (_pace.Update(subject, reference, speed, Gravity.Current, Server.TickCount) is not PaceResult pace)
-			return [];
-
-		string Signed(float value) => $"{(value >= 0 ? "+" : "-")}{Math.Abs(value).ToString("0", CultureInfo.InvariantCulture)}";
 		var rows = new List<List<HudElement>>
 		{
 			new()

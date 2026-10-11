@@ -124,6 +124,13 @@ public class Player
 	internal float SyncPercent => this.SyncTotalTicks > 0 ? 100f * this.SyncGoodTicks / this.SyncTotalTicks : 0f;
 	private float _lastYaw;
 
+	// Jumps and strafes of the current run (HUD fields) - reset with the sync when a run starts
+	internal int RunJumps { get; private set; }
+	internal int RunStrafes { get; private set; }
+	private bool _syncWasOnGround = true;
+	/// <summary>The strafe key held alone last (-1 left, 1 right, 0 none yet) - a switch in the air is a strafe</summary>
+	private int _lastStrafeKey;
+
 	// Sync counters when the current stage / checkpoint segment started - a segment's sync is the difference
 	private int _segmentSyncGood;
 	private int _segmentSyncTotal;
@@ -317,6 +324,9 @@ public class Player
 	{
 		this.SyncGoodTicks = 0;
 		this.SyncTotalTicks = 0;
+		this.RunJumps = 0;
+		this.RunStrafes = 0;
+		_lastStrafeKey = 0;
 		MarkSegmentStart();
 	}
 
@@ -338,13 +348,41 @@ public class Player
 			return;
 
 		bool onGround = (pawn.Flags & (uint)PlayerFlags.FL_ONGROUND) != 0;
-		bool? inSync = StrafeSync.Evaluate(prevYaw, yaw, onGround, this.Controller.Buttons);
+		var buttons = this.Controller.Buttons;
+		CountJumpsAndStrafes(onGround, buttons);
+
+		bool? inSync = StrafeSync.Evaluate(prevYaw, yaw, onGround, buttons);
 		if (inSync == null)
 			return;
 
 		this.SyncTotalTicks++;
 		if (inSync.Value)
 			this.SyncGoodTicks++;
+	}
+
+	/// <summary>
+	/// A jump: leaving the ground with jump held. A strafe: in the air, switching to the other strafe key (held alone) -
+	/// the first strafe of each air time counts too.
+	/// </summary>
+	private void CountJumpsAndStrafes(bool onGround, PlayerButtons buttons)
+	{
+		if (_syncWasOnGround && !onGround && buttons.HasFlag(PlayerButtons.Jump))
+			this.RunJumps++;
+		_syncWasOnGround = onGround;
+
+		if (onGround)
+		{
+			_lastStrafeKey = 0;
+			return;
+		}
+
+		bool left = buttons.HasFlag(PlayerButtons.Moveleft), right = buttons.HasFlag(PlayerButtons.Moveright);
+		int key = left == right ? 0 : left ? -1 : 1;
+		if (key != 0 && key != _lastStrafeKey)
+		{
+			this.RunStrafes++;
+			_lastStrafeKey = key;
+		}
 	}
 
 	/// <summary>

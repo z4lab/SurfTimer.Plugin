@@ -1,17 +1,5 @@
 namespace SurfTimer;
 
-/// <summary>Fields of the bottom HUD block the player can arrange (!options - HUD)</summary>
-internal enum HudFieldKind
-{
-	Timer,
-	Speed,
-	Prespeed,
-	Keys,
-	Sync,
-	/// <summary>Mechanical energy (Energy.cs) - not in the presets</summary>
-	Energy,
-}
-
 /// <summary>Which velocity axes speeds are shown with (!options - HUD)</summary>
 internal enum SpeedAxes
 {
@@ -95,27 +83,38 @@ internal sealed class PlayerOptions
 	internal const string KeyZonesShow = "zones_show";
 	internal const string KeySpeedAxes = "speed_axes";
 	internal const string KeySoundVolume = "sound_volume";
-	/// <summary>The center HUD (custom HUD middle slots - the speed above the crosshair) on / off</summary>
+	/// <summary>The center HUD (custom HUD middle slots - fields around the crosshair) on / off</summary>
 	internal const string KeyCenterHud = "center_hud";
+	/// <summary>Center HUD layout: three lines (above, at, below the crosshair) split by '|', fields by ','</summary>
+	internal const string KeyCenterFields = "center_fields";
+	/// <summary>Center fields with their labels ("Speed 1234") instead of only the values</summary>
+	internal const string KeyCenterLabels = "center_labels";
+	/// <summary>The timer's own short messages (Map Start, Run restored, prespeed ...) in a center line</summary>
+	internal const string KeyCenterNotify = "center_notify";
+	/// <summary>Lines 1 and 2: center_size_N / center_offset_N - line 0 keeps the old center_speed / center_speed_offset</summary>
+	internal const string KeyCenterSizePrefix = "center_size_";
+	internal const string KeyCenterOffsetPrefix = "center_offset_";
 	/// <summary>Live pace (projected finish) under the splits, and the energy / speed difference to the reference there</summary>
 	internal const string KeyHudPace = "hud_pace";
 	internal const string KeyHudPaceEnergy = "hud_pace_energy";
-	/// <summary>Size of the center speed, 1-5 (0 meant off before center_hud existed)</summary>
+	/// <summary>Size of the center HUD's first line (the speed before the lines had fields), 1-5 (0 meant off before center_hud existed)</summary>
 	internal const string KeyCenterSpeed = "center_speed";
 	/// <summary>The center speed's colour: follow (the HUD speed colour) or a SpeedColorMode of its own</summary>
 	internal const string KeyCenterSpeedColor = "center_speed_color";
 	internal const string KeyCenterSpeedColorStatic = "center_speed_color_static";
-	/// <summary>Its height: steps up (-) / down (+) from the slot's place, 10px each</summary>
+	/// <summary>The first line's height: steps up (-) / down (+) from its place, 10px each</summary>
 	internal const string KeyCenterSpeedOffset = "center_speed_offset";
 	internal const string KeyCenterSpeedMono = "center_speed_mono";
 	internal const string KeySpeedColor = "speed_color";
 	internal const string KeySpeedColorStatic = "speed_color_static";
 	internal const string KeyTimerWarning = "timer_warning";
 
-	internal const int CenterSpeedSizes = 5;
-	internal const int DefaultCenterSpeedSize = 3;
-	internal const int CenterSpeedMaxOffset = 10;
-	internal const int DefaultCenterSpeedOffset = 0;
+	internal const int CenterSizes = 5;
+	internal const int DefaultCenterSize = 3;
+	internal const int CenterMaxOffset = 10;
+
+	/// <summary>Center HUD: the speed above the crosshair, nothing at / below it</summary>
+	internal const string DefaultCenterFields = "speed||";
 
 	/// <summary>Static speed colours (Nord) - the layout's nc-&lt;key&gt; classes</summary>
 	internal static readonly (string Key, string Label)[] SpeedStaticColors =
@@ -146,13 +145,6 @@ internal sealed class PlayerOptions
 		("Keys first", "keys,timer,speed|prespeed,sync"),
 	];
 
-	// Layout limits - fixed by the published HUD addon (CustomHud.FieldRows / FieldsPerRow)
-	internal static int RowCapacity => CustomHud.FieldsPerRow;
-	internal static int MaxRows => CustomHud.FieldRows;
-
-	/// <summary>Width of a field in the bottom HUD - the timer spans two</summary>
-	internal static int Width(HudFieldKind field) => field == HudFieldKind.Timer ? 2 : 1;
-
 	private readonly PlayerProfile _profile;
 
 	private bool _hideLegs, _hidePlayers, _hideBots;
@@ -166,9 +158,10 @@ internal sealed class PlayerOptions
 	private ZoneDisplay _zonesShow = ZoneDisplay.Off;
 	private SpeedAxes _speedAxes = SpeedAxes.XY;
 	private int _soundVolume = DefaultSoundVolume;
-	private int _centerSpeed;
-	private int _centerSpeedOffset = DefaultCenterSpeedOffset;
-	private bool _centerHud;
+	private string _centerFields = DefaultCenterFields;
+	private readonly int[] _centerSizes = new int[CustomHud.MidSlots];
+	private readonly int[] _centerOffsets = new int[CustomHud.MidSlots];
+	private bool _centerHud, _centerLabels, _centerNotify;
 	private bool _hudPace, _hudPaceEnergy;
 	private SpeedColorMode? _centerSpeedColor;
 	private string _centerSpeedColorStatic = "snow";
@@ -216,10 +209,18 @@ internal sealed class PlayerOptions
 		_soundVolume = _profile.Settings.TryGetValue(KeySoundVolume, out var volume) && int.TryParse(volume, out int percent)
 			&& percent is >= 0 and <= 100 ? percent : DefaultSoundVolume;
 		int storedSize = _profile.Settings.TryGetValue(KeyCenterSpeed, out var centerSize) && int.TryParse(centerSize, out int size)
-			&& size is >= 0 and <= CenterSpeedSizes ? size : 0;
+			&& size is >= 0 and <= CenterSizes ? size : 0;
 		// Before center_hud existed, size 0 meant off
 		_centerHud = Bool(KeyCenterHud, storedSize > 0);
-		_centerSpeed = storedSize > 0 ? storedSize : DefaultCenterSpeedSize;
+		_centerLabels = Bool(KeyCenterLabels, false);
+		_centerNotify = Bool(KeyCenterNotify, true);
+		for (int line = 0; line < CustomHud.MidSlots; line++)
+		{
+			_centerSizes[line] = _profile.Settings.TryGetValue(CenterSizeKey(line), out var lineSize) && int.TryParse(lineSize, out int parsedSize)
+				&& parsedSize is >= 1 and <= CenterSizes ? parsedSize : DefaultCenterSize;
+			_centerOffsets[line] = _profile.Settings.TryGetValue(CenterOffsetKey(line), out var lineOffset) && int.TryParse(lineOffset, out int parsedOffset)
+				&& Math.Abs(parsedOffset) <= CenterMaxOffset ? parsedOffset : 0;
+		}
 		_hudPace = Bool(KeyHudPace, false);
 		_hudPaceEnergy = Bool(KeyHudPaceEnergy, false);
 		_centerSpeedColor = _profile.Settings.TryGetValue(KeyCenterSpeedColor, out var centerColor)
@@ -227,8 +228,6 @@ internal sealed class PlayerOptions
 				? parsedCenterColor : null;
 		_centerSpeedColorStatic = _profile.Settings.TryGetValue(KeyCenterSpeedColorStatic, out var centerStatic)
 			&& SpeedStaticColors.Any(c => c.Key == centerStatic) ? centerStatic : "snow";
-		_centerSpeedOffset = _profile.Settings.TryGetValue(KeyCenterSpeedOffset, out var centerOffset) && int.TryParse(centerOffset, out int offset)
-			&& Math.Abs(offset) <= CenterSpeedMaxOffset ? offset : DefaultCenterSpeedOffset;
 		_centerSpeedMono = Bool(KeyCenterSpeedMono, true);
 		_speedColor = _profile.Settings.TryGetValue(KeySpeedColor, out var speedColor)
 			&& Enum.TryParse(speedColor, ignoreCase: true, out SpeedColorMode parsedColor) && Enum.IsDefined(parsedColor) ? parsedColor : SpeedColorMode.Gradient;
@@ -246,18 +245,26 @@ internal sealed class PlayerOptions
 		}
 
 		// A stored layout the HUD can't show falls back to the default
-		string fields = _profile.Settings.TryGetValue(KeyHudFields, out var value) ? value : DefaultHudFields;
-		if (!TryParseHud(fields, out var rows))
-		{
-			fields = DefaultHudFields;
-			TryParseHud(fields, out rows);
-		}
-		_hudFields = fields;
-		HudRows = rows;
+		(_hudFields, HudRows) = LoadLayout(HudLayoutSpec.Bottom, KeyHudFields, DefaultHudFields);
+		(_centerFields, CenterLines) = LoadLayout(HudLayoutSpec.Center, KeyCenterFields, DefaultCenterFields);
 
 		bool Bool(string key, bool fallback) =>
 			_profile.Settings.TryGetValue(key, out var stored) ? stored is "1" or "true" : fallback;
 	}
+
+	private (string Text, IReadOnlyList<IReadOnlyList<string>> Rows) LoadLayout(HudLayoutSpec spec, string key, string fallback)
+	{
+		string text = _profile.Settings.TryGetValue(key, out var value) ? value : fallback;
+		if (!spec.TryParse(text, out var rows))
+		{
+			text = fallback;
+			spec.TryParse(text, out rows);
+		}
+		return (spec.Format(rows), rows);
+	}
+
+	private static string CenterSizeKey(int line) => line == 0 ? KeyCenterSpeed : KeyCenterSizePrefix + line;
+	private static string CenterOffsetKey(int line) => line == 0 ? KeyCenterSpeedOffset : KeyCenterOffsetPrefix + line;
 
 	/// <summary>
 	/// Back to the defaults (the stored settings were removed, e.g. by an admin).
@@ -361,7 +368,7 @@ internal sealed class PlayerOptions
 		}
 	}
 
-	// ---- Center speed ----
+	// ---- Pace, center HUD ----
 
 	/// <summary>Live pace under the splits (off by default) - against the splits panel's target</summary>
 	internal bool HudPace { get => _hudPace; set { _hudPace = value; Save(KeyHudPace, value); } }
@@ -372,15 +379,46 @@ internal sealed class PlayerOptions
 	/// <summary>The center HUD on / off (off by default)</summary>
 	internal bool CenterHud { get => _centerHud; set { _centerHud = value; Save(KeyCenterHud, value); } }
 
-	/// <summary>Size of the center speed, 1-5</summary>
-	internal int CenterSpeed
+	/// <summary>Center fields with their labels</summary>
+	internal bool CenterLabels { get => _centerLabels; set { _centerLabels = value; Save(KeyCenterLabels, value); } }
+
+	/// <summary>The timer's own short messages in a center line (on by default)</summary>
+	internal bool CenterNotify { get => _centerNotify; set { _centerNotify = value; Save(KeyCenterNotify, value); } }
+
+	/// <summary>Size of a center line, 1-5</summary>
+	internal int CenterSize(int line) => _centerSizes[line];
+
+	internal void SetCenterSize(int line, int size)
 	{
-		get => _centerSpeed;
-		set
-		{
-			_centerSpeed = Math.Clamp(value, 1, CenterSpeedSizes);
-			_profile.SetSetting(KeyCenterSpeed, _centerSpeed.ToString());
-		}
+		_centerSizes[line] = Math.Clamp(size, 1, CenterSizes);
+		_profile.SetSetting(CenterSizeKey(line), _centerSizes[line].ToString());
+	}
+
+	/// <summary>Steps up (-) / down (+) from a center line's place, 10px each</summary>
+	internal int CenterOffset(int line) => _centerOffsets[line];
+
+	internal void SetCenterOffset(int line, int offset)
+	{
+		_centerOffsets[line] = Math.Clamp(offset, -CenterMaxOffset, CenterMaxOffset);
+		_profile.SetSetting(CenterOffsetKey(line), _centerOffsets[line].ToString());
+	}
+
+	/// <summary>The center HUD layout as stored (see DefaultCenterFields)</summary>
+	internal string CenterFields => _centerFields;
+
+	/// <summary>The center HUD's three lines (above, at, below the crosshair) - read by the HUD every update</summary>
+	internal IReadOnlyList<IReadOnlyList<string>> CenterLines { get; private set; } = [];
+
+	/// <summary>Sets the center HUD layout - false (nothing changed) when it doesn't fit</summary>
+	internal bool TrySetCenterFields(string fields)
+	{
+		if (!HudLayoutSpec.Center.TryParse(fields, out var lines))
+			return false;
+
+		_centerFields = HudLayoutSpec.Center.Format(lines);
+		CenterLines = lines;
+		_profile.SetSetting(KeyCenterFields, _centerFields);
+		return true;
 	}
 
 	/// <summary>The center speed's own colour mode - null: the same as the HUD speed (default)</summary>
@@ -407,19 +445,7 @@ internal sealed class PlayerOptions
 		}
 	}
 
-	/// <summary>Steps up (-) / down (+) from the upper middle slot's place</summary>
-	internal int CenterSpeedOffset
-	{
-		get => _centerSpeedOffset;
-		set
-		{
-			_centerSpeedOffset = Math.Clamp(value, -CenterSpeedMaxOffset, CenterSpeedMaxOffset);
-			_profile.SetSetting(KeyCenterSpeedOffset, _centerSpeedOffset.ToString());
-		}
-	}
-
-	/// <summary>Axes the HUD, prespeed and split speeds are shown with</summary>
-	/// <summary>The centre speed in the monospace font (digits don't shift)</summary>
+	/// <summary>The center HUD in the monospace font (digits don't shift)</summary>
 	internal bool CenterSpeedMono { get => _centerSpeedMono; set { _centerSpeedMono = value; Save(KeyCenterSpeedMono, value); } }
 
 	internal SpeedColorMode SpeedColor
@@ -455,6 +481,7 @@ internal sealed class PlayerOptions
 		}
 	}
 
+	/// <summary>Axes the HUD, prespeed and split speeds are shown with</summary>
 	internal SpeedAxes SpeedAxes
 	{
 		get => _speedAxes;
@@ -510,54 +537,20 @@ internal sealed class PlayerOptions
 	/// <summary>The bottom HUD layout as stored (see DefaultHudFields)</summary>
 	internal string HudFields => _hudFields;
 
-	/// <summary>The bottom HUD layout, parsed - read by the HUD every tick</summary>
-	internal IReadOnlyList<IReadOnlyList<HudFieldKind>> HudRows { get; private set; } = [];
+	/// <summary>The bottom HUD layout, parsed - read by the HUD every update</summary>
+	internal IReadOnlyList<IReadOnlyList<string>> HudRows { get; private set; } = [];
 
 	/// <summary>
 	/// Sets the bottom HUD layout - false (nothing changed) when it doesn't fit the HUD.
 	/// </summary>
 	internal bool TrySetHudFields(string fields)
 	{
-		if (!TryParseHud(fields, out var rows))
+		if (!HudLayoutSpec.Bottom.TryParse(fields, out var rows))
 			return false;
 
-		_hudFields = Format(rows);
+		_hudFields = HudLayoutSpec.Bottom.Format(rows);
 		HudRows = rows;
 		_profile.SetSetting(KeyHudFields, _hudFields);
 		return true;
 	}
-
-	/// <summary>
-	/// Parses "timer,speed|prespeed,keys,sync": at most MaxRows rows of RowCapacity width, every field at
-	/// most once. Empty rows are dropped; an empty layout (no bottom HUD) is allowed.
-	/// </summary>
-	internal static bool TryParseHud(string text, out IReadOnlyList<IReadOnlyList<HudFieldKind>> rows)
-	{
-		rows = [];
-		var parsed = new List<IReadOnlyList<HudFieldKind>>();
-		var seen = new HashSet<HudFieldKind>();
-
-		foreach (var rowText in text.Split('|', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
-		{
-			var row = new List<HudFieldKind>();
-			foreach (var name in rowText.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
-			{
-				if (!Enum.TryParse(name, ignoreCase: true, out HudFieldKind field) || !Enum.IsDefined(field) || !seen.Add(field))
-					return false;
-				row.Add(field);
-			}
-			if (row.Sum(Width) > RowCapacity)
-				return false;
-			if (row.Count > 0)
-				parsed.Add(row);
-		}
-
-		if (parsed.Count > MaxRows)
-			return false;
-		rows = parsed;
-		return true;
-	}
-
-	internal static string Format(IEnumerable<IEnumerable<HudFieldKind>> rows) =>
-		string.Join("|", rows.Select(r => string.Join(",", r.Select(f => f.ToString().ToLowerInvariant()))).Where(r => r.Length > 0));
 }

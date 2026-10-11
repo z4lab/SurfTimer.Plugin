@@ -32,6 +32,32 @@ public interface ISurfTimerApi
 	/// <summary>A value for one player only - wins over the global value of the same key. null clears it.</summary>
 	void SetTopHudFor(CCSPlayerController player, string key, HudValue? value);
 
+	// ---- HUD fields and center messages (custom HUD only) ----
+
+	/// <summary>
+	/// Adds a live value players can place in their bottom HUD and center HUD (!options - HUD), like the timer's own
+	/// fields. key: "addon.name" (lowercase letters, digits, _), stored in players' layouts - keep it stable. value is
+	/// asked for every HUD update (16x a second, main thread) with the viewer and returns what they see - null or an empty
+	/// Value shows nothing. HudValue.Label and Row are ignored (label is the field's name). Registering a key again
+	/// replaces it.
+	/// </summary>
+	void RegisterHudField(string key, string label, string description, Func<CCSPlayerController, HudValue?> value);
+
+	void UnregisterHudField(string key);
+
+	/// <summary>
+	/// Shows a short text in a line of the center HUD (around the crosshair) for some seconds (0.5 - 30) - for one player,
+	/// or everyone when player is null. The line shows the text instead of its fields, then goes back to them. Auto takes
+	/// a line without fields (at, below, above the crosshair), else the one at the crosshair. On a line with a message
+	/// already, the newest shows; an older one comes back if it still has time left. size: 1 - 5. Players without the
+	/// custom HUD get CS2's center print.
+	/// </summary>
+	CenterMessage ShowCenterMessage(CCSPlayerController? player, string text, float seconds, CenterLine line = CenterLine.Auto,
+		HudColor color = HudColor.Default, int size = 3);
+
+	/// <summary>Takes a center message down before its time is up</summary>
+	void ClearCenterMessage(CenterMessage message);
+
 	// ---- Menus (the custom HUD popup, or the chat menu without it) ----
 
 	void ShowMenu(CCSPlayerController player, ApiMenu menu);
@@ -156,6 +182,19 @@ public enum HudRow
 	/// <summary>Addons</summary>
 	Fourth,
 }
+
+/// <summary>The center HUD's lines</summary>
+public enum CenterLine
+{
+	/// <summary>A line without fields, else the one at the crosshair</summary>
+	Auto,
+	Above,
+	Crosshair,
+	Below,
+}
+
+/// <summary>A message shown with ShowCenterMessage - ClearCenterMessage takes it down early</summary>
+public sealed record CenterMessage(long Id);
 
 /// <param name="Label">Small label before the value ("Time left"), empty for none</param>
 /// <param name="Value">The value ("12:34")</param>
