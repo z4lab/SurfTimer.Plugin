@@ -16,6 +16,8 @@
 	"invalid_usage": "{red}Invalid arguments. {default}Usage: {green}{0}",
 	"invalid_stage_value": "{red}Invalid stage provided. {default}this map has {green}{0}{default} stages.",
 	"not_staged": "{red}This map has no stages.",
+	"end_not_in_start": "{red}!end only works in the start zone of {0}.",
+	"end_no_end": "{red}{0} has no end zone.",
 	"invalid_bonus_value": "{red}Invalid bonus provided. {default}this map has {green}{0}{default} bonuses.",
 	"not_bonused": "{red}This map has no bonuses.",
 	"rank": "Your current rank for {gold}{0}{default} is {green}{1}{default} out of {yellow}{2}",
