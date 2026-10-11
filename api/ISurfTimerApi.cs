@@ -112,6 +112,17 @@ public interface ISurfTimerApi
 	/// </summary>
 	event Action<MapFinish>? MapFinished;
 
+	// ---- Help (!help) ----
+
+	/// <summary>
+	/// Lists a command in !help (the popup's tab of its group, and !help &lt;command&gt;). Registering a command again
+	/// replaces it. Players only see it when they have entry.Flag (root has all) - admin entries without a flag need any
+	/// admin permission.
+	/// </summary>
+	void RegisterHelp(HelpEntry entry);
+
+	void UnregisterHelp(string command);
+
 	// ---- Chat ----
 
 	/// <summary>
@@ -182,6 +193,33 @@ public enum HudRow
 	/// <summary>Addons</summary>
 	Fourth,
 }
+
+/// <summary>The tabs of !help, from basic to advanced</summary>
+public enum HelpGroup
+{
+	/// <summary>Getting around: reset, stages, bonuses, map votes</summary>
+	Basics,
+	/// <summary>Savelocs, start positions, repeat</summary>
+	Practice,
+	/// <summary>Records, ranks, profiles</summary>
+	Records,
+	/// <summary>Spectating and replays</summary>
+	Spectate,
+	/// <summary>Settings, shortcuts, weapons</summary>
+	Options,
+	/// <summary>Only shown to admins</summary>
+	Admin,
+}
+
+/// <param name="Command">The chat command without "!" / "css_", e.g. "rtv"</param>
+/// <param name="Text">One line: what it does</param>
+/// <param name="Usage">Its arguments, e.g. "[map]" ([] optional, &lt;&gt; needed)</param>
+/// <param name="Aliases">Other names, without "!"</param>
+/// <param name="Detail">Longer text for !help &lt;command&gt;</param>
+/// <param name="Flag">Only players with this permission see it</param>
+/// <param name="Order">Place in its tab - lower first (the timer's own use 0 - 99)</param>
+public sealed record HelpEntry(string Command, string Text, HelpGroup Group = HelpGroup.Basics, string Usage = "",
+	string[]? Aliases = null, string Detail = "", string? Flag = null, int Order = 100);
 
 /// <summary>The center HUD's lines</summary>
 public enum CenterLine

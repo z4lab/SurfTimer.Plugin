@@ -42,7 +42,7 @@ public partial class SurfTimer : BasePlugin
 
 	// Metadata
 	public override string ModuleName => $"z4lab/{Config.PluginName}";
-	public override string ModuleVersion => "1.0.19";
+	public override string ModuleVersion => "1.0.20";
 	public override string ModuleDescription => Config.PluginName;
 	public override string ModuleAuthor => "z4lab";
 
@@ -209,6 +209,7 @@ public partial class SurfTimer : BasePlugin
 
 		// Our API for addons (SurfTimer.Api, e.g. the map chooser) - offered in Load, so it's there when the
 		// addons look for it in their OnAllPluginsLoaded
+		RegisterOwnHelp(); // !help lists the timer's commands, addons add theirs through the API
 		var api = new SurfTimerApiImpl(this, _logger);
 		SurfTimerApiImpl.Register(api);
 		Capabilities.RegisterPluginCapability(SurfTimerApi.Capability, () => api);

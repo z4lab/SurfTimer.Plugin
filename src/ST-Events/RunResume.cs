@@ -106,6 +106,7 @@ public partial class SurfTimer
 			return;
 
 		p.FirstSpawnHandled = true;
+		ShowHelpHint(p);
 		int token = ++p.PlacementToken;
 		p.PlacementPendingUntilTick = Server.TickCount + (int)(FirstSpawnAttempts * FirstSpawnPollSeconds * 64) + 64;
 		PlaceFirstSpawn(p, token, FirstSpawnAttempts);

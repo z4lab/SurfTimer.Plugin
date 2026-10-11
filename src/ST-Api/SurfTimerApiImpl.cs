@@ -108,6 +108,12 @@ internal sealed class SurfTimerApiImpl(SurfTimer plugin, ILogger logger) : ISurf
 	/// <summary>The layout's colour class of an addon colour - null for the default</summary>
 	internal static string? ColorClassOf(HudColor color) => color == HudColor.Default ? null : CustomHud.ColorClass(HexOf(color));
 
+	// ---- Help ----
+
+	public void RegisterHelp(HelpEntry entry) => SurfTimer.RegisterAddonHelp(entry);
+
+	public void UnregisterHelp(string command) => SurfTimer.UnregisterAddonHelp(command);
+
 	// ---- HUD fields and center messages ----
 
 	public void RegisterHudField(string key, string label, string description, Func<CCSPlayerController, HudValue?> value)

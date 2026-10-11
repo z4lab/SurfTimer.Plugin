@@ -25,6 +25,7 @@ Some menu rows ask you to type something in chat. Type `!cancel` to abort.
 
 | Command | Aliases | What it does |
 |---|---|---|
+| `!help [command]` | | Every command in a popup, a tab per topic from basic to advanced: **Basics**, **Practice**, **Records**, **Spectate**, **Options**, **Admin** (only with admin permissions, only the commands you may use). Addons (map chooser, paint, admin plugin) add theirs. Each command opens its details, with **Run** for commands that need no arguments. With a command (`!help saveloc`, aliases work too): its details in chat. New players get a hint once. |
 | `!r` | | Back to the map start. Also takes you out of spectator. During a run you type it twice within 3 seconds: the first one only warns, with a quiet sound (turn this off in Options › Gameplay). |
 | `!rs` | `!back` | Back to the start of the stage or bonus you're on. Otherwise the map start. From spectator: back to where you were (see **Joining, resuming & spectating**). |
 | `!s [n]` | `!stage` | Teleports you to stage *n* and resets your timer (stage mode). Staged maps only. Without a number it opens a picker with every stage and its tier. |
