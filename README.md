@@ -76,8 +76,8 @@ The timer keeps that in line:
 - Walking into a start zone changes nothing (the map handles that).
 - On maps with a start name set, a run that starts with another name gets the start name (logged).
 
-Map admins: `!mapfilters` prints the map's filters, the triggers using them and what the map's triggers do to players
-(to your console and the server log). Not covered: attributes (`filter_activator_attribute_int`), classnames, context
+Map admins: `!mapfilters` prints your contexts and name, the map's filters and the triggers using them (to your
+console and the server log). What the triggers do (e.g. `AddContext`) shows in a map source viewer. Not covered: attributes (`filter_activator_attribute_int`), classnames, context
 expiry times and the map's delayed outputs still pending when you teleport.
 
 </details>
