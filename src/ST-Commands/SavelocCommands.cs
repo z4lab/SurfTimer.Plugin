@@ -306,6 +306,15 @@ public partial class SurfTimer
 			p.Stats.ThisRun.Checkpoints.Clear();
 		}
 
+		// Map filters: a saveloc in a start zone begins like that start (unless the map keeps names), others carry the
+		// state they were saved with - replay savelocs have none and get their course's start state
+		p.StageFilters.Clear();
+		var filter = saveloc.StartZone is var (filterZone, filterNumber) ? StartFilterOf(filterZone, filterNumber) ?? saveloc.Filter
+			: saveloc.Filter ?? (saveloc.Run is { IsStageMode: true } stageRun ? StartFilterOf(ZoneType.StageStart, stageRun.Stage)
+				: saveloc.CourseBonus > 0 ? StartFilterOf(ZoneType.BonusStart, saveloc.CourseBonus)
+				: StartFilterOf(ZoneType.MapStart, 1));
+		filter?.Apply(pawn);
+
 		saveloc.ApplyPawn(pawn);
 
 		// Landing inside a zone isn't entering it (no stray start / stop) - only moving out of / into one counts

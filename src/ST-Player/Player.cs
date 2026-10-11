@@ -74,6 +74,9 @@ public class Player
 	/// <summary>A first !r during a run asked for a second one until this tick (Options - Gameplay - Confirm !r)</summary>
 	internal int ResetConfirmUntilTick { get; set; }
 
+	/// <summary>Filter state the current map run left each stage start with - !rs back to one gives it again (MapFilters.cs)</summary>
+	internal Dictionary<short, FilterState> StageFilters { get; } = new();
+
 	/// <summary>The saved in-progress run of this player on this map (PlayerStateService)</summary>
 	internal RunStateTracker RunState { get; } = new();
 

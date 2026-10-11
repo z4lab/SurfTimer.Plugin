@@ -82,6 +82,7 @@
 	"prompt_cancel_hint": "{grey}(type {yellow}!cancel{grey} to abort)",
 	"prompt_cancelled": "{grey}Cancelled.",
 	"prompt_workshop_id": "Type the map's workshop id in chat (- removes it).",
+	"prompt_filter_name": "Type the filter name runs start with (the targetname the map gives at its start).",
 	"prompt_course_name": "Type a name for this course in chat (- removes it).",
 	"prompt_authors": "Type the map's authors in chat, comma separated.",
 	"prompt_cvar": "Type the value of {0} for this map in chat.",

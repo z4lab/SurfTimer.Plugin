@@ -366,6 +366,36 @@ public class Map : MapEntity
 	internal const string SettingReplays = "replays_enabled";
 	internal const string SettingExitLimit = "exit_speed_limit";
 	internal const string SettingExitLimitValue = "exit_speed_limit_value";
+	/// <summary>"0": the timer's start teleports keep the player's filter name (maps that give it only once, at the start)</summary>
+	internal const string SettingFilterReset = "filter_reset";
+	/// <summary>The filter name a run starts with (default none) - per course: filter_start_name_s3, filter_start_name_b1</summary>
+	internal const string SettingFilterStartName = "filter_start_name";
+
+	/// <summary>The timer's start teleports set the start's filter state (filter_reset, default on)</summary>
+	internal bool FilterResets { get; private set; } = true;
+
+	private string? FilterStartNameSetting(ZoneType type, short number)
+	{
+		string? course = type switch
+		{
+			ZoneType.StageStart when number > 1 => $"{SettingFilterStartName}_s{number}",
+			ZoneType.BonusStart => $"{SettingFilterStartName}_b{number}",
+			_ => null,
+		};
+		if (course != null && Settings.TryGetValue(course, out var own))
+			return own;
+		return Settings.TryGetValue(SettingFilterStartName, out var name) ? name : null;
+	}
+
+	/// <summary>An admin set the start name for this start (or the whole map)</summary>
+	internal bool HasFilterStartName(ZoneType type, short number) => FilterStartNameSetting(type, number) != null;
+
+	/// <summary>
+	/// The filter state a run from this start begins with: the configured start name (else none), no contexts. Null when
+	/// the map keeps names (filter_reset 0).
+	/// </summary>
+	internal FilterState? FilterStartState(ZoneType type, short number) =>
+		FilterResets ? new FilterState(FilterStartNameSetting(type, number) ?? "", []) : null;
 
 	/// <summary>The map turns the hard limit on leaving run starts on (exit_speed_limit)</summary>
 	internal bool ExitLimitEnabled { get; private set; }
@@ -489,6 +519,7 @@ public class Map : MapEntity
 			? parsedLimit
 			: null;
 		this.ExitLimitEnabled = IsTrue(SettingExitLimit, false);
+		this.FilterResets = IsTrue(SettingFilterReset, true);
 
 		var snapshot = new Dictionary<string, string>(Settings, StringComparer.OrdinalIgnoreCase);
 		Server.NextFrame(() =>

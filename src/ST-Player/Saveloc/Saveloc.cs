@@ -39,6 +39,8 @@ internal sealed class Saveloc
 	internal float DuckAmount { get; init; }
 	internal MoveType_t MoveType { get; init; } = MoveType_t.MOVETYPE_WALK;
 	internal float GravityScale { get; init; } = 1f;
+	/// <summary>The map filter state of the saved pawn (this saveloc's own) - null for replay savelocs, which have none</summary>
+	internal FilterState? Filter { get; init; }
 
 	/// <summary>The course it was saved on (0 = map, N = bonus N) - loading it locks the player to that course</summary>
 	internal short CourseBonus { get; init; }
@@ -97,6 +99,7 @@ internal sealed class Saveloc
 			DuckAmount = movement?.DuckAmount ?? 0f,
 			MoveType = pawn.MoveType == MoveType_t.MOVETYPE_LADDER ? MoveType_t.MOVETYPE_LADDER : MoveType_t.MOVETYPE_WALK,
 			GravityScale = pawn.GravityScale,
+			Filter = FilterState.Capture(pawn),
 			CourseBonus = courseBonus,
 			StartZone = startZone,
 			Run = startZone == null && run != null && run.Timer.IsRunning ? SavelocRun.Capture(run) : null,

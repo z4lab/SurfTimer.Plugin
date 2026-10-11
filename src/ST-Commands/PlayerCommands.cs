@@ -64,15 +64,16 @@ public partial class SurfTimer
 		p.Timer.Reset();
 		p.Stats.ThisRun.Checkpoints.Clear();
 		p.CourseBonus = 0; // Back on the map course
-		TeleportToZone(p.Controller, ZoneType.MapStart, 1);
+		p.StageFilters.Clear();
+		TeleportToZone(p.Controller, ZoneType.MapStart, 1, StartFilterOf(ZoneType.MapStart, 1));
 	}
 
 	/// <summary>
 	/// Teleports the player (velocity zeroed) to the nearest trigger of a zone - maps can have several
 	/// per zone (e.g. one per side of a course) - or to their !startpos of that start zone. Returns false
-	/// if the map has no such zone.
+	/// if the map has no such zone. filter: the map filter state the player gets there (null keeps theirs).
 	/// </summary>
-	private bool TeleportToZone(CCSPlayerController player, ZoneType type, short number)
+	private bool TeleportToZone(CCSPlayerController player, ZoneType type, short number, FilterState? filter = null)
 	{
 		var pawn = player.PlayerPawn.Value;
 		VectorT? from = player.PawnIsAlive && pawn != null && pawn.IsValid && pawn.AbsOrigin != null
@@ -98,6 +99,7 @@ public partial class SurfTimer
 			var target = player.PlayerPawn.Value;
 			if (target == null || !target.IsValid)
 				return;
+			filter?.Apply(target); // Before the teleport: the map's own triggers there can still give a name
 			if (angles is QAngleT view)
 				target.TeleportWithView(position, view, new VectorT(0, 0, 0)); // Keeps the pawn level
 			else
@@ -143,13 +145,15 @@ public partial class SurfTimer
 		// On a bonus course: its start (the course lock keeps the player there)
 		if (oPlayer.CourseBonus > 0)
 		{
-			TeleportToZone(player, ZoneType.BonusStart, oPlayer.CourseBonus);
+			TeleportToZone(player, ZoneType.BonusStart, oPlayer.CourseBonus,
+				CurrentStartFilterOf(oPlayer, ZoneType.BonusStart, oPlayer.CourseBonus));
 			return;
 		}
 
-		bool teleported = oPlayer.Timer.Stage > 1 && TeleportToZone(player, ZoneType.StageStart, oPlayer.Timer.Stage);
+		bool teleported = oPlayer.Timer.Stage > 1 && TeleportToZone(player, ZoneType.StageStart, oPlayer.Timer.Stage,
+			CurrentStartFilterOf(oPlayer, ZoneType.StageStart, oPlayer.Timer.Stage));
 		if (!teleported) // Reset back to map start
-			TeleportToZone(player, ZoneType.MapStart, 1);
+			TeleportToZone(player, ZoneType.MapStart, 1, CurrentStartFilterOf(oPlayer, ZoneType.MapStart, 1));
 	}
 
 	[ConsoleCommand("css_s", "Teleport to a stage - without a number: stage 1, or a picker on staged maps")]
@@ -255,7 +259,8 @@ public partial class SurfTimer
 			playerList[player.UserId ?? 0].Timer.IsStageMode = true;
 		}
 		playerList[player.UserId ?? 0].CourseBonus = 0; // Stages are part of the map course
-		TeleportToZone(player, zoneType, stage);
+		playerList[player.UserId ?? 0].StageFilters.Clear();
+		TeleportToZone(player, zoneType, stage, StartFilterOf(zoneType, stage));
 
 		// To-do: If you run this while you're in the start zone, endtouch for the start zone runs after you've teleported
 		//        causing the timer to start. This needs to be fixed.
@@ -427,7 +432,8 @@ public partial class SurfTimer
 		oPlayer.Timer.IsBonusMode = true;
 		oPlayer.Timer.Bonus = bonus;
 		oPlayer.CourseBonus = bonus;
-		TeleportToZone(oPlayer.Controller, ZoneType.BonusStart, bonus);
+		oPlayer.StageFilters.Clear();
+		TeleportToZone(oPlayer.Controller, ZoneType.BonusStart, bonus, StartFilterOf(ZoneType.BonusStart, bonus));
 	}
 
 	[ConsoleCommand("css_spec", "Spectate a player or bot by (partial) name, or open a picker menu")]

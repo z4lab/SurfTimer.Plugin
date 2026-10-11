@@ -212,7 +212,7 @@ public partial class SurfTimer
 	private static readonly HashSet<string> KnownMapSettings = new(StringComparer.OrdinalIgnoreCase)
 	{
 		Map.SettingStagedLinear, Map.SettingStartSpeedCap, Map.SettingReplays, Map.SettingExitLimit, Map.SettingExitLimitValue,
-		Map.SettingStagesAsCheckpoints,
+		Map.SettingStagesAsCheckpoints, Map.SettingFilterReset, Map.SettingFilterStartName,
 	};
 
 	private static bool IsCustomMapSetting(string key) =>
@@ -283,9 +283,50 @@ public partial class SurfTimer
 				AdminSetMapSetting(ctx, Map.SettingReplays, on ? null : "0");
 				ctx.Session.Status = on ? "Replays are recorded again" : "No replays are stored on this map";
 			}),
+			ctx.Nav("Filters", !map.FilterResets ? "keep" : map.Settings.TryGetValue(Map.SettingFilterStartName, out var startName) ? startName : "reset",
+				"player names on start teleports", AdminFiltersPage),
 			ctx.Nav("Cvars", cvars == 0 ? "none" : $"{cvars} set", "movement cvars for this map", AdminCvarsPage),
 			ctx.Nav("Custom keys", custom.ToString(), "free key / value notes", AdminCustomKeysPage),
 		]);
+		return rows;
+	});
+
+	/// <summary>
+	/// Map filters (README: Map filters): whether the timer's start teleports reset the player's filter name, and the name
+	/// a run starts with. Per stage / bonus names are custom keys (filter_start_name_s3, filter_start_name_b1).
+	/// </summary>
+	private PanelPage AdminFiltersPage() => new("Filters", ctx =>
+	{
+		var map = CurrentMap;
+		var rows = new List<HudMenuItem>
+		{
+			ctx.Toggle("Reset on start teleports", map.FilterResets, "!r / !s / !b set the start name - off: keep", on =>
+			{
+				AdminSetMapSetting(ctx, Map.SettingFilterReset, on ? null : "0");
+				ctx.Session.Status = on ? "Start teleports set the start name" : "Players keep their filter name on this map";
+			}),
+		};
+		if (map.FilterResets)
+		{
+			bool named = map.Settings.TryGetValue(Map.SettingFilterStartName, out var name);
+			rows.Add(ctx.Ask("Start name", named ? name! : "none", named ? "runs start with it, checked" : "type in chat",
+				LocalizationService.LocalizerNonNull["prompt_filter_name"], text =>
+				{
+					if (text.Length > 64 || text.Any(char.IsWhiteSpace))
+						return "Up to 64 characters, no spaces";
+					AdminSetMapSetting(ctx, Map.SettingFilterStartName, text);
+					ctx.Session.Status = $"Runs start with the name '{text}'";
+					return null;
+				}));
+			if (named)
+				rows.Add(ctx.Act("Remove start name", "", "back to no name", () =>
+				{
+					AdminSetMapSetting(ctx, Map.SettingFilterStartName, null);
+					ctx.Session.Status = "Runs start without a name";
+				}));
+		}
+		if (ctx.Player.Controller.PlayerPawn.Value is { IsValid: true } pawn)
+			rows.Add(ctx.Act("Your state", FilterState.Capture(pawn).Describe(), "what filters see on you now", () => { }));
 		return rows;
 	});
 

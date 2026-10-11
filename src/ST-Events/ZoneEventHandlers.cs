@@ -613,6 +613,7 @@ public partial class SurfTimer
 		// MAP START ZONE
 		if (!player.Timer.IsStageMode && !player.Timer.IsBonusMode)
 		{
+			CheckRunFilter(player, ZoneType.MapStart, 1);
 			player.Timer.Start();
 			if (player.Timer.IsRunning && !player.Timer.IsPracticeMode)
 				Sounds.Play(player, Sounds.TimerStart);
@@ -670,9 +671,13 @@ public partial class SurfTimer
 		player.Timer.StageEntryVelZ = velocity.Z;
 		player.HUD.NotifyPrespeed($"Stage {stage}", velocity);
 
+		// Map filters: !rs back here during a map run gives the state the player left with
+		RecordStageFilter(player, stage);
+
 		// Start the Stage timer
 		if (player.Timer.IsStageMode && player.Timer.Stage == stage)
 		{
+			CheckRunFilter(player, ZoneType.StageStart, stage);
 			player.Timer.Start();
 			if (player.Timer.IsRunning && !player.Timer.IsPracticeMode)
 				Sounds.Play(player, Sounds.TimerStart);
@@ -770,6 +775,7 @@ public partial class SurfTimer
 		}
 
 		// BONUS START ZONE
+		CheckRunFilter(player, ZoneType.BonusStart, zone.Number);
 		player.Timer.Start();
 		if (player.Timer.IsRunning && !player.Timer.IsPracticeMode)
 			Sounds.Play(player, Sounds.TimerStart);

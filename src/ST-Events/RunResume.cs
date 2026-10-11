@@ -232,7 +232,11 @@ public partial class SurfTimer
 		else
 			p.ReplayRecorder.DropForRun();
 
-		state.ToSaveloc().ApplyPawn(pawn);
+		// The map filter state the run had - so filtered parts ahead still let the player through
+		var saveloc = state.ToSaveloc();
+		p.StageFilters.Clear();
+		saveloc.Filter?.Apply(pawn);
+		saveloc.ApplyPawn(pawn);
 
 		// Landing inside a zone isn't entering it (no stray start / stop) - now and next frame, as with savelocs
 		ResyncZoneTouches(p);
