@@ -211,6 +211,7 @@ public partial class SurfTimer
 		rows.Add(ctx.Toggle("Center HUD", options.CenterHud, "fields around the crosshair", on => options.CenterHud = on));
 		rows.Add(ctx.Nav("Center HUD settings", options.CenterHud ? $"{options.CenterLines.Sum(l => l.Count)} fields" : "off",
 			"fields, lines, size, height", OptionsCenterHudPage));
+		rows.Add(ctx.Nav("Ghost & path", GhostLabel(options), "a run's path ahead of you and a ghost racing you", OptionsGhostPage));
 		rows.Add(ctx.Nav("Speed color", SpeedColorLabel(options), "gradient, gain / loss or one color", OptionsSpeedColorPage));
 		rows.Add(ctx.Act("Timer warning", options.TimerWarning == TimerWarning.Wr ? "WR" : "PB", "the timer turns yellow once slower", () =>
 		{
@@ -340,6 +341,75 @@ public partial class SurfTimer
 		(CustomHud.Left, "Splits position", "0-10 · 200-600px from the top"),
 		(CustomHud.Right, "Spectators position", "0-10 · 200-600px from the top"),
 	];
+
+	// ---- Ghost & path ----
+
+	private static string GhostLabel(PlayerOptions options) =>
+		options.GhostPath && options.GhostOrb ? "path + ghost" : options.GhostPath ? "path" : options.GhostOrb ? "ghost" : "off";
+
+	private static string GhostTargetLabel(GhostTarget target) => target switch
+	{
+		GhostTarget.Splits => "splits target",
+		GhostTarget.Pb => "PB",
+		GhostTarget.Wr => "WR",
+		GhostTarget.NextRank => "next rank",
+		GhostTarget.Top10 => "top 10",
+		_ => $"G{target - GhostTarget.G1 + 1}",
+	};
+
+	/// <summary>
+	/// Ghost &amp; path (GhostPath.cs): the path of a run ahead of you (coloured by its speed, jump / crouch markers) and an
+	/// orb racing you - only you and your spectators see them.
+	/// </summary>
+	private PanelPage OptionsGhostPage() => new("Ghost & path", ctx =>
+	{
+		var options = ctx.Player.Options;
+		var rows = new List<HudMenuItem>
+		{
+			ctx.Toggle("Path", options.GhostPath, "the run's path ahead, colored by its speed - in a start zone and runs",
+				on => options.GhostPath = on),
+		};
+		if (options.GhostPath)
+		{
+			rows.Add(ctx.Toggle("Jump & crouch markers", options.GhostMarkers, "square: jump · triangle down / up: crouch / stand up",
+				on => options.GhostMarkers = on));
+			rows.Add(ctx.Act("Path length", $"{options.GhostSeconds}s", "of the run ahead of you - each press one step", () =>
+			{
+				var steps = PlayerOptions.GhostSecondSteps;
+				options.GhostSeconds = steps[(Array.IndexOf(steps, options.GhostSeconds) + 1) % steps.Length];
+				ctx.Session.Status = $"Path: {options.GhostSeconds}s ahead";
+			}));
+		}
+		rows.Add(ctx.Toggle("Ghost", options.GhostOrb, "an orb where the run was at your time - while your timer runs",
+			on => options.GhostOrb = on));
+		rows.Add(ctx.Nav("Run", GhostTargetLabel(options.GhostTarget), "which run they follow", OptionsGhostTargetPage));
+		rows.Add(PanelContext.Info("Following", GhostStatusOf(ctx.Player)));
+		return rows;
+	});
+
+	private PanelPage OptionsGhostTargetPage() => new("Ghost run", ctx =>
+	{
+		var options = ctx.Player.Options;
+		HudMenuItem Row(GhostTarget target, string text, string sub) =>
+			ctx.Act(text, options.GhostTarget == target ? "current" : "", sub, () =>
+			{
+				options.GhostTarget = target;
+				PanelBackFrom(ctx.Session, ctx.Page, $"Ghost & path follow: {GhostTargetLabel(target)}");
+			});
+
+		var rows = new List<HudMenuItem>
+		{
+			Row(GhostTarget.Splits, "Splits target", $"the splits panel's ({SplitTargetLabel(options.HudSplitTarget)})"),
+			Row(GhostTarget.Pb, "Personal best", "your own PB run"),
+			Row(GhostTarget.Wr, "World record", ""),
+			Row(GhostTarget.NextRank, "Next rank", "the time one rank above yours"),
+			Row(GhostTarget.Top10, "Top 10", "#10, or one rank above you"),
+		};
+		for (int group = 1; group <= PointsCalculator.GroupCount; group++)
+			rows.Add(Row(GhostTarget.G1 + (group - 1), $"Group {group}", "its last rank"));
+		rows.Add(PanelContext.Info("Stage / bonus mode", "", "that stage's / bonus's PB (Personal best) or WR (anything else)"));
+		return rows;
+	});
 
 	/// <summary>
 	/// A HUD layout the menus edit: the bottom HUD (2 rows of 4) or the center HUD (3 lines around the crosshair).

@@ -29,6 +29,23 @@ internal enum TimerWarning
 	Wr,
 }
 
+/// <summary>The run the ghost path / orb follow (!options - HUD - Ghost &amp; path)</summary>
+internal enum GhostTarget
+{
+	/// <summary>The splits panel's target (PB if it's off)</summary>
+	Splits,
+	Pb,
+	Wr,
+	/// <summary>The time one rank above yours (the last time without a PB)</summary>
+	NextRank,
+	Top10,
+	G1,
+	G2,
+	G3,
+	G4,
+	G5,
+}
+
 /// <summary>Which zone outlines a player sees (!options - Visibility)</summary>
 internal enum ZoneDisplay
 {
@@ -106,6 +123,15 @@ internal sealed class PlayerOptions
 	internal const string KeySpeedColor = "speed_color";
 	internal const string KeySpeedColorStatic = "speed_color_static";
 	internal const string KeyTimerWarning = "timer_warning";
+	/// <summary>Ghost &amp; path (GhostPath.cs): the target's path ahead, its jump / crouch markers, the racing orb, which run, how far</summary>
+	internal const string KeyGhostPath = "ghost_path";
+	internal const string KeyGhostMarkers = "ghost_markers";
+	internal const string KeyGhostOrb = "ghost_orb";
+	internal const string KeyGhostTarget = "ghost_target";
+	internal const string KeyGhostSeconds = "ghost_seconds";
+
+	internal static readonly int[] GhostSecondSteps = [2, 4, 6, 8];
+	internal const int DefaultGhostSeconds = 4;
 
 	internal const int CenterSizes = 5;
 	internal const int DefaultCenterSize = 3;
@@ -168,6 +194,9 @@ internal sealed class PlayerOptions
 	private string _speedColorStatic = "snow";
 	private TimerWarning _timerWarning = TimerWarning.Pb;
 	private bool _sounds = true;
+	private bool _ghostPath, _ghostMarkers, _ghostOrb;
+	private GhostTarget _ghostTarget = GhostTarget.Splits;
+	private int _ghostSeconds = DefaultGhostSeconds;
 	private readonly Dictionary<string, int> _hudPositions = new();
 
 	internal PlayerOptions(PlayerProfile profile)
@@ -233,6 +262,13 @@ internal sealed class PlayerOptions
 		_timerWarning = _profile.Settings.TryGetValue(KeyTimerWarning, out var warning)
 			&& Enum.TryParse(warning, ignoreCase: true, out TimerWarning parsedWarning) && Enum.IsDefined(parsedWarning) ? parsedWarning : TimerWarning.Pb;
 		_sounds = Bool(KeySounds, true);
+		_ghostPath = Bool(KeyGhostPath, false);
+		_ghostMarkers = Bool(KeyGhostMarkers, true);
+		_ghostOrb = Bool(KeyGhostOrb, false);
+		_ghostTarget = _profile.Settings.TryGetValue(KeyGhostTarget, out var ghostTarget)
+			&& Enum.TryParse(ghostTarget, ignoreCase: true, out GhostTarget parsedGhost) && Enum.IsDefined(parsedGhost) ? parsedGhost : GhostTarget.Splits;
+		_ghostSeconds = _profile.Settings.TryGetValue(KeyGhostSeconds, out var ghostSeconds) && int.TryParse(ghostSeconds, out int seconds)
+			&& GhostSecondSteps.Contains(seconds) ? seconds : DefaultGhostSeconds;
 		_hudPositions.Clear();
 		foreach (string slot in CustomHud.SlotShift.Keys)
 		{
@@ -343,6 +379,36 @@ internal sealed class PlayerOptions
 		else
 			_hudPositions.Remove(slot);
 		_profile.SetSetting(KeyHudPosPrefix + slot, shift?.ToString() ?? "");
+	}
+
+	// ---- Ghost & path (off by default) ----
+
+	internal bool GhostPath { get => _ghostPath; set { _ghostPath = value; Save(KeyGhostPath, value); } }
+
+	/// <summary>Jump squares and crouch triangles on the path (on, once the path is)</summary>
+	internal bool GhostMarkers { get => _ghostMarkers; set { _ghostMarkers = value; Save(KeyGhostMarkers, value); } }
+
+	internal bool GhostOrb { get => _ghostOrb; set { _ghostOrb = value; Save(KeyGhostOrb, value); } }
+
+	internal GhostTarget GhostTarget
+	{
+		get => _ghostTarget;
+		set
+		{
+			_ghostTarget = value;
+			_profile.SetSetting(KeyGhostTarget, value.ToString().ToLowerInvariant());
+		}
+	}
+
+	/// <summary>How much of the path ahead is drawn, in seconds of the target's run</summary>
+	internal int GhostSeconds
+	{
+		get => _ghostSeconds;
+		set
+		{
+			_ghostSeconds = GhostSecondSteps.Contains(value) ? value : DefaultGhostSeconds;
+			_profile.SetSetting(KeyGhostSeconds, _ghostSeconds.ToString());
+		}
 	}
 
 	/// <summary>Main switch for every timer / addon sound (!quake)</summary>

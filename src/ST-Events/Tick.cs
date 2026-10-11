@@ -133,6 +133,16 @@ public partial class SurfTimer
 			LogTickError(ex, "trails");
 		}
 
+		// Ghost & path of players who turned it on (GhostPath.cs)
+		try
+		{
+			TickGhosts();
+		}
+		catch (Exception ex)
+		{
+			LogTickError(ex, "ghost & path");
+		}
+
 		// The zone editor's noclip and undone map teleports (ZoneEditor.cs)
 		try
 		{

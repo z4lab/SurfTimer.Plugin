@@ -927,7 +927,7 @@ public class PlayerHud
 	/// What the pace compares against: the splits panel's target for map runs (PB, WR, #10, a group's rank); in stage /
 	/// bonus mode that stage's / bonus's PB (target PB) or WR (any other target). Null when there's no such time.
 	/// </summary>
-	private static PaceReference? PaceReferenceOf(Player p, SplitTarget target)
+	internal static PaceReference? PaceReferenceOf(Player p, SplitTarget target)
 	{
 		var map = SurfTimer.CurrentMap;
 		int style = p.Timer.Style;
@@ -979,6 +979,18 @@ public class PlayerHud
 		var ranked = rank > 1 ? map.SplitTargets.Get(map.CourseId(0, 0), style, rank) : null;
 		return ranked != null && ranked.RunTime > 0
 			? new($"rank{rank}:{ranked.RunTime}", ranked.RunTime, splits, ranked.ReplayId, null, 0, 0)
+			: null;
+	}
+
+	/// <summary>The map run of a leaderboard rank (1 = WR) as a reference - null while its time loads, or without one</summary>
+	internal static PaceReference? RankReferenceOf(Player p, int rank)
+	{
+		if (rank == 1)
+			return PaceReferenceOf(p, SplitTarget.Wr);
+		var map = SurfTimer.CurrentMap;
+		var ranked = rank > 1 ? map.SplitTargets.Get(map.CourseId(0, 0), p.Timer.Style, rank) : null;
+		return ranked != null && ranked.RunTime > 0
+			? new($"rank{rank}:{ranked.RunTime}", ranked.RunTime, ranked.Splits, ranked.ReplayId, null, 0, 0)
 			: null;
 	}
 

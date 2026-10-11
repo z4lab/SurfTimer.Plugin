@@ -16,10 +16,78 @@ internal sealed class ReferencePath
 	internal float[] Speeds { get; }
 	internal int Count => Speeds.Length;
 
-	private ReferencePath(float[] positions, float[] speeds)
+	/// <summary>Jumps and crouch changes of the run, by tick (ghost path markers)</summary>
+	internal IReadOnlyList<(int Frame, PathMarker Kind)> Markers { get; }
+
+	/// <summary>
+	/// Where the ghost path's beam segments start: every SegmentTicks ticks, sooner after SegmentDistance units - so
+	/// slow parts stay smooth and fast ones don't cut corners. The last entry is the path's end.
+	/// </summary>
+	internal int[] SegmentStarts { get; }
+
+	private const int SegmentTicks = 16;
+	private const float SegmentDistance = 64f;
+
+	private ReferencePath(float[] positions, float[] speeds, List<(int, PathMarker)> markers)
 	{
 		Positions = positions;
 		Speeds = speeds;
+		Markers = markers;
+		SegmentStarts = BuildSegments();
+	}
+
+	internal VectorT PositionAt(int frame)
+	{
+		frame = Math.Clamp(frame, 0, Count - 1);
+		return new VectorT(Positions[frame * 3], Positions[frame * 3 + 1], Positions[frame * 3 + 2]);
+	}
+
+	private int[] BuildSegments()
+	{
+		var starts = new List<int> { 0 };
+		int last = 0;
+		for (int i = 1; i < Count; i++)
+		{
+			float dx = Positions[i * 3] - Positions[last * 3];
+			float dy = Positions[i * 3 + 1] - Positions[last * 3 + 1];
+			float dz = Positions[i * 3 + 2] - Positions[last * 3 + 2];
+			if (i - last >= SegmentTicks || dx * dx + dy * dy + dz * dz >= SegmentDistance * SegmentDistance)
+			{
+				starts.Add(i);
+				last = i;
+			}
+		}
+		if (last != Count - 1)
+			starts.Add(Count - 1);
+		return starts.ToArray();
+	}
+
+	/// <summary>
+	/// Jumps (jump held while leaving the ground - replays without buttons: leaving the ground going up fast) and crouch
+	/// presses / releases (the ducking flag) of a run window.
+	/// </summary>
+	private static List<(int, PathMarker)> FindMarkers(IReadOnlyList<ReplayFrame> frames, int start, int count)
+	{
+		const uint onGround = (uint)CounterStrikeSharp.API.Modules.Utils.PlayerFlags.FL_ONGROUND;
+		const uint ducking = (uint)CounterStrikeSharp.API.Modules.Utils.PlayerFlags.FL_DUCKING;
+		const ulong jump = (ulong)CounterStrikeSharp.API.PlayerButtons.Jump;
+		var markers = new List<(int, PathMarker)>();
+		for (int i = 1; i < count; i++)
+		{
+			var previous = frames[start + i - 1];
+			var current = frames[start + i];
+			bool leftGround = (previous.Flags & onGround) != 0 && (current.Flags & onGround) == 0;
+			bool jumped = current.Buttons is ulong buttons
+				? (buttons & jump) != 0
+				: current.pos[2] - previous.pos[2] > 2.5f;
+			if (leftGround && jumped)
+				markers.Add((i, PathMarker.Jump));
+
+			bool wasDucked = (previous.Flags & ducking) != 0, isDucked = (current.Flags & ducking) != 0;
+			if (isDucked != wasDucked)
+				markers.Add((i, isDucked ? PathMarker.Crouch : PathMarker.Uncrouch));
+		}
+		return markers;
 	}
 
 	/// <summary>
@@ -77,8 +145,15 @@ internal sealed class ReferencePath
 			float dz = positions[b * 3 + 2] - positions[a * 3 + 2];
 			speeds[i] = MathF.Sqrt(dx * dx + dy * dy + dz * dz) * ReplayCodec.TickRate;
 		}
-		return new ReferencePath(positions, speeds);
+		return new ReferencePath(positions, speeds, FindMarkers(frames, start, count));
 	}
+}
+
+internal enum PathMarker
+{
+	Jump,
+	Crouch,
+	Uncrouch,
 }
 
 /// <summary>

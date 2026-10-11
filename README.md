@@ -178,6 +178,7 @@ The HUD uses the [Nord](https://www.nordtheme.com) colors. Its accent (field bor
 | Speed | XY | Each press switches: **XY** (horizontal) → **XYZ** (3D) → **Z** (vertical, negative = falling). Applies to the HUD speed, prespeed and split speeds. |
 | Center HUD | Off | Fields in three lines around the crosshair (custom HUD): by default your speed just above it. |
 | Center HUD settings › | | See below. |
+| Ghost & path › | Off | A run's path ahead of you and a ghost racing you - see below. |
 | Speed color › | Gradient | How the speed and prespeed are colored (the center HUD too, unless it has its own color): **Gradient** (Nord colors, slow blue → fast red), **Gain / loss** (white, green while gaining speed, red while losing), or one Nord color (snow, frost, teal, blue, deep blue, red, orange, yellow, green, purple). |
 | Timer warning | PB | The running timer is green, and turns yellow once your run is slower than your **PB** of it (map, stage or bonus) - or the **WR**. Practice runs stay purple. |
 | Top bar | On | Map, tier and stage, then a smaller row with rank, PB and WR. With [SurfTimer.MapChooser](https://github.com/z4lab/SurfTimer.MapChooser), a third row shows the time left, the running vote and the map's end (needs the HUD addon with four top rows). |
@@ -228,6 +229,24 @@ For each field:
 - **Reset to default**: restores the default layout.
 
 **Energy** (not in the presets) is your mechanical energy, as in Momentum Mod: the height your speed could carry you to plus how high you are above where the run started - `speed² / (2 · gravity) + height`. Air strafing raises it; ramp hits, walls and friction lower it, so it shows how clean your surf is. Green while it rises, red while it drops.
+
+</details>
+
+<details>
+<summary>HUD › Ghost & path</summary>
+
+Only you and the players spectating you see these.
+
+| Row | Description |
+|---|---|
+| Path | The path of the run you follow, the next few seconds of it ahead of where you are on it, colored by its speed there (Nord gradient, slow blue → fast red). In a start zone it shows the start of the run, so you can preview the route. Shown in runs and practice. |
+| Jump & crouch markers | On the path: a flat **square** where the run jumped, a **triangle pointing down** where it crouched and **pointing up** where it stood up again. |
+| Path length | 2 / 4 / 6 / 8 seconds of the run ahead of you (default 4). |
+| Ghost | An orb where the run was at your current run time - ahead of you when it was faster. Shown while your timer runs, colored by its speed. |
+| Run › | Which run: the **splits target** (default), your **PB**, the **WR**, the **next rank** (the time one rank above yours), **top 10**, or the last rank of **Group 1 – 5**. In stage / bonus mode: that stage's / bonus's PB (Personal best) or WR (anything else). |
+| Following | The run's time - or why there's nothing to show (no such run yet, no replay stored for it). |
+
+Both need the run's stored replay.
 
 </details>
 

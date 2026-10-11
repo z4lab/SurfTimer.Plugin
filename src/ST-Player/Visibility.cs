@@ -73,7 +73,8 @@ public partial class SurfTimer
 	{
 		bool hidePawns = _anyoneHiding && _transmitTargets.Count > 0;
 		bool zoneBeams = ZoneBeamsExist;
-		if (!hidePawns && !_anyoneFilteringTrails && !zoneBeams)
+		bool ghosts = _ghosts.Count > 0;
+		if (!hidePawns && !_anyoneFilteringTrails && !zoneBeams && !ghosts)
 			return;
 
 		foreach ((CCheckTransmitInfo info, CCSPlayerController? viewer) in infoList)
@@ -90,6 +91,10 @@ public partial class SurfTimer
 			// Zone outlines the viewer doesn't get (see ZoneDrawing.cs)
 			if (zoneBeams)
 				FilterZoneTransmit(info, player);
+
+			// Other players' ghost & path (see GhostPath.cs)
+			if (ghosts)
+				FilterGhostTransmit(info, viewer);
 
 			if (!hidePawns || (!options.HidePlayers && !options.HideBots))
 				continue;
