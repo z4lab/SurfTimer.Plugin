@@ -75,7 +75,10 @@ Some maps only let you through a teleport or push after you passed an earlier pa
 - Walking into a start zone changes nothing (the map handles that).
 - On maps with a start name set, a run that starts with another name gets the start name (logged).
 
-Not covered: contexts (CounterStrikeSharp can't read them), classnames and the map's delayed outputs still pending when you teleport.
+Only the name is handled. CS2 maps can't set names with `AddOutput targetname` any more, so many CS2 maps use other
+filters (contexts, attributes) that the timer doesn't carry yet. Map admins: `!mapfilters` prints the map's filters,
+the triggers using them and what the map's triggers do to players (to your console and the server log). Not covered:
+contexts, attributes, classnames and the map's delayed outputs still pending when you teleport.
 
 </details>
 
@@ -272,7 +275,7 @@ Permissions are granted through CounterStrikeSharp (`admins.json` / admin groups
 | Permission | Grants |
 |---|---|
 | `@css/root` | Every admin panel tab, `!changemap`, the root name and trail color |
-| `@surftimer/map` | Admin panel › **Map** tab (map data, zones, map settings) |
+| `@surftimer/map` | Admin panel › **Map** tab (map data, zones, map settings), `!mapfilters` |
 | `@surftimer/records` | Admin panel › **Records** tab |
 | `@surftimer/players` | Admin panel › **Players** tab |
 | `@surftimer/server` | Admin panel › **Server** tab (timer settings, chat, trails, bots) |
