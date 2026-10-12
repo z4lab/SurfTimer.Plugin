@@ -249,26 +249,26 @@ public class CurrentRun : RunStatsEntity
 			if (stage_run_time < SurfTimer.CurrentMap.StageWR[stage][pStyle].RunTime) // Player beat the Stage WR
 			{
 				int timeImprove = SurfTimer.CurrentMap.StageWR[stage][pStyle].RunTime - stage_run_time;
-				ChatAnnounce.Send(ChatAnnounce.Kind.Record, player, $"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["stagewr_improved",
+				ChatAnnounce.Record(ChatEvent.StageWr, player, $"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["stagewr_improved",
 					player.Controller.PlayerName, stage, PlayerHud.FormatTime(stage_run_time), PlayerHud.FormatTime(timeImprove), PlayerHud.FormatTime(SurfTimer.CurrentMap.StageWR[stage][pStyle].RunTime)]}");
 			}
 			else if (SurfTimer.CurrentMap.StageWR[stage][pStyle].ID == -1) // No Stage record was set on the map
 			{
-				ChatAnnounce.Send(ChatAnnounce.Kind.Record, player, $"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["stagewr_set",
+				ChatAnnounce.Record(ChatEvent.StageWr, player, $"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["stagewr_set",
 					player.Controller.PlayerName, stage, PlayerHud.FormatTime(stage_run_time)]}");
 			}
 			else if (player.Stats.StagePB[stage][pStyle] != null && player.Stats.StagePB[stage][pStyle].ID == -1) // Player first Stage personal best
 			{
-				player.Controller.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["stagepb_set",
-					stage, PlayerHud.FormatTime(stage_run_time)]}"
-				);
-				Sounds.Play(player, Sounds.Pb);
+				ChatAnnounce.Pb(ChatEvent.StagePb, player,
+					$"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["stagepb_set", stage, PlayerHud.FormatTime(stage_run_time)]}",
+					$"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["stagepb_set_others", player.Controller.PlayerName, stage, PlayerHud.FormatTime(stage_run_time)]}");
 			}
 			else if (player.Stats.StagePB[stage][pStyle] != null && player.Stats.StagePB[stage][pStyle].RunTime > stage_run_time) // Player beating their existing Stage personal best
 			{
 				int timeImprove = player.Stats.StagePB[stage][pStyle].RunTime - stage_run_time;
-				ChatAnnounce.Send(ChatAnnounce.Kind.Pb, player, $"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["stagepb_improved",
-					player.Controller.PlayerName, stage, PlayerHud.FormatTime(stage_run_time), PlayerHud.FormatTime(timeImprove), PlayerHud.FormatTime(player.Stats.StagePB[stage][pStyle].RunTime)]}");
+				string improved = $"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["stagepb_improved",
+					player.Controller.PlayerName, stage, PlayerHud.FormatTime(stage_run_time), PlayerHud.FormatTime(timeImprove), PlayerHud.FormatTime(player.Stats.StagePB[stage][pStyle].RunTime)]}";
+				ChatAnnounce.Pb(ChatEvent.StagePb, player, improved, improved);
 			}
 
 			// Save stage run
@@ -284,9 +284,9 @@ public class CurrentRun : RunStatsEntity
 			if (stage_run_time > SurfTimer.CurrentMap.StageWR[stage][pStyle].RunTime && player.Timer.IsStageMode) // Player is behind the Stage WR for the map
 			{
 				int timeImprove = stage_run_time - SurfTimer.CurrentMap.StageWR[stage][pStyle].RunTime;
-				player.Controller.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["stagewr_missed",
-					stage, PlayerHud.FormatTime(stage_run_time), PlayerHud.FormatTime(timeImprove), PlayerHud.FormatTime(SurfTimer.CurrentMap.StageWR[stage][pStyle].RunTime)]}"
-				);
+				string missed = LocalizationService.LocalizerNonNull["stagewr_missed",
+					stage, PlayerHud.FormatTime(stage_run_time), PlayerHud.FormatTime(timeImprove), PlayerHud.FormatTime(SurfTimer.CurrentMap.StageWR[stage][pStyle].RunTime)];
+				ChatAnnounce.Run(ChatEvent.SplitSegment, player, $"{Config.PluginPrefix} {missed}", ChatAnnounce.About(player, missed));
 			}
 		}
 	}
@@ -323,26 +323,26 @@ public class CurrentRun : RunStatsEntity
 			if (checkpoint_run_time < SurfTimer.CurrentMap.CheckpointWR[checkpoint][pStyle].RunTime) // Player beat the Checkpoint WR
 			{
 				int timeImprove = SurfTimer.CurrentMap.CheckpointWR[checkpoint][pStyle].RunTime - checkpoint_run_time;
-				ChatAnnounce.Send(ChatAnnounce.Kind.Record, player, $"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["checkpointwr_improved",
+				ChatAnnounce.Record(ChatEvent.CpWr, player, $"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["checkpointwr_improved",
 					player.Controller.PlayerName, checkpoint, PlayerHud.FormatTime(checkpoint_run_time), PlayerHud.FormatTime(timeImprove), PlayerHud.FormatTime(SurfTimer.CurrentMap.CheckpointWR[checkpoint][pStyle].RunTime)]}");
 			}
 			else if (SurfTimer.CurrentMap.CheckpointWR[checkpoint][pStyle].ID == -1) // No Checkpoint record was set on the map
 			{
-				ChatAnnounce.Send(ChatAnnounce.Kind.Record, player, $"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["checkpointwr_set",
+				ChatAnnounce.Record(ChatEvent.CpWr, player, $"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["checkpointwr_set",
 					player.Controller.PlayerName, checkpoint, PlayerHud.FormatTime(checkpoint_run_time)]}");
 			}
 			else if (player.Stats.CheckpointPB[checkpoint][pStyle] != null && player.Stats.CheckpointPB[checkpoint][pStyle].ID == -1) // Player first Checkpoint personal best
 			{
-				player.Controller.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["checkpointpb_set",
-					checkpoint, PlayerHud.FormatTime(checkpoint_run_time)]}"
-				);
-				Sounds.Play(player, Sounds.Pb);
+				ChatAnnounce.Pb(ChatEvent.CpPb, player,
+					$"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["checkpointpb_set", checkpoint, PlayerHud.FormatTime(checkpoint_run_time)]}",
+					$"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["checkpointpb_set_others", player.Controller.PlayerName, checkpoint, PlayerHud.FormatTime(checkpoint_run_time)]}");
 			}
 			else if (player.Stats.CheckpointPB[checkpoint][pStyle] != null && player.Stats.CheckpointPB[checkpoint][pStyle].RunTime > checkpoint_run_time) // Player beating their existing Checkpoint personal best
 			{
 				int timeImprove = player.Stats.CheckpointPB[checkpoint][pStyle].RunTime - checkpoint_run_time;
-				ChatAnnounce.Send(ChatAnnounce.Kind.Pb, player, $"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["checkpointpb_improved",
-					player.Controller.PlayerName, checkpoint, PlayerHud.FormatTime(checkpoint_run_time), PlayerHud.FormatTime(timeImprove), PlayerHud.FormatTime(player.Stats.CheckpointPB[checkpoint][pStyle].RunTime)]}");
+				string improved = $"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["checkpointpb_improved",
+					player.Controller.PlayerName, checkpoint, PlayerHud.FormatTime(checkpoint_run_time), PlayerHud.FormatTime(timeImprove), PlayerHud.FormatTime(player.Stats.CheckpointPB[checkpoint][pStyle].RunTime)]}";
+				ChatAnnounce.Pb(ChatEvent.CpPb, player, improved, improved);
 			}
 
 			// Save checkpoint segment run

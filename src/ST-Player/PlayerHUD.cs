@@ -1645,10 +1645,6 @@ public class PlayerHud
 	/// </summary>
 	internal void DisplayCheckpointMessages()
 	{
-		// !options - Chat: own split messages
-		if (!_player.Options.ChatSplits)
-			return;
-
 		int pbTime;
 		int wrTime = -1;
 		float pbSpeed;
@@ -1760,11 +1756,10 @@ public class PlayerHud
 			}
 		}
 
-		// Print checkpoint message
-		_player.Controller.PrintToChat(
-			$"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["checkpoint_message",
-			playerCurrentCheckpoint, FormatTime(_player.Timer.Ticks), currentSpeed.ToString("0"), strPbDifference, strWrDifference]}"
-		);
+		// The runner and their spectators by their own toggle, others by theirs (!options - Chat)
+		string message = LocalizationService.LocalizerNonNull["checkpoint_message",
+			playerCurrentCheckpoint, FormatTime(_player.Timer.Ticks), currentSpeed.ToString("0"), strPbDifference, strWrDifference];
+		ChatAnnounce.Run(ChatEvent.SplitMap, _player, $"{Config.PluginPrefix} {message}", ChatAnnounce.About(_player, message));
 
 #if DEBUG
 		Console.WriteLine(
@@ -1792,10 +1787,6 @@ public class PlayerHud
 	/// <param name="exitVelocity">Player's velocity at the moment the stage was completed</param>
 	internal void DisplayStageMessage(short stage, int stageRunTime, VectorT exitVelocity)
 	{
-		// !options - Chat: own split messages
-		if (!_player.Options.ChatSplits)
-			return;
-
 		int style = _player.Timer.Style;
 		var axes = _player.Options.SpeedAxes;
 		float exitSpeed = Extensions.Speed(exitVelocity, axes);
@@ -1845,10 +1836,9 @@ public class PlayerHud
 			strWrDifference += ChatColors.Default + ")";
 		}
 
-		_player.Controller.PrintToChat(
-			$"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["stage_message",
-			stage, FormatTime(stageRunTime), exitSpeed.ToString("0"), strPbDifference, strWrDifference]}"
-		);
+		string message = LocalizationService.LocalizerNonNull["stage_message",
+			stage, FormatTime(stageRunTime), exitSpeed.ToString("0"), strPbDifference, strWrDifference];
+		ChatAnnounce.Run(ChatEvent.SplitSegment, _player, $"{Config.PluginPrefix} {message}", ChatAnnounce.About(_player, message));
 	}
 
 	/// <summary>
@@ -1861,10 +1851,6 @@ public class PlayerHud
 	/// <param name="exitVelocity">Player's velocity at the moment the checkpoint segment was completed</param>
 	internal void DisplayCheckpointSegmentMessage(short checkpoint, int checkpointRunTime, VectorT exitVelocity)
 	{
-		// !options - Chat: own split messages
-		if (!_player.Options.ChatSplits)
-			return;
-
 		int style = _player.Timer.Style;
 		var axes = _player.Options.SpeedAxes;
 		float exitSpeed = Extensions.Speed(exitVelocity, axes);
@@ -1918,9 +1904,8 @@ public class PlayerHud
 			strWrDifference += ChatColors.Default + ")";
 		}
 
-		_player.Controller.PrintToChat(
-			$"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["checkpoint_message",
-			checkpoint, FormatTime(checkpointRunTime), exitSpeed.ToString("0"), strPbDifference, strWrDifference]}"
-		);
+		string message = LocalizationService.LocalizerNonNull["checkpoint_message",
+			checkpoint, FormatTime(checkpointRunTime), exitSpeed.ToString("0"), strPbDifference, strWrDifference];
+		ChatAnnounce.Run(ChatEvent.SplitSegment, _player, $"{Config.PluginPrefix} {message}", ChatAnnounce.About(_player, message));
 	}
 }

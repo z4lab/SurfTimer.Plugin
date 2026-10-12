@@ -385,6 +385,10 @@ public class ReplayPlayer
 		this.IsReplayOutsideZone = this.PlayedFrameIndex > this.RunStartFrame && this.PlayedFrameIndex < this.RunEndFrame;
 		this.ReplayCurrentRunTime = Math.Clamp(this.PlayedFrameIndex - this.RunStartFrame, 0, Math.Max(0, this.RunEndFrame - this.RunStartFrame));
 
+		// Splits / finish in chat for its spectators (ReplayChat.cs) - played forwards, once per frame
+		if (!this.IsPaused && this.FrameTickIncrement > 0 && current_frame.Situation != ReplayFrameSituation.NONE)
+			ReplayChat.OnFrame(this, current_frame.Situation, this.PlayedFrameIndex);
+
 		var current_pos = pawn.AbsOrigin!.ToVector_t();
 		var current_frame_pos = current_frame.GetPos();
 		var current_frame_ang = current_frame.GetAng();

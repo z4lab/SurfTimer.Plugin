@@ -284,15 +284,22 @@ What the panel compares your run against:
 <details>
 <summary><b>Chat</b></summary>
 
-All on by default.
-
 | Option | Description |
 |---|---|
-| Own split messages | Your checkpoint and stage comparisons. |
-| Others' PBs | Personal bests of other players. |
-| Others' records | WRs of other players. |
+| Own messages › | Run messages about **your** runs. They also count for whoever you **spectate**: a player's messages, or a replay bot's splits and finish (compared with your own PB there). All on by default. |
+| Others' messages › | The same messages about **other players'** runs. PBs and WRs on by default, finishes and splits off. |
 | Connect messages | Players joining. |
 | Saveloc messages | "Teleported to #N" when you load a saveloc. |
+
+Both message pages have a toggle for each kind, plus **All on** / **All off**:
+
+| Message | What it is |
+|---|---|
+| Splits vs map PB / WR | In a map run, at each checkpoint / stage: the time there against the map PB's / WR's time there. |
+| Splits vs stage / CP PB / WR | The time of one stage / checkpoint segment against its own PB / WR. |
+| Map finish / Bonus finish | A finish without a PB. |
+| Map / Stage / CP / Bonus PB | A new personal best. |
+| Map / Stage / CP / Bonus WR | A new record. |
 
 </details>
 

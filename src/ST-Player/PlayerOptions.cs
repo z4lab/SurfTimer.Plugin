@@ -46,6 +46,28 @@ internal enum GhostTarget
 	G5,
 }
 
+/// <summary>
+/// The run messages in chat a player can turn on / off - for their own runs (and whoever they spectate) and for other
+/// players' (!options - Chat). Stored by lowercase name: chat_own_&lt;name&gt;, chat_others_&lt;name&gt;.
+/// </summary>
+internal enum ChatEvent
+{
+	/// <summary>In a map run, at every checkpoint / stage: the time there vs the map PB / WR's time there</summary>
+	SplitMap,
+	/// <summary>A stage / checkpoint segment's time vs its own segment PB / WR</summary>
+	SplitSegment,
+	MapFinish,
+	MapPb,
+	MapWr,
+	StagePb,
+	StageWr,
+	CpPb,
+	CpWr,
+	BonusFinish,
+	BonusPb,
+	BonusWr,
+}
+
 /// <summary>Which zone outlines a player sees (!options - Visibility)</summary>
 internal enum ZoneDisplay
 {
@@ -79,9 +101,12 @@ internal sealed class PlayerOptions
 	internal const string KeyHideLegs = "hide_legs";
 	internal const string KeyHidePlayers = "hide_players";
 	internal const string KeyHideBots = "hide_bots";
+	// Before the per-message toggles (chat_own_* / chat_others_*) - only read for their defaults
 	internal const string KeyChatSplits = "chat_splits";
 	internal const string KeyChatOthersPb = "chat_others_pb";
 	internal const string KeyChatOthersRecords = "chat_others_records";
+	internal const string KeyChatOwnPrefix = "chat_own_";
+	internal const string KeyChatOthersPrefix = "chat_others_";
 	internal const string KeyChatConnects = "chat_connects";
 	internal const string KeyChatSaveloc = "chat_saveloc";
 	internal const string KeyConfirmReset = "confirm_reset";
@@ -172,7 +197,8 @@ internal sealed class PlayerOptions
 	private readonly PlayerProfile _profile;
 
 	private bool _hideLegs, _hidePlayers, _hideBots;
-	private bool _chatSplits, _chatOthersPb, _chatOthersRecords, _chatConnects, _chatSaveloc;
+	private bool _chatConnects, _chatSaveloc;
+	private readonly Dictionary<ChatEvent, bool> _chatOwn = new(), _chatOthers = new();
 	private bool _confirmReset;
 	private bool _hudTop, _hudSpectators, _hudSplitsKeep;
 	private SplitTarget _hudSplitTarget = SplitTarget.Pb;
@@ -210,9 +236,20 @@ internal sealed class PlayerOptions
 		_hideLegs = Bool(KeyHideLegs, true);
 		_hidePlayers = Bool(KeyHidePlayers, false);
 		_hideBots = Bool(KeyHideBots, false);
-		_chatSplits = Bool(KeyChatSplits, true);
-		_chatOthersPb = Bool(KeyChatOthersPb, true);
-		_chatOthersRecords = Bool(KeyChatOthersRecords, true);
+		// Own: all on (splits as the old split switch). Others: PBs / records as the old switches, finishes and splits off
+		bool oldSplits = Bool(KeyChatSplits, true), oldPb = Bool(KeyChatOthersPb, true), oldRecords = Bool(KeyChatOthersRecords, true);
+		foreach (var ev in Enum.GetValues<ChatEvent>())
+		{
+			string name = ev.ToString().ToLowerInvariant();
+			bool split = ev is ChatEvent.SplitMap or ChatEvent.SplitSegment;
+			_chatOwn[ev] = Bool(KeyChatOwnPrefix + name, !split || oldSplits);
+			_chatOthers[ev] = Bool(KeyChatOthersPrefix + name, ev switch
+			{
+				ChatEvent.MapPb or ChatEvent.StagePb or ChatEvent.CpPb or ChatEvent.BonusPb => oldPb,
+				ChatEvent.MapWr or ChatEvent.StageWr or ChatEvent.CpWr or ChatEvent.BonusWr => oldRecords,
+				_ => false,
+			});
+		}
 		_chatConnects = Bool(KeyChatConnects, true);
 		_chatSaveloc = Bool(KeyChatSaveloc, true);
 		_confirmReset = Bool(KeyConfirmReset, true);
@@ -323,14 +360,23 @@ internal sealed class PlayerOptions
 
 	// ---- Chat ----
 
-	/// <summary>Own checkpoint / stage / segment comparison messages</summary>
-	internal bool ChatSplits { get => _chatSplits; set { _chatSplits = value; Save(KeyChatSplits, value); } }
+	/// <summary>A run message about the player's own runs - also used for whoever they spectate (players and replay bots)</summary>
+	internal bool ChatOwn(ChatEvent ev) => _chatOwn[ev];
 
-	/// <summary>Other players' PB announcements</summary>
-	internal bool ChatOthersPb { get => _chatOthersPb; set { _chatOthersPb = value; Save(KeyChatOthersPb, value); } }
+	internal void SetChatOwn(ChatEvent ev, bool on)
+	{
+		_chatOwn[ev] = on;
+		Save(KeyChatOwnPrefix + ev.ToString().ToLowerInvariant(), on);
+	}
 
-	/// <summary>Other players' record (WR) announcements</summary>
-	internal bool ChatOthersRecords { get => _chatOthersRecords; set { _chatOthersRecords = value; Save(KeyChatOthersRecords, value); } }
+	/// <summary>A run message about other players' runs</summary>
+	internal bool ChatOthers(ChatEvent ev) => _chatOthers[ev];
+
+	internal void SetChatOthers(ChatEvent ev, bool on)
+	{
+		_chatOthers[ev] = on;
+		Save(KeyChatOthersPrefix + ev.ToString().ToLowerInvariant(), on);
+	}
 
 	/// <summary>"X connected" messages</summary>
 	internal bool ChatConnects { get => _chatConnects; set { _chatConnects = value; Save(KeyChatConnects, value); } }

@@ -603,17 +603,64 @@ public partial class SurfTimer
 
 	// ---- Chat ----
 
+	/// <summary>The run messages, in the order of the Own / Others pages</summary>
+	private static readonly (ChatEvent Event, string Label, string Sub)[] ChatEvents =
+	[
+		(ChatEvent.SplitMap, "Splits vs map PB / WR", "map run: your time at each CP / stage vs the map PB / WR"),
+		(ChatEvent.SplitSegment, "Splits vs stage / CP PB / WR", "a stage / CP segment's time vs its own PB / WR"),
+		(ChatEvent.MapFinish, "Map finish", "a finish without a PB"),
+		(ChatEvent.MapPb, "Map PB", ""),
+		(ChatEvent.MapWr, "Map WR", ""),
+		(ChatEvent.StagePb, "Stage PB", ""),
+		(ChatEvent.StageWr, "Stage WR", ""),
+		(ChatEvent.CpPb, "CP PB", ""),
+		(ChatEvent.CpWr, "CP WR", ""),
+		(ChatEvent.BonusFinish, "Bonus finish", "a finish without a PB"),
+		(ChatEvent.BonusPb, "Bonus PB", ""),
+		(ChatEvent.BonusWr, "Bonus WR", ""),
+	];
+
 	private PanelPage OptionsChatRoot() => new("Chat", ctx =>
 	{
 		var options = ctx.Player.Options;
+		int own = ChatEvents.Count(e => options.ChatOwn(e.Event));
+		int others = ChatEvents.Count(e => options.ChatOthers(e.Event));
 		return
 		[
-			ctx.Toggle("Own split messages", options.ChatSplits, "checkpoint / stage comparisons", on => options.ChatSplits = on),
-			ctx.Toggle("Others' PBs", options.ChatOthersPb, "personal bests of other players", on => options.ChatOthersPb = on),
-			ctx.Toggle("Others' records", options.ChatOthersRecords, "WRs of other players", on => options.ChatOthersRecords = on),
+			ctx.Nav("Own messages", $"{own} / {ChatEvents.Length} on", "your runs - and whoever you spectate (players and replay bots)",
+				() => OptionsChatEventsPage(own: true)),
+			ctx.Nav("Others' messages", $"{others} / {ChatEvents.Length} on", "other players' runs", () => OptionsChatEventsPage(own: false)),
 			ctx.Toggle("Connect messages", options.ChatConnects, "players joining", on => options.ChatConnects = on),
 			ctx.Toggle("Saveloc messages", options.ChatSaveloc, "\"Teleported to #N\" when loading a saveloc", on => options.ChatSaveloc = on),
 		];
+	});
+
+	/// <summary>Every run message on / off - for your own runs (and whoever you spectate) or for other players'</summary>
+	private PanelPage OptionsChatEventsPage(bool own) => new(own ? "Own messages" : "Others' messages", ctx =>
+	{
+		var options = ctx.Player.Options;
+		var rows = ChatEvents.Select(e => ctx.Toggle(e.Label, own ? options.ChatOwn(e.Event) : options.ChatOthers(e.Event), e.Sub, on =>
+		{
+			if (own)
+				options.SetChatOwn(e.Event, on);
+			else
+				options.SetChatOthers(e.Event, on);
+		})).ToList();
+
+		void All(bool on)
+		{
+			foreach (var e in ChatEvents)
+			{
+				if (own)
+					options.SetChatOwn(e.Event, on);
+				else
+					options.SetChatOthers(e.Event, on);
+			}
+			ctx.Session.Status = on ? "All on" : "All off";
+		}
+		rows.Add(ctx.Act("All on", "", "", () => All(true)));
+		rows.Add(ctx.Act("All off", "", "", () => All(false)));
+		return rows;
 	});
 
 	// ---- Gameplay ----
