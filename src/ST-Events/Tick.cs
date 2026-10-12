@@ -47,7 +47,6 @@ public partial class SurfTimer
 					player.TickIdle();
 					player.TickPendingStartRecording();
 					player.TickStartZoneSpeedCap();
-					player.TickRemoveLandingSlowdown();
 					player.TickSync();
 				}
 

@@ -293,33 +293,6 @@ public class Player
 		Utilities.SetStateChanged(entity, "CBaseModelEntity", "m_clrRender");
 	}
 
-	/// <summary>
-	/// Removes landing slowdowns so surf drops (e.g. into stage starts) don't cost speed:
-	/// the "hurt" velocity modifier (lowered on hard landings even with fall damage scaled to 0) and
-	/// the stamina penalty (backs up sv_staminamax 0 in case a map cfg overrides it).
-	/// Both are written only when actually set, and networked so client prediction agrees -
-	/// otherwise the client still predicts the slowdown and rubber-bands.
-	/// </summary>
-	internal void TickRemoveLandingSlowdown()
-	{
-		var pawn = this.Controller.PlayerPawn.Value;
-		if (pawn == null || !pawn.IsValid)
-			return;
-
-		if (pawn.VelocityModifier < 1f)
-		{
-			pawn.VelocityModifier = 1f;
-			Utilities.SetStateChanged(pawn, "CCSPlayerPawn", "m_flVelocityModifier");
-		}
-
-		var movement = pawn.MovementServices?.As<CCSPlayer_MovementServices>();
-		if (movement != null && movement.Stamina > 0f)
-		{
-			movement.Stamina = 0f;
-			Utilities.SetStateChanged(pawn, "CBasePlayerPawn", "m_pMovementServices");
-		}
-	}
-
 	internal void ResetSync()
 	{
 		this.SyncGoodTicks = 0;
