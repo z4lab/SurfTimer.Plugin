@@ -139,7 +139,7 @@ Everything here is saved to your profile. The menu reopens on the tab and page w
 
 | Option | Default | Description |
 |---|---|---|
-| Hide own legs | **On** | Hides your first-person legs. Other players still see your model. |
+| Hide own legs | **On** | Hides your first-person legs. Other players still see your model. Spectating a player in first person shows their own setting (it's one value per player); replay bots never show legs. |
 | Hide players | Off | Hides other players for you only. The player you spectate stays visible. |
 | Hide replay bots | Off | Hides replay bots for you only. The bot you spectate stays visible. |
 | Trails › | | Opens the trail settings below. |

@@ -135,7 +135,8 @@ public partial class SurfTimer
 
 	/// <summary>
 	/// Undoes maps hiding players (render mode, alpha, EF_NODRAW) - every 0.5s. Humans keep their own
-	/// hide-legs alpha, replay bots are fully visible.
+	/// hide-legs alpha. Replay bots always have their legs hidden: spectating one in first person shows no legs, and
+	/// everyone else still sees the whole model.
 	/// </summary>
 	private void EnforcePlayerVisibility()
 	{
@@ -161,7 +162,7 @@ public partial class SurfTimer
 					? slot.Controller.PlayerPawn.Value
 					: null;
 				if (pawn != null && pawn.IsValid)
-					Player.EnforceVisible(pawn, 255);
+					Player.EnforceVisible(pawn, Player.LegsHiddenAlpha);
 			}
 		}
 		catch (Exception ex)
