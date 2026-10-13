@@ -637,9 +637,6 @@ internal sealed class PlayerOptions
 		}
 	}
 
-	/// <summary>Any viewer toggle off - the transmit filter has work to do for this player</summary>
-	internal bool FiltersTrails => !_trailsOthers || !_trailsOwn || !_trailsSpectate || !_trailsBots;
-
 	/// <summary>The bottom HUD layout as stored (see DefaultHudFields)</summary>
 	internal string HudFields => _hudFields;
 

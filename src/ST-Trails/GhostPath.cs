@@ -47,8 +47,8 @@ public partial class SurfTimer
 		internal readonly Dictionary<int, List<CBeam>> Markers = new();
 		internal readonly List<CBeam> Orb = new();
 		internal int OrbFrame = -1;
-		/// <summary>Every beam's entity index - what other viewers don't get (CheckTransmit)</summary>
-		internal readonly List<uint> Indexes = new();
+		/// <summary>Every beam's entity index and handle - what other viewers don't get (CheckTransmit)</summary>
+		internal readonly List<(uint Index, uint Handle)> Indexes = new();
 		internal bool IndexesDirty;
 	}
 
@@ -428,28 +428,56 @@ public partial class SurfTimer
 	/// <summary>Map end - the map's entities are gone already</summary>
 	private void ForgetGhosts() => _ghosts.Clear();
 
-	/// <summary>A viewer gets only their own ghost and the one of whoever they spectate (Visibility.cs)</summary>
-	private void FilterGhostTransmit(CCheckTransmitInfo info, CCSPlayerController viewer)
+	/// <summary>A ghost's beams (index, handle) - rebuilt after its beams changed</summary>
+	private static List<(uint Index, uint Handle)> GhostTransmitBeams(GhostState state)
+	{
+		if (state.IndexesDirty)
+		{
+			state.Indexes.Clear();
+			foreach (var beam in state.Segments.Values.Concat(state.Markers.Values.SelectMany(s => s)).Concat(state.Orb))
+			{
+				if (beam.IsValid)
+					state.Indexes.Add((beam.Index, beam.EntityHandle.Raw));
+			}
+			state.IndexesDirty = false;
+		}
+		return state.Indexes;
+	}
+
+	/// <summary>
+	/// A viewer gets only their own ghost and the one of whoever they spectate (Visibility.cs). Beams of a ghost they
+	/// stopped spectating keep being sent until removed - their client would draw them forever otherwise.
+	/// </summary>
+	private void FilterGhostTransmit(CCheckTransmitInfo info, CCSPlayerController viewer, Player player)
 	{
 		uint observed = ObservedPawn(viewer) is { } target
 			? new CCSPlayerPawn(target.Handle).Controller.Value?.Index ?? 0
 			: 0;
 
+		// Forget sent beams that are gone (by handle - an index can be reused right away)
+		if (player.GhostBeamsSent.Count > 0)
+		{
+			var current = _ghosts.Values.SelectMany(GhostTransmitBeams).Select(b => b.Handle).ToHashSet();
+			player.GhostBeamsSent.IntersectWith(current);
+		}
+
 		foreach (var (owner, state) in _ghosts)
 		{
-			if (owner == viewer.Index || owner == observed)
+			var beams = GhostTransmitBeams(state);
+			if (owner == viewer.Index)
 				continue;
-
-			if (state.IndexesDirty)
+			if (owner == observed)
 			{
-				state.Indexes.Clear();
-				state.Indexes.AddRange(state.Segments.Values.Where(b => b.IsValid).Select(b => b.Index));
-				state.Indexes.AddRange(state.Markers.Values.SelectMany(s => s).Where(b => b.IsValid).Select(b => b.Index));
-				state.Indexes.AddRange(state.Orb.Where(b => b.IsValid).Select(b => b.Index));
-				state.IndexesDirty = false;
+				foreach (var (_, handle) in beams)
+					player.GhostBeamsSent.Add(handle);
+				continue;
 			}
-			foreach (uint index in state.Indexes)
-				info.TransmitEntities.Remove(index);
+
+			foreach (var (index, handle) in beams)
+			{
+				if (!player.GhostBeamsSent.Contains(handle))
+					info.TransmitEntities.Remove(index);
+			}
 		}
 	}
 }

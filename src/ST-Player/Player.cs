@@ -77,6 +77,15 @@ public class Player
 	/// <summary>Filter state the current map run left each stage start with - !rs back to one gives it again (MapFilters.cs)</summary>
 	internal Dictionary<short, FilterState> StageFilters { get; } = new();
 
+	// Trail / ghost beams this player's client already got keep being sent until the server removes them: a client never
+	// learns that a beam it stopped receiving was deleted, and would draw it until the map changes (Trails.cs,
+	// GhostPath.cs). Trails: by source, the tick a trail became hidden for this player - older pieces stay sent.
+	internal Dictionary<uint, int> TrailHiddenSince { get; } = new();
+	/// <summary>The trail filter ran for this player - before that they got no trail beams at all</summary>
+	internal bool TrailFilterStarted { get; set; }
+	/// <summary>Ghost beams (entity handles) sent while spectating their owner - kept until removed</summary>
+	internal HashSet<uint> GhostBeamsSent { get; } = new();
+
 	/// <summary>The saved in-progress run of this player on this map (PlayerStateService)</summary>
 	internal RunStateTracker RunState { get; } = new();
 

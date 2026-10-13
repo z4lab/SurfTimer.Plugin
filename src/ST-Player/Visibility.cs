@@ -18,9 +18,6 @@ public partial class SurfTimer
 	private readonly List<TransmitTarget> _transmitTargets = new();
 	private bool _anyoneHiding;
 
-	// Someone doesn't want to see some trails (their !options - Trails toggles, or hidden players / bots)
-	private bool _anyoneFilteringTrails;
-
 	/// <summary>
 	/// Collects the alive human and replay bot pawns (OnTick) - only when someone uses a hide option.
 	/// </summary>
@@ -28,7 +25,6 @@ public partial class SurfTimer
 	{
 		_transmitTargets.Clear();
 		_anyoneHiding = playerList.Values.Any(p => p.Options.HidePlayers || p.Options.HideBots);
-		_anyoneFilteringTrails = _trails.Count > 0 && (_anyoneHiding || playerList.Values.Any(p => p.Options.FiltersTrails));
 		if (!_anyoneHiding)
 			return;
 
@@ -74,19 +70,26 @@ public partial class SurfTimer
 		bool hidePawns = _anyoneHiding && _transmitTargets.Count > 0;
 		bool zoneBeams = ZoneBeamsExist;
 		bool ghosts = _ghosts.Count > 0;
-		if (!hidePawns && !_anyoneFilteringTrails && !zoneBeams && !ghosts)
+		bool trails = _trails.Count > 0;
+		if (!hidePawns && !trails && !zoneBeams && !ghosts)
 			return;
 
 		foreach ((CCheckTransmitInfo info, CCSPlayerController? viewer) in infoList)
 		{
-			if (viewer == null || !viewer.IsValid || viewer.IsBot || !playerList.TryGetValue(viewer.UserId ?? 0, out var player))
+			if (viewer == null || !viewer.IsValid || viewer.IsBot)
 				continue;
+			if (!playerList.TryGetValue(viewer.UserId ?? 0, out var player))
+			{
+				// Still loading: no trail / ghost beams yet - once its options are known it gets the ones it wants
+				HideTrailAndGhostBeams(info);
+				continue;
+			}
 
 			var options = player.Options;
 
 			// Trails the viewer doesn't want (see Trails.cs)
-			if (_anyoneFilteringTrails && (options.FiltersTrails || options.HidePlayers || options.HideBots))
-				FilterTrailTransmit(info, viewer, options);
+			if (trails)
+				FilterTrailTransmit(info, viewer, player);
 
 			// Zone outlines the viewer doesn't get (see ZoneDrawing.cs)
 			if (zoneBeams)
@@ -94,7 +97,7 @@ public partial class SurfTimer
 
 			// Other players' ghost & path (see GhostPath.cs)
 			if (ghosts)
-				FilterGhostTransmit(info, viewer);
+				FilterGhostTransmit(info, viewer, player);
 
 			if (!hidePawns || (!options.HidePlayers && !options.HideBots))
 				continue;

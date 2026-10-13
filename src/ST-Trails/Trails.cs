@@ -352,10 +352,13 @@ public partial class SurfTimer
 
 	/// <summary>
 	/// Leaves out the beams a viewer doesn't want: their own, the spectated source's, replay bots' and other
-	/// players' trails each have their own toggle; hidden players / bots take their trails along.
+	/// players' trails each have their own toggle; hidden players / bots take their trails along. Pieces the viewer
+	/// already got before a trail became hidden for them keep being sent until they're removed (Player.TrailHiddenSince).
 	/// </summary>
-	private void FilterTrailTransmit(CCheckTransmitInfo info, CCSPlayerController viewer, PlayerOptions options)
+	private void FilterTrailTransmit(CCheckTransmitInfo info, CCSPlayerController viewer, Player player)
 	{
+		var options = player.Options;
+		int now = Server.TickCount;
 		uint observed = ObservedPawn(viewer) is { } target
 			? new CCSPlayerPawn(target.Handle).Controller.Value?.Index ?? 0
 			: 0;
@@ -367,13 +370,39 @@ public partial class SurfTimer
 				: ring.IsBot ? options.TrailsBots && !options.HideBots
 				: options.TrailsOthers && !options.HidePlayers;
 			if (visible)
+			{
+				player.TrailHiddenSince.Remove(source);
 				continue;
+			}
 
+			// Hidden from the start (nothing sent yet), or since now (what was sent stays until it's removed)
+			if (!player.TrailHiddenSince.TryGetValue(source, out int since))
+				player.TrailHiddenSince[source] = since = player.TrailFilterStarted ? now : int.MinValue;
+
+			foreach (var segment in ring.Segments)
+			{
+				if (segment.Tick >= since && segment.Beam.IsValid)
+					info.TransmitEntities.Remove(segment.Beam.Index);
+			}
+		}
+		player.TrailFilterStarted = true;
+	}
+
+	/// <summary>A viewer whose options aren't loaded yet gets no trail or ghost beams at all</summary>
+	private void HideTrailAndGhostBeams(CCheckTransmitInfo info)
+	{
+		foreach (var ring in _trails.Values)
+		{
 			foreach (var segment in ring.Segments)
 			{
 				if (segment.Beam.IsValid)
 					info.TransmitEntities.Remove(segment.Beam.Index);
 			}
+		}
+		foreach (var state in _ghosts.Values)
+		{
+			foreach (var (index, _) in GhostTransmitBeams(state))
+				info.TransmitEntities.Remove(index);
 		}
 	}
 }
