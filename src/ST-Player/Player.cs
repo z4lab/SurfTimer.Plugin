@@ -104,9 +104,6 @@ public class Player
 		_ => true,
 	};
 
-	// !startpos - where resets into a start zone put the player, per start zone (map start = (MapStart, 1)).
-	// In memory only: a Player lives for one map / connection.
-	internal Dictionary<(ZoneType Type, short Number), (VectorT Position, QAngleT Angles)> StartPositions { get; } = new();
 
 	// Start zones where the anti-prehop cap applies. On staged_linear maps stage starts (2+) are part
 	// of the run and may be bhopped through freely - only the map start (stage 1) and bonus starts count.

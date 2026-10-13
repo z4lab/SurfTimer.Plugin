@@ -70,8 +70,7 @@ public partial class SurfTimer
 
 	/// <summary>
 	/// Teleports the player (velocity zeroed) to the nearest trigger of a zone - maps can have several
-	/// per zone (e.g. one per side of a course) - or to their !startpos of that start zone. Returns false
-	/// if the map has no such zone. filter: the map filter state the player gets there (null keeps theirs).
+	/// per zone (e.g. one per side of a course). Returns false if the map has no such zone. filter: the map filter state the player gets there (null keeps theirs).
 	/// </summary>
 	private bool TeleportToZone(CCSPlayerController player, ZoneType type, short number, FilterState? filter = null)
 	{
@@ -84,26 +83,14 @@ public partial class SurfTimer
 		if (zone == null)
 			return false;
 
-		// The player's own start position in this start zone (!startpos), if they set one
 		VectorT position = zone.Teleport;
-		QAngleT? angles = null;
-		if (playerList.TryGetValue(player.UserId ?? 0, out var oPlayer)
-			&& oPlayer.StartPositions.TryGetValue((type, number), out var startPos))
-		{
-			position = startPos.Position;
-			angles = startPos.Angles;
-		}
-
 		Server.NextFrame(() =>
 		{
 			var target = player.PlayerPawn.Value;
 			if (target == null || !target.IsValid)
 				return;
 			filter?.Apply(target); // Before the teleport: the map's own triggers there can still give a name
-			if (angles is QAngleT view)
-				target.TeleportWithView(position, view, new VectorT(0, 0, 0)); // Keeps the pawn level
-			else
-				Extensions.Teleport(target, position, null, new VectorT(0, 0, 0));
+			Extensions.Teleport(target, position, null, new VectorT(0, 0, 0));
 		});
 		return true;
 	}

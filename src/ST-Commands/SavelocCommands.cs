@@ -352,7 +352,7 @@ public partial class SurfTimer
 		return null;
 	}
 
-	/// <summary>Like !startpos: on the ground, not crouched, (almost) not moving</summary>
+	/// <summary>On the ground, not crouched, (almost) not moving</summary>
 	private static bool IsStandingStill(CCSPlayerPawn pawn)
 	{
 		bool onGround = (pawn.Flags & (uint)PlayerFlags.FL_ONGROUND) != 0;

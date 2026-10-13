@@ -68,10 +68,6 @@ public partial class SurfTimer
 			detail: "Tabs: My set, Recent (everyone's latest), Import, Info.");
 		Add(HelpGroup.Practice, "repeat", "repeat mode on / off",
 			detail: "After each stage you go back to that stage's start. Staged maps only, off every time you join.");
-		Add(HelpGroup.Practice, "startpos", "save where resets put you in this start zone",
-			detail: "Saves where !r / !rs / !s / !b put you in the start zone you stand in, and your view. Stand still on the ground. Kept until the map changes.");
-		Add(HelpGroup.Practice, "clearstartpos", "remove your start position", "[all]",
-			detail: "Removes your start position for this start zone - all of them with \"all\".");
 
 		// Records
 		Add(HelpGroup.Records, "rank", "your rank on this map");

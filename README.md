@@ -32,8 +32,6 @@ Some menu rows ask you to type something in chat. Type `!cancel` to abort.
 | `!b [n]` | `!bonus` | Teleports you to bonus *n*. You stay on that bonus until you use `!r`, `!s` or `!b`. Without a number: bonus 1 if the map has only one, otherwise a picker with every bonus and its tier. |
 | `!end` | | Teleports you to the end of the course you're on (map, bonus, or the stage in stage mode). Only from that course's start zone. The timer stops and doesn't finish there. With several end zones you pick one from a menu. |
 | `!repeat` | | Turns repeat mode on or off: after each stage you go back to that stage's start. Staged maps only. Not saved, so it's off every time you join. |
-| `!startpos` | | Saves where `!r` / `!rs` / `!s` / `!b` put you in the start zone you're standing in, and which way you face. Stand still on the ground, not crouched. Kept until the map changes. **Deprecated soon:** will be replaced by saving a saveloc (`!saveloc`) in the start zone. |
-| `!clearstartpos [all]` | | Removes your start position for this start zone. `all` removes every one. **Deprecated soon**, together with `!startpos`. |
 
 </details>
 
