@@ -337,6 +337,36 @@ internal sealed class PlayerOptions
 	private static string CenterOffsetKey(int line) => line == 0 ? KeyCenterSpeedOffset : KeyCenterOffsetPrefix + line;
 
 	/// <summary>
+	/// Every setting of !options - HUD - what a HUD code (HudPresets) carries. Only these are taken from a code.
+	/// </summary>
+	internal static readonly IReadOnlyList<string> HudKeys =
+	[
+		KeyHudFields, KeyHudTop, KeyHudSplitTarget, KeyHudSplitsKeep, KeyHudSpectators, KeyHudPace, KeyHudPaceEnergy,
+		KeySpeedAxes, KeySpeedColor, KeySpeedColorStatic, KeyTimerWarning,
+		KeyCenterHud, KeyCenterFields, KeyCenterLabels, KeyCenterSpeed, KeyCenterSpeedOffset, KeyCenterSpeedMono,
+		KeyCenterSpeedColor, KeyCenterSpeedColorStatic,
+		.. Enumerable.Range(1, CustomHud.MidSlots - 1).SelectMany(line => new[] { KeyCenterSizePrefix + line, KeyCenterOffsetPrefix + line }),
+		KeyGhostPath, KeyGhostMarkers, KeyGhostOrb, KeyGhostTarget, KeyGhostSeconds,
+		.. CustomHud.SlotShift.Keys.Select(slot => KeyHudPosPrefix + slot),
+	];
+
+	/// <summary>
+	/// Takes a HUD code's settings: each HUD option becomes the code's value, options it doesn't have go back to their
+	/// defaults. Values the HUD can't use fall back like any stored setting does.
+	/// </summary>
+	internal void ApplyHud(IReadOnlyDictionary<string, string> settings)
+	{
+		foreach (string key in HudKeys)
+		{
+			if (settings.TryGetValue(key, out var value) && value.Length > 0 && value.Length <= 200)
+				_profile.SetSetting(key, value);
+			else if (_profile.Settings.ContainsKey(key))
+				_profile.RemoveSetting(key);
+		}
+		Load();
+	}
+
+	/// <summary>
 	/// Back to the defaults (the stored settings were removed, e.g. by an admin).
 	/// </summary>
 	internal void ResetToDefaults()

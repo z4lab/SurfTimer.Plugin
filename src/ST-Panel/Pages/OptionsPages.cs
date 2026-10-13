@@ -233,6 +233,20 @@ public partial class SurfTimer
 			rows.Add(ctx.Toggle("Keep last splits", options.HudSplitsKeep, "after a fail / reset, until your next run starts",
 				on => options.HudSplitsKeep = on));
 		rows.Add(ctx.Toggle("Spectator list", options.HudSpectators, "right side", on => options.HudSpectators = on));
+		// HUD codes (HudPresets.cs): all of this page's settings as a code to share
+		rows.Add(ctx.Act("Export HUD", "", "a code for all your HUD settings - !hudexport", () =>
+		{
+			ctx.Session.Status = "Making your HUD code…";
+			ExportHud(ctx.Player, ctx.Session);
+		}));
+		rows.Add(ctx.Ask("Import HUD", "", "type a HUD code in chat - !hudimport <code>",
+			LocalizationService.LocalizerNonNull["prompt_hud_code"], text =>
+			{
+				string? error = ImportHud(ctx.Player, text, ctx.Session);
+				if (error == null)
+					ctx.Session.Status = "Looking up the code…";
+				return error;
+			}));
 
 		// Positions: each click one step further down (top / sides) or up (bottom), after the last back to the default
 		foreach (var (slot, label, sub) in HudPositionRows)

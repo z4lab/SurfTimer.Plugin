@@ -66,4 +66,14 @@ public class PlayerProfile : PlayerProfileEntity
 		int playerId = ID;
 		_ = Task.Run(() => PlayerRepository.SetSettingAsync(playerId, key, value));
 	}
+
+	/// <summary>
+	/// Removes a setting - back to its default (in the background).
+	/// </summary>
+	internal void RemoveSetting(string key)
+	{
+		Settings.Remove(key);
+		int playerId = ID;
+		_ = Task.Run(() => PlayerRepository.DeleteSettingAsync(playerId, key));
+	}
 }

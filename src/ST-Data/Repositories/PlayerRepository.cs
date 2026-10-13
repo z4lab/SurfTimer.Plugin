@@ -128,6 +128,10 @@ internal static class PlayerRepository
 			ON DUPLICATE KEY UPDATE `value` = VALUES(`value`), `updated_at` = VALUES(`updated_at`)",
 			new { PlayerId = playerId, Key = key, Value = value });
 
+	internal static Task<int> DeleteSettingAsync(int playerId, string key) =>
+		SurfTimer.DB.ExecuteAsync("DELETE FROM `{p}player_settings` WHERE `player_id` = @PlayerId AND `setting_key` = @Key",
+			new { PlayerId = playerId, Key = key });
+
 	internal static Task<int> ResetSettingsAsync(int playerId) =>
 		SurfTimer.DB.ExecuteAsync("DELETE FROM `{p}player_settings` WHERE `player_id` = @PlayerId", new { PlayerId = playerId });
 

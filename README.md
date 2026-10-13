@@ -125,6 +125,8 @@ outputs still pending when you teleport.
 | `!hide` | Options › Visibility › Hide players |
 | `!hidebots` | Options › Visibility › Hide replay bots |
 | `!quake` | Options › Sound › Sounds (all timer sounds on / off) |
+| `!hudexport` | Options › HUD › Export HUD |
+| `!hudimport <code>` | Options › HUD › Import HUD |
 
 </details>
 
@@ -185,6 +187,8 @@ The HUD uses the [Nord](https://www.nordtheme.com) colors. Its accent (field bor
 | Pace | Off | *Only shown when the splits panel is on.* Under the splits: your projected finish time, live, and how far ahead (green) or behind (red) you are - against the splits panel's target (in stage / bonus mode: that stage's / bonus's PB, or its WR for any other target). It matches your position on the target run's replay every update, so it moves while you surf, not only at checkpoints. Without a replay it's worked out from the splits (shown with a `~`). The splits panel shows 4 splits instead of 6 then. |
 | Energy vs reference | Off | *Only shown with Pace on.* Under the pace: your energy and speed compared to the target run at the same spot (+ green / − red). |
 | Spectator list | On | Right side. |
+| Export HUD | | Makes a code for **all** your HUD settings (everything on this page: layouts, center HUD, colors, positions, splits, pace, ghost & path), shown in chat - e.g. `7K2M9QPX`. The same settings always get the same code, and codes stay forever. Same as `!hudexport`. |
+| Import HUD | | Type a code in chat: every HUD setting becomes the code's, settings the code doesn't have go back to their defaults. Same as `!hudimport <code>`. |
 | Top position | default (4) | Each press moves the top bar one step down (0-10, 40-240px from the top). After 10 it goes back to the server's default. |
 | Bottom position | default (3) | Same for the bottom HUD (timer, speed): 0-10, 100-300px from the bottom. |
 | Splits position | default (5) | Same for the splits panel on the left: 0-10, 200-600px from the top. |

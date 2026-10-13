@@ -94,6 +94,10 @@ public partial class SurfTimer
 		Add(HelpGroup.Options, "hidebots", "hide replay bots on / off");
 		Add(HelpGroup.Options, "hideself", "hide your own legs on / off");
 		Add(HelpGroup.Options, "quake", "all timer sounds on / off");
+		Add(HelpGroup.Options, "hudexport", "a code for all your HUD settings",
+			detail: "Every !options - HUD setting as an 8 character code. Others take it with !hudimport <code>. Codes stay forever.");
+		Add(HelpGroup.Options, "hudimport", "take someone's HUD settings", "<code>",
+			detail: "Takes every HUD setting of a code from !hudexport - settings the code doesn't have go back to their defaults.");
 		Add(HelpGroup.Options, "cursor", "mouse cursor for popup menus on / off",
 			detail: "Click the popup with the mouse, or move with it open. Bindable: bind <key> css_cursor.");
 		Add(HelpGroup.Options, "close", "close the popup menu");
