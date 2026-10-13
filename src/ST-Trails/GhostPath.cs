@@ -251,7 +251,7 @@ public partial class SurfTimer
 			var b = path.PositionAt(starts[k + 1]);
 			var color = Lighten(ColorTranslator.FromHtml(Extensions.GetSpeedColorGradient(path.Speeds[starts[k]])), GhostLineLift);
 			var beam = CreateBeam(new Vector(a.X, a.Y, a.Z + GhostPathLift), new Vector(b.X, b.Y, b.Z + GhostPathLift), color,
-				GhostLineWidth, GhostLineBrightness);
+				GhostLineWidth, GhostLineBrightness, GhostBeamName);
 			if (beam != null)
 			{
 				state.Segments[k] = beam;
@@ -328,7 +328,7 @@ public partial class SurfTimer
 		var beams = new List<CBeam>();
 		for (int i = 0; i < corners.Count; i++)
 		{
-			var beam = CreateBeam(corners[i], corners[(i + 1) % corners.Count], color, GhostPathWidth);
+			var beam = CreateBeam(corners[i], corners[(i + 1) % corners.Count], color, GhostPathWidth, name: GhostBeamName);
 			if (beam != null)
 				beams.Add(beam);
 		}
@@ -357,7 +357,7 @@ public partial class SurfTimer
 		];
 		foreach (var (a, b) in axes)
 		{
-			var beam = CreateBeam(a, b, color, GhostOrbWidth);
+			var beam = CreateBeam(a, b, color, GhostOrbWidth, name: GhostBeamName);
 			if (beam != null)
 				state.Orb.Add(beam);
 		}
@@ -416,6 +416,14 @@ public partial class SurfTimer
 		foreach (uint owner in _ghosts.Keys.ToList())
 			RemoveGhost(owner);
 	}
+
+	/// <summary>Every beam the ghosts track - SweepBeams keeps these</summary>
+	private IEnumerable<uint> GhostBeamIndexes() =>
+		_ghosts.Values.SelectMany(state => state.Segments.Values
+			.Concat(state.Markers.Values.SelectMany(shape => shape))
+			.Concat(state.Orb))
+			.Where(beam => beam.IsValid)
+			.Select(beam => beam.Index);
 
 	/// <summary>Map end - the map's entities are gone already</summary>
 	private void ForgetGhosts() => _ghosts.Clear();

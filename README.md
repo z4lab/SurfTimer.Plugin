@@ -370,6 +370,7 @@ Permissions are granted through CounterStrikeSharp (`admins.json` / admin groups
 |---|---|---|---|
 | `!surfadmin` | `!timeradmin` | at least one `@surftimer/*` section (or root) | Opens the admin panel with the tabs you have access to. It reopens on the last tab and page. |
 | `!changemap [map]` | | `@css/changemap` (the server console can always use it) | Changes to a map from the map list. Part of a name is enough when it's unique. Without a name it opens Server › Change map. |
+| `!cleartrails` | | `@surftimer/server` (the server console can always use it) | Removes every trail and ghost & path beam, stuck pieces too. Trails start over, ghosts are drawn again. Trail beams no trail tracks any more are also removed by themselves every 5 seconds. |
 
 Every change made in the panel is written to the **Audit** log.
 

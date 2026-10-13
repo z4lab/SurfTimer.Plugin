@@ -1,7 +1,9 @@
 using System.Drawing;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
+using CounterStrikeSharp.API.Core.Attributes.Registration;
 using CounterStrikeSharp.API.Modules.Admin;
+using CounterStrikeSharp.API.Modules.Commands;
 using CounterStrikeSharp.API.Modules.Utils;
 using Microsoft.Extensions.Logging;
 
@@ -31,6 +33,12 @@ public partial class SurfTimer
 
 	private const float TrailHeight = 4f;
 	private const float TrailTeleportDistance = 300f;
+
+	// Every trail / ghost beam carries one of these names, so beams nothing tracks any more (a plugin reload, a lost
+	// segment) can be found and removed - "stuck" bits otherwise stay until the map changes
+	private const string TrailBeamName = "surftimer_trail";
+	private const string GhostBeamName = "surftimer_ghost";
+	private const int BeamSweepTicks = 64 * 5;
 
 	// By the source's controller entity index (players and replay bots). Main thread only.
 	private readonly Dictionary<uint, TrailRing> _trails = new();
@@ -142,6 +150,12 @@ public partial class SurfTimer
 	private void TickTrails()
 	{
 		var settings = TrailSettings.Current;
+		int now = Server.TickCount;
+
+		// Every few seconds: trail / ghost beams nothing tracks are removed
+		if (CurrentMap != null && now % BeamSweepTicks == 0)
+			SweepBeams(all: false);
+
 		if (!settings.Enabled || CurrentMap == null)
 		{
 			if (_trails.Count > 0)
@@ -149,7 +163,6 @@ public partial class SurfTimer
 			return;
 		}
 
-		int now = Server.TickCount;
 		if (now % settings.SegmentTicks != 0)
 			return;
 
@@ -215,7 +228,7 @@ public partial class SurfTimer
 			// Teleports (!r, map teleporters) start a new trail instead of a line across the map
 			if (distance <= TrailTeleportDistance && distance > 1f && speed >= settings.MinSpeed)
 			{
-				var beam = CreateBeam(last, position, TrailColors.Resolve(color, ring.Step++), (float)settings.Width);
+				var beam = CreateBeam(last, position, TrailColors.Resolve(color, ring.Step++), (float)settings.Width, name: TrailBeamName);
 				if (beam != null)
 					ring.Segments.Enqueue(new TrailSegment { Beam = beam, Tick = now });
 			}
@@ -230,7 +243,8 @@ public partial class SurfTimer
 	/// where they spawned, so a moved beam vanishes or shows in pieces.
 	/// </summary>
 	/// <param name="brightness">HDR colour scale - above 1 glows brighter (the ghost path on dark maps)</param>
-	private static CBeam? CreateBeam(Vector start, Vector end, Color color, float width, float brightness = 1f)
+	/// <param name="name">Targetname - trail / ghost beams carry theirs for SweepBeams</param>
+	private static CBeam? CreateBeam(Vector start, Vector end, Color color, float width, float brightness = 1f, string? name = null)
 	{
 		var beam = Utilities.CreateEntityByName<CBeam>("beam");
 		if (beam == null)
@@ -245,8 +259,62 @@ public partial class SurfTimer
 		beam.EndPos.X = end.X;
 		beam.EndPos.Y = end.Y;
 		beam.EndPos.Z = end.Z;
+		if (name != null && beam.Entity != null)
+			beam.Entity.Name = name;
 		beam.DispatchSpawn();
 		return beam;
+	}
+
+	/// <summary>
+	/// Removes trail and ghost beams: all: every one (!cleartrails - trails start over, ghosts are drawn again), else
+	/// only the ones no trail / ghost tracks any more. Returns how many were removed.
+	/// </summary>
+	private int SweepBeams(bool all)
+	{
+		HashSet<uint> tracked = [];
+		if (!all)
+		{
+			foreach (var ring in _trails.Values)
+			{
+				foreach (var segment in ring.Segments)
+				{
+					if (segment.Beam.IsValid)
+						tracked.Add(segment.Beam.Index);
+				}
+			}
+			foreach (uint index in GhostBeamIndexes())
+				tracked.Add(index);
+		}
+		else
+		{
+			RemoveAllTrails();
+			RemoveAllGhosts();
+		}
+
+		int removed = 0;
+		foreach (var beam in Utilities.FindAllEntitiesByDesignerName<CBeam>("beam"))
+		{
+			if (!beam.IsValid || tracked.Contains(beam.Index))
+				continue;
+			string name = beam.Entity?.Name ?? "";
+			if (name != TrailBeamName && name != GhostBeamName)
+				continue; // Zone outlines, paint, the map's own beams
+			beam.Remove();
+			removed++;
+		}
+		if (removed > 0 && !all)
+			_logger.LogDebug("[Trails] Removed {Count} untracked trail / ghost beams", removed);
+		return removed;
+	}
+
+	[ConsoleCommand("css_cleartrails", "Server admins: remove every trail and ghost beam (stuck pieces too) - trails start over")]
+	[CommandHelper(whoCanExecute: CommandUsage.CLIENT_AND_SERVER)]
+	public void ClearTrailsCommand(CCSPlayerController? player, CommandInfo command)
+	{
+		if (player != null && !AdminPermissions.Has(player, AdminPermissions.Server))
+			return;
+		int removed = SweepBeams(all: true);
+		command.ReplyToCommand($"{Config.PluginPrefix} Removed {removed} trail / ghost beams.");
 	}
 
 	private static void RemoveSegment(TrailSegment segment)
