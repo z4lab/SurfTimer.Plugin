@@ -60,6 +60,7 @@
 	"replay_finish": "{grey}{0}{default} finished in {gold}{1}{default}{2}",
 	"replay_segment": "{grey}{0}{default} · {1}: {yellow}{2}{default}{3}",
 	"checkpoint_message": "CP [{yellow}{0}{default}]: {yellow}{1}{default} {yellow}({2}){default} [PB: {3} | WR: {4}]",
+	"stage_split_message": "Run at Stage [{yellow}{0}{default}]: {yellow}{1}{default} {yellow}({2}){default} [PB: {3} | WR: {4}]",
 	"stage_message": "Stage [{yellow}{0}{default}]: {yellow}{1}{default} {yellow}({2}){default} [PB: {3} | WR: {4}]",
 	"replay_pool_full": "{red}All {green}{0}{red} replay slots are currently in use. Try again shortly.",
 	"replay_spawning": "{green}Spawning a replay bot, please wait...",

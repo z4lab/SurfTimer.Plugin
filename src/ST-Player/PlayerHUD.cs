@@ -1643,7 +1643,8 @@ public class PlayerHud
 	/// Displays checkpoints comparison messages in player chat.
 	/// Only calculates if the player has a PB, otherwise it will display N/A
 	/// </summary>
-	internal void DisplayCheckpointMessages()
+	/// <param name="atStage">At a stage start of a staged map (stage N start = checkpoint N-1) - labelled with the stage</param>
+	internal void DisplayCheckpointMessages(bool atStage = false)
 	{
 		int pbTime;
 		int wrTime = -1;
@@ -1757,8 +1758,11 @@ public class PlayerHud
 		}
 
 		// The runner and their spectators by their own toggle, others by theirs (!options - Chat)
-		string message = LocalizationService.LocalizerNonNull["checkpoint_message",
-			playerCurrentCheckpoint, FormatTime(_player.Timer.Ticks), currentSpeed.ToString("0"), strPbDifference, strWrDifference];
+		string message = atStage
+			? LocalizationService.LocalizerNonNull["stage_split_message",
+				playerCurrentCheckpoint + 1, FormatTime(_player.Timer.Ticks), currentSpeed.ToString("0"), strPbDifference, strWrDifference]
+			: LocalizationService.LocalizerNonNull["checkpoint_message",
+				playerCurrentCheckpoint, FormatTime(_player.Timer.Ticks), currentSpeed.ToString("0"), strPbDifference, strWrDifference];
 		ChatAnnounce.Run(ChatEvent.SplitMap, _player, $"{Config.PluginPrefix} {message}", ChatAnnounce.About(_player, message));
 
 #if DEBUG
@@ -1790,6 +1794,10 @@ public class PlayerHud
 		int style = _player.Timer.Style;
 		var axes = _player.Options.SpeedAxes;
 		float exitSpeed = Extensions.Speed(exitVelocity, axes);
+
+		// Runs inside zone touch handlers - an unknown stage must not throw and abort the handler
+		if (!RunTargets.HasEntry(_player.Stats.StagePB, stage, style) || !RunTargets.HasEntry(SurfTimer.CurrentMap.StageWR, stage, style))
+			return;
 
 		string strPbDifference =
 			$"{ChatColors.Grey}N/A{ChatColors.Default} ({ChatColors.Grey}N/A{ChatColors.Default})";

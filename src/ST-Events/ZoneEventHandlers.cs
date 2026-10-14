@@ -129,6 +129,10 @@ public partial class SurfTimer
 				CurrentRun.LogRun(player, 0, 0, player.Timer.Ticks, player.SyncPercent); // Not a PB - history only
 			}
 
+			// Practice on a staged map: the last stage's time is shown (by the timer), nothing saved
+			if (player.Timer.IsPracticeMode && CurrentMap.Stages > 0)
+				player.HUD.DisplayStageMessage(CurrentMap.Stages, lastStageTimerTicks, velocity);
+
 			// Add entry in DB for the run
 			if (!player.Timer.IsPracticeMode)
 			{
@@ -373,9 +377,10 @@ public partial class SurfTimer
 			Console.WriteLine($"CS2 Surf DEBUG >> CBaseTrigger_StartTouchFunc (Stage start zones) -> player.Stats.PB[{player.Timer.Style}].Checkpoint.Count = {player.Stats.PB[player.Timer.Style].Checkpoints?.Count ?? 0}");
 #endif
 
-			// Print Stage completion message (staged maps show Stage records, never the generic
-			// Checkpoint comparison - that's for non-staged maps only)
+			// The finished stage's time vs the stage records, and the run so far vs the map PB / WR at this stage
+			// (stage N start = map checkpoint N-1) - each has its own chat toggle
 			player.HUD.DisplayStageMessage((short)(stage - 1), stage_run_time, velocity);
+			player.HUD.DisplayCheckpointMessages(atStage: true);
 
 			// store the checkpoint in the player's current run checkpoints used for Checkpoint functionality.
 			// Not recorded yet (guarded above); its tries are the finished stage's first try plus every fail.
