@@ -81,6 +81,31 @@ internal static class MapRepository
 	internal static Task SetWorkshopIdAsync(int mapId, ulong? workshopId) =>
 		SurfTimer.DB.ExecuteAsync("UPDATE `{p}maps` SET `workshop_id` = @WorkshopId WHERE `id` = @Id", new { Id = mapId, WorkshopId = workshopId });
 
+	private sealed class WorkshopRow
+	{
+		public int Id { get; set; }
+		public string Name { get; set; } = "";
+		public ulong? WorkshopId { get; set; }
+	}
+
+	/// <summary>
+	/// Stores the workshop id of every stored map that's on the server's map list (MapList) where it's missing or
+	/// different. Maps that aren't stored yet get theirs on their first load. Returns the maps it changed.
+	/// </summary>
+	internal static async Task<List<(string Name, ulong? Old, ulong New)>> SyncWorkshopIdsAsync(IReadOnlyDictionary<string, ulong> listed)
+	{
+		var changed = new List<(string, ulong?, ulong)>();
+		var rows = await SurfTimer.DB.QueryAsync<WorkshopRow>("SELECT `id`, `name`, `workshop_id` FROM `{p}maps`");
+		foreach (var row in rows)
+		{
+			if (!listed.TryGetValue(row.Name, out ulong id) || row.WorkshopId == id)
+				continue;
+			await SetWorkshopIdAsync(row.Id, id);
+			changed.Add((row.Name, row.WorkshopId, id));
+		}
+		return changed;
+	}
+
 	/// <summary>
 	/// Maps by when they were last played, newest first (the admin panel's change-map list).
 	/// </summary>

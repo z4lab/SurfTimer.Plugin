@@ -389,7 +389,7 @@ Every change made in the panel is written to the **Audit** log.
 | Map tier › | Tier 1–N, or no tier. |
 | Stages › / Bonuses › | Per course: **Tier** (overrides the map tier), **Name**, **Gives points** (leave out e.g. a broken bonus), **Reset records** (danger). |
 | Authors › | Set authors (comma separated) or remove them. |
-| Workshop id | Type it in chat. |
+| Workshop id | Type it in chat. Filled in by itself: after every map start the timer reads which workshop addon each map comes from and stores missing or different ids for every map in the database (maps not stored yet get theirs on their first load). |
 | Map settings › | See below. |
 | Zones › | See below. |
 | Reset map records | **Danger.** Deletes times, replays and history. Points are recalculated. A preview shows the counts first. |

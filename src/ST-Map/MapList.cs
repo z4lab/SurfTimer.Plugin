@@ -130,7 +130,39 @@ public partial class SurfTimer
 				_logger.LogInformation("[MapList] {Maps} maps in {Addons} workshop addons ({Folder})", maps.Count, addons, used);
 				if (_unreadableVpks > 0)
 					_logger.LogWarning("[MapList] {Count} workshop VPKs couldn't be read (last: {Last})", _unreadableVpks, _lastUnreadableVpk);
+				SyncWorkshopIds(maps);
 			});
+		});
+	}
+
+	/// <summary>
+	/// After a scan: the stored maps get the workshop id their map comes from on this server (missing or different ones
+	/// are written) - the loaded map's too, so !changemap and the map chooser change by id.
+	/// </summary>
+	private void SyncWorkshopIds(Dictionary<string, ulong> maps)
+	{
+		if (maps.Count == 0 || DB == null)
+			return;
+
+		_ = Task.Run(async () =>
+		{
+			try
+			{
+				var changed = await MapRepository.SyncWorkshopIdsAsync(maps);
+				foreach (var (name, old, id) in changed)
+					_logger.LogInformation("[MapList] {Map}: workshop id {Old} -> {New}", name, old?.ToString() ?? "(none)", id);
+
+				Server.NextFrame(() =>
+				{
+					var map = CurrentMap;
+					if (map?.Name != null && maps.TryGetValue(map.Name, out ulong id) && map.WorkshopId != id)
+						map.WorkshopId = id;
+				});
+			}
+			catch (Exception ex)
+			{
+				_logger.LogError(ex, "[MapList] Storing the maps' workshop ids failed");
+			}
 		});
 	}
 
