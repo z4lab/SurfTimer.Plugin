@@ -352,6 +352,31 @@ public class Map : MapEntity
 	internal Dictionary<string, string> Settings { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
 
 	internal const string SettingStagedLinear = "staged_linear";
+	/// <summary>Per start zone: prehop_cap_map, prehop_cap_s3, prehop_cap_b1 = "1" capped / "0" free - unset: the map's rule</summary>
+	internal const string SettingPrehopCapPrefix = "prehop_cap_";
+
+	internal static string PrehopCapKey(ZoneType type, short number) => SettingPrehopCapPrefix + type switch
+	{
+		ZoneType.StageStart => $"s{number}",
+		ZoneType.BonusStart => $"b{number}",
+		_ => "map",
+	};
+
+	/// <summary>A start zone's own prehop rule - null: none set, the map's rule (StagedLinear) applies</summary>
+	internal bool? PrehopCapOverride(ZoneType type, short number) =>
+		Settings.TryGetValue(PrehopCapKey(type, number), out var value) ? value is "1" or "true" : null;
+
+	/// <summary>
+	/// Whether the anti-prehop cap applies in a start zone: its own setting, else map / bonus starts always and stage
+	/// starts unless the map is staged linear (there they're part of the run and may be bhopped through).
+	/// </summary>
+	internal bool IsPrehopCapped(ZoneType type, short number) =>
+		PrehopCapOverride(type, number) ?? type switch
+		{
+			ZoneType.MapStart or ZoneType.BonusStart => true,
+			ZoneType.StageStart => !StagedLinear,
+			_ => false,
+		};
 	internal const string SettingStagesAsCheckpoints = "stages_as_checkpoints";
 
 	/// <summary>

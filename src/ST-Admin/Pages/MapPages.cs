@@ -216,7 +216,8 @@ public partial class SurfTimer
 	};
 
 	private static bool IsCustomMapSetting(string key) =>
-		!KnownMapSettings.Contains(key) && !key.StartsWith(MapCvars.SettingPrefix, StringComparison.OrdinalIgnoreCase);
+		!KnownMapSettings.Contains(key) && !key.StartsWith(MapCvars.SettingPrefix, StringComparison.OrdinalIgnoreCase)
+		&& !key.StartsWith(Map.SettingPrehopCapPrefix, StringComparison.OrdinalIgnoreCase);
 
 	/// <summary>
 	/// Stores (value) or removes (null) a map setting and applies the map's settings again.
@@ -271,6 +272,8 @@ public partial class SurfTimer
 		rows.AddRange(
 		[
 			ctx.Nav("Start speed cap", cap, "bhop cap in start zones", AdminSpeedCapPage),
+			ctx.Nav("Prehop per start zone", PrehopOverrideCount(map) is int prehopOwn and > 0 ? $"{prehopOwn} set" : "map rule",
+				"capped / free for single start zones", AdminPrehopZonesPage),
 			ctx.Toggle("Exit speed limit", map.ExitLimitEnabled, "caps speed leaving run starts", on =>
 			{
 				AdminSetMapSetting(ctx, Map.SettingExitLimit, on ? "1" : null);
@@ -325,6 +328,47 @@ public partial class SurfTimer
 					ctx.Session.Status = "Runs start without a name";
 				}));
 		}
+		return rows;
+	});
+
+	private static int PrehopOverrideCount(Map map) =>
+		map.Settings.Keys.Count(k => k.StartsWith(Map.SettingPrehopCapPrefix, StringComparison.OrdinalIgnoreCase));
+
+	/// <summary>
+	/// The anti-prehop cap per start zone: each press cycles map rule (Staged linear decides for stage starts) -> capped ->
+	/// free -> map rule.
+	/// </summary>
+	private PanelPage AdminPrehopZonesPage() => new("Prehop per start zone", ctx =>
+	{
+		var map = CurrentMap;
+		var starts = new List<(ZoneType Type, short Number, string Label)>();
+		if (map.HasZone(ZoneType.MapStart, 1))
+			starts.Add((ZoneType.MapStart, 1, map.Stages > 0 ? "Stage 1 (map start)" : "Map start"));
+		for (short stage = 2; stage <= map.Stages; stage++)
+		{
+			if (map.HasZone(ZoneType.StageStart, stage))
+				starts.Add((ZoneType.StageStart, stage, $"Stage {stage}"));
+		}
+		for (short bonus = 1; bonus <= map.Bonuses; bonus++)
+		{
+			if (map.HasZone(ZoneType.BonusStart, bonus))
+				starts.Add((ZoneType.BonusStart, bonus, $"Bonus {bonus}"));
+		}
+
+		var rows = new List<HudMenuItem>();
+		foreach (var (type, number, label) in starts)
+		{
+			bool? own = map.PrehopCapOverride(type, number);
+			string value = own switch { true => "capped", false => "free", _ => $"map rule ({(map.IsPrehopCapped(type, number) ? "capped" : "free")})" };
+			rows.Add(ctx.Act(label, value, "each press: capped, free, map rule", () =>
+			{
+				string? next = own switch { null => "1", true => "0", false => null };
+				AdminSetMapSetting(ctx, Map.PrehopCapKey(type, number), next);
+				ctx.Session.Status = next switch { "1" => $"{label}: prehop capped", "0" => $"{label}: free (no prehop cap)", _ => $"{label}: map rule" };
+			}));
+		}
+		if (starts.Count == 0)
+			rows.Add(PanelContext.Info("No start zones", "", "this map has no map / stage / bonus start zones"));
 		return rows;
 	});
 

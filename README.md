@@ -402,6 +402,7 @@ Every change made in the panel is written to the **Audit** log.
 | Staged linear | *Only on staged maps.* Keeps the stages, with no speed cap in stage starts 2+. |
 | Stages as checkpoints | Counts stages as checkpoints. A confirm page shows what gets deleted, and the **map restarts**. |
 | Start speed cap › | Bhop cap in start zones: ±10 / ±50, No cap, or Use default. |
+| Prehop per start zone › | The anti-prehop cap for single start zones: map start, each stage start, each bonus start. Each press cycles **capped** → **free** → **map rule**. Map rule is the old behavior: map and bonus starts capped, stage starts capped unless **Staged linear** is on. |
 | Exit speed limit | Caps your speed when you leave a run start. |
 | Exit limit value › | ±10 / ±50, or Use default. |
 | Record replays | Stores replays of new PBs. |

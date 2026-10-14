@@ -105,14 +105,11 @@ public class Player
 	};
 
 
-	// Start zones where the anti-prehop cap applies. On staged_linear maps stage starts (2+) are part
-	// of the run and may be bhopped through freely - only the map start (stage 1) and bonus starts count.
-	internal bool IsInStartZone => this.TouchingTriggers.Values.Any(zone => zone.Type switch
-	{
-		ZoneType.MapStart or ZoneType.BonusStart => true,
-		ZoneType.StageStart => !SurfTimer.CurrentMap.StagedLinear,
-		_ => false
-	});
+	// Start zones where the anti-prehop cap applies (Map.IsPrehopCapped): a start zone's own setting, else map / bonus
+	// starts always and stage starts unless the map is staged linear.
+	internal bool IsInStartZone => this.TouchingTriggers.Values.Any(zone =>
+		zone.Type is ZoneType.MapStart or ZoneType.StageStart or ZoneType.BonusStart
+		&& SurfTimer.CurrentMap.IsPrehopCapped(zone.Type, zone.Number));
 
 	internal bool IsTouchingZone(ZoneType type, short number) => this.TouchingTriggers.Values.Any(zone =>
 		zone.Type == type && zone.Number == number);
