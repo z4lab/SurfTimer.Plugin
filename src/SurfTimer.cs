@@ -42,7 +42,7 @@ public partial class SurfTimer : BasePlugin
 
 	// Metadata
 	public override string ModuleName => $"z4lab/{Config.PluginName}";
-	public override string ModuleVersion => "1.2.8";
+	public override string ModuleVersion => "1.2.9";
 	public override string ModuleDescription => Config.PluginName;
 	public override string ModuleAuthor => "z4lab";
 
@@ -125,6 +125,7 @@ public partial class SurfTimer : BasePlugin
 		// come back as new Player objects
 		foreach (var player in playerList.Values)
 		{
+			player.ReplayRecorder.FlushPendingTrims(); // Saves of a just finished run keep their replay
 			PlayerStateService.SaveFinal(player, "map end");
 			StatsService.Flush(player, final: true);
 		}

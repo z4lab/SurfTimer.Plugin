@@ -14,25 +14,35 @@ public partial class SurfTimer
 	/// resets from the moment it's scheduled until it finishes - otherwise a !r in that window clears
 	/// the recorder's Frames before they're trimmed. The lock is always released, even on failure.
 	/// </summary>
+	/// <summary>
+	/// Starts a run save now: it captures the run on the spot and stores it in the background - its replay is cut once the
+	/// outro is recorded (ReplayRecorder.ScheduleTrim). Nothing waits for it: resets, teleports and savelocs go right on.
+	/// </summary>
 	private void ScheduleRunSave(Player player, string description, Func<Task> save)
 	{
-		player.ReplayRecorder.BeginSave();
-		AddTimer(1.0f, async () =>
+		Task task;
+		try
 		{
-			try
-			{
-				await save();
-			}
-			catch (Exception ex)
-			{
-				_logger.LogError(ex, "[{ClassName}] {Description} failed for '{Name}'",
-					nameof(SurfTimer), description, player.Profile.Name);
-			}
-			finally
-			{
-				player.ReplayRecorder.EndSave();
-			}
-		});
+			task = save();
+		}
+		catch (Exception ex)
+		{
+			_logger.LogError(ex, "[{ClassName}] {Description} failed for '{Name}'", nameof(SurfTimer), description, player.Profile.Name);
+			return;
+		}
+
+		string name = player.Profile.Name ?? "";
+		_ = task.ContinueWith(t => _logger.LogError(t.Exception?.GetBaseException(), "[{ClassName}] {Description} failed for '{Name}'",
+			nameof(SurfTimer), description, name), TaskContinuationOptions.OnlyOnFaulted);
+	}
+
+	/// <summary>
+	/// The frame the end zone entry is recorded as: already recorded, or - called in the touch's own tick - the next one
+	/// </summary>
+	private static int EndEnterIndex(ReplayRecorder recorder)
+	{
+		int index = recorder.Frames.FindLastIndex(f => f.Situation == ReplayFrameSituation.END_ZONE_ENTER);
+		return recorder.CurrentSituation == ReplayFrameSituation.END_ZONE_ENTER ? recorder.Frames.Count : index;
 	}
 
 	/* StartTouch */
@@ -144,7 +154,6 @@ public partial class SurfTimer
 					float lastStageEntryVelZ = player.Timer.StageEntryVelZ;
 					ScheduleRunSave(player, "SaveStageTime (last)", async () =>
 					{
-						// This calculation is wrong unless we wait for a bit in order for the `END_ZONE_ENTER` to be available in the `Frames` object
 						int stage_run_time = LastStageTicks(player, lastStageTimerTicks);
 
 						// Before the save: still on the main thread (chat can't be printed after an await),
@@ -167,8 +176,7 @@ public partial class SurfTimer
 					short lastSegment = (short)CurrentMap.CheckpointSegments;
 					ScheduleRunSave(player, "SaveCheckpointTime (last)", async () =>
 					{
-						// This calculation is wrong unless we wait for a bit in order for the `END_ZONE_ENTER` to be available in the `Frames` object
-						int endEnter = player.ReplayRecorder.Frames.FindLastIndex(f => f.Situation == ReplayFrameSituation.END_ZONE_ENTER);
+						int endEnter = EndEnterIndex(player.ReplayRecorder);
 						int lastCheckpointExit = player.ReplayRecorder.Frames.FindLastIndex(f => f.Situation == ReplayFrameSituation.CHECKPOINT_ZONE_EXIT);
 						if (endEnter < 0 || lastCheckpointExit < 0 || lastCheckpointExit >= endEnter)
 						{
@@ -205,7 +213,6 @@ public partial class SurfTimer
 				float lastStageEntryVelZ = player.Timer.StageEntryVelZ;
 				ScheduleRunSave(player, "SaveStageTime (last, stage mode)", async () =>
 				{
-					// This calculation is wrong unless we wait for a bit in order for the `END_ZONE_ENTER` to be available in the `Frames` object
 					int stage_run_time = LastStageTicks(player, lastStageTimerTicks);
 
 					// Before the save: still on the main thread (chat can't be printed after an await),
@@ -234,7 +241,7 @@ public partial class SurfTimer
 	private static int LastStageTicks(Player player, int timerTicks)
 	{
 		var frames = player.ReplayRecorder.Frames;
-		int endEnter = frames.FindLastIndex(f => f.Situation == ReplayFrameSituation.END_ZONE_ENTER);
+		int endEnter = EndEnterIndex(player.ReplayRecorder);
 		int stageExit = frames.FindLastIndex(f => f.Situation == ReplayFrameSituation.STAGE_ZONE_EXIT);
 		return endEnter >= 0 && stageExit >= 0 && endEnter > stageExit ? endEnter - stageExit : timerTicks;
 	}
@@ -264,16 +271,12 @@ public partial class SurfTimer
 	/// <summary>Teleport-back zone: back to the start of the stage / bonus the player is in, like !rs</summary>
 	private void StartTouchHandleTeleportBackZone(Player player)
 	{
-		if (player.ReplayRecorder.IsSaving)
-			return; // As !rs - the finished run is still being saved
 		ResetToCurrentStart(player);
 	}
 
 	private static void StartTouchHandleMapStartZone(Player player, ZoneInfo zone, [CallerMemberName] string methodName = "")
 	{
-		// The timer stops right away. The recorder restarts only once a pending save has trimmed its replay
-		// from the current frames (Player.TickPendingStartRecording) - e.g. the map teleported the player
-		// here right after a checkpoint / stage time was saved.
+		// The timer stops right away, the recorder starts over (pending replay trims of saves are done first)
 		player.Timer.Reset();
 		player.Stats.ThisRun.Checkpoints.Clear();
 		player.HUD.Notify($"Map Start ({zone.Name})");
@@ -492,7 +495,7 @@ public partial class SurfTimer
 
 	private static void StartTouchHandleBonusStartZone(Player player, ZoneInfo zone, [CallerMemberName] string methodName = "")
 	{
-		// Same as the map start: the timer stops now, the recorder restarts once a pending save is done
+		// Same as the map start: the timer stops now, the recorder starts over
 		short bonus = zone.Number;
 		player.Timer.Bonus = bonus;
 
@@ -792,7 +795,8 @@ public partial class SurfTimer
 		// Replay
 		if (player.ReplayRecorder.IsRecording)
 		{
-			// Saving 2 seconds before leaving the start zone
+			// Saving 2 seconds before leaving the start zone (pending trims of an earlier save first)
+			player.ReplayRecorder.FlushPendingTrims();
 			player.ReplayRecorder.Frames.RemoveRange(0, Math.Max(0, player.ReplayRecorder.Frames.Count - (Config.ReplaysPre * 2)));
 		}
 

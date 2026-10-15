@@ -21,17 +21,82 @@ public class ReplayRecorder
 	/// run saves without a replay, until Reset starts a new run.
 	/// </summary>
 	internal bool DroppedForRun { get; private set; }
-	private int _pendingSaves = 0;
 	/// <summary>
-	/// True while any delayed run save is scheduled or in flight - resets are blocked so the
-	/// recorder's Frames aren't cleared before the save trims them.
+	/// A run save's replay, cut once its outro (replays_pre frames after the end) is recorded - or right before the frames
+	/// are cleared / cut (a reset, teleport, new run), so nothing ever waits for a save. EndIndex: the frame its end marker
+	/// (end zone / stage / checkpoint enter) is recorded as - the trim only sees markers up to there.
 	/// </summary>
-	public bool IsSaving => Volatile.Read(ref _pendingSaves) > 0;
-	internal void BeginSave() => Interlocked.Increment(ref _pendingSaves);
-	internal void EndSave()
+	private sealed record PendingTrim(int EndIndex, int DeadlineTick, Func<List<ReplayFrame>> Trim,
+		TaskCompletionSource<List<ReplayFrame>> Result);
+	private readonly List<PendingTrim> _pendingTrims = new();
+
+	/// <summary>
+	/// The replay of a save that was just captured - trim runs on the main thread once the outro is recorded (or the
+	/// frames are about to be cleared). Call it in the tick the end marker was set (CurrentSituation).
+	/// </summary>
+	internal Task<List<ReplayFrame>> ScheduleTrim(Func<List<ReplayFrame>> trim)
 	{
-		if (Interlocked.Decrement(ref _pendingSaves) < 0)
-			Interlocked.Exchange(ref _pendingSaves, 0);
+		var result = new TaskCompletionSource<List<ReplayFrame>>(TaskCreationOptions.RunContinuationsAsynchronously);
+		int outro = Math.Max(1, Config.ReplaysPre);
+		_pendingTrims.Add(new PendingTrim(this.Frames.Count, CounterStrikeSharp.API.Server.TickCount + outro + 32, trim, result));
+		return result.Task;
+	}
+
+	/// <summary>Every tick (alive or not): trims whose outro is recorded - or that waited too long (dead, spectating)</summary>
+	internal void TickPendingTrims()
+	{
+		if (_pendingTrims.Count == 0)
+			return;
+		int outro = Math.Max(1, Config.ReplaysPre);
+		int now = CounterStrikeSharp.API.Server.TickCount;
+		foreach (var pending in _pendingTrims.Where(p => this.Frames.Count > p.EndIndex + outro || now >= p.DeadlineTick).ToList())
+			Complete(pending);
+	}
+
+	/// <summary>Every pending trim now, with the frames recorded so far - before they're cleared or cut</summary>
+	internal void FlushPendingTrims()
+	{
+		foreach (var pending in _pendingTrims.ToList())
+			Complete(pending);
+	}
+
+	private void Complete(PendingTrim pending)
+	{
+		_pendingTrims.Remove(pending);
+
+		// Its end marker isn't recorded (cleared in the same tick, or not recording): no replay
+		if (this.Frames.Count <= pending.EndIndex)
+		{
+			pending.Result.TrySetResult(new List<ReplayFrame>());
+			return;
+		}
+
+		// The trim sees the run up to its end marker plus the outro - markers recorded after it (a repeat teleport, the
+		// next stage) are left out of the outro so "the last marker" is still this save's
+		int outro = Math.Max(1, Config.ReplaysPre);
+		int last = Math.Min(this.Frames.Count - 1, pending.EndIndex + outro * 2);
+		var view = this.Frames.GetRange(0, pending.EndIndex + 1);
+		for (int i = pending.EndIndex + 1; i <= last; i++)
+		{
+			var frame = this.Frames[i];
+			view.Add(frame.Situation == ReplayFrameSituation.NONE ? frame
+				: new ReplayFrame { pos = frame.pos, ang = frame.ang, Flags = frame.Flags, Buttons = frame.Buttons });
+		}
+
+		var all = this.Frames;
+		this.Frames = view;
+		try
+		{
+			pending.Result.TrySetResult(pending.Trim());
+		}
+		catch (Exception ex)
+		{
+			pending.Result.TrySetException(ex);
+		}
+		finally
+		{
+			this.Frames = all;
+		}
 	}
 	public ReplayFrameSituation CurrentSituation { get; set; } = ReplayFrameSituation.NONE;
 	public List<ReplayFrame> Frames { get; set; } = new List<ReplayFrame>();
@@ -52,6 +117,7 @@ public class ReplayRecorder
 
 	internal void Reset([CallerMemberName] string methodName = "")
 	{
+		FlushPendingTrims();
 		this.DroppedForRun = false;
 		this.IsRecording = false;
 		this.Frames.Clear();
@@ -101,6 +167,7 @@ public class ReplayRecorder
 	/// </summary>
 	internal void StopAndFree()
 	{
+		FlushPendingTrims();
 		this.IsRecording = false;
 		this.Frames = new List<ReplayFrame>();
 		this.StageEnterSituations.Clear();
@@ -148,7 +215,7 @@ public class ReplayRecorder
 			return;
 
 		// Disabling Recording if timer disabled
-		if (!player.Timer.IsEnabled && !player.ReplayRecorder.IsSaving)
+		if (!player.Timer.IsEnabled)
 		{
 			this.Stop();
 			this.Reset();

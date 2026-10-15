@@ -33,6 +33,9 @@ public partial class SurfTimer
 			// replay playback) - it's logged instead.
 			try
 			{
+				// Replays of saves whose outro is recorded (or waited long enough - dead / spectating)
+				player.ReplayRecorder.TickPendingTrims();
+
 				// Zones entered / left since the last tick, before the timer counts it (ZoneTracker.cs)
 				TickZones(player);
 
@@ -45,7 +48,6 @@ public partial class SurfTimer
 					player.Energy.Tick(player);
 					player.ReplayRecorder.Tick(player);
 					player.TickIdle();
-					player.TickPendingStartRecording();
 					player.TickStartZoneSpeedCap();
 					player.TickSync();
 				}

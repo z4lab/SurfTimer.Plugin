@@ -116,12 +116,14 @@ public class CurrentRun : RunStatsEntity
 			return;
 		}
 
-		// Everything from the live run is taken here, on the main thread, before the first await.
-		// No replay when replays are off globally or for this map.
-		// No replay either when the idle checker dropped this run's recording.
+		// Everything from the live run is taken here, on the main thread, right when the run / segment ended (before the
+		// first await) - nothing is read from the player later, so resets never wait for a save.
+		// The replay is cut once its outro is recorded (or right before a reset clears the frames) - ReplayRecorder.ScheduleTrim.
+		// No replay when replays are off globally or for this map, or when the idle checker dropped this run's recording.
 		bool storeReplay = Config.ReplaysEnabled && map.RecordReplays
 			&& !player.ReplayRecorder.DroppedForRun && player.ReplayRecorder.Frames.Count > 0;
-		var frames = !storeReplay ? new List<ReplayFrame>() : player.ReplayRecorder.TrimReplay(
+		var recorder = player.ReplayRecorder;
+		var framesTask = !storeReplay ? Task.FromResult(new List<ReplayFrame>()) : recorder.ScheduleTrim(() => recorder.TrimReplay(
 			player,
 			type: recType,
 			bonus: bonus,
@@ -129,7 +131,7 @@ public class CurrentRun : RunStatsEntity
 			lastStage: stage == map.Stages,
 			checkpoint: checkpoint,
 			lastCheckpoint: checkpoint == map.CheckpointSegments // Last segment ends at the map end
-		);
+		));
 
 		var splits = recType == 0
 			? this.Checkpoints.Values.Select(c => new CheckpointEntity(c.CP, c.RunTime, c.StartVelX, c.StartVelY, c.StartVelZ,
@@ -155,6 +157,7 @@ public class CurrentRun : RunStatsEntity
 		var stopwatch = Stopwatch.StartNew();
 
 		// Encoding the replay is the expensive part - off the main thread
+		var frames = await framesTask;
 		var replay = frames.Count > 0 ? await Task.Run(() => ReplayCodec.Encode(frames)) : null;
 		var result = await TimeRepository.SavePbAsync(save with { Replay = replay });
 

@@ -273,11 +273,6 @@ public partial class SurfTimer
 	private void LoadSaveloc(Player p, Saveloc saveloc)
 	{
 		var controller = p.Controller;
-		if (p.ReplayRecorder.IsSaving)
-		{
-			controller.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["reset_delay"]}");
-			return;
-		}
 
 		// Spectators can save locations (of who they watch) but must join a team before loading one
 		if (!CanLoadSaveloc(p))

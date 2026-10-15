@@ -12,7 +12,6 @@
 	"saveloc_limit": "{red}The saveloc limit of this map is reached ({0}).",
 	"saveloc_nothing": "{red}Nothing to save - spectate a player or replay bot.",
 	"saveloc_spectating": "{red}Join a team to load a saveloc{default} - spectators can only save them.",
-	"reset_delay": "Please wait for your run to be saved before resetting.",
 	"invalid_usage": "{red}Invalid arguments. {default}Usage: {green}{0}",
 	"invalid_stage_value": "{red}Invalid stage provided. {default}this map has {green}{0}{default} stages.",
 	"not_staged": "{red}This map has no stages.",

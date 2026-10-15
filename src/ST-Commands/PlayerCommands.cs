@@ -18,12 +18,6 @@ public partial class SurfTimer
 		if (player == null || !playerList.TryGetValue(player.UserId ?? 0, out var oPlayer))
 			return;
 
-		if (oPlayer.ReplayRecorder.IsSaving)
-		{
-			player.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["reset_delay"]}");
-			return;
-		}
-
 		if (AskResetConfirm(oPlayer))
 			return;
 
@@ -102,12 +96,6 @@ public partial class SurfTimer
 	{
 		if (player == null || !playerList.TryGetValue(player.UserId ?? 0, out var oPlayer))
 			return;
-
-		if (oPlayer.ReplayRecorder.IsSaving)
-		{
-			player.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["reset_delay"]}");
-			return;
-		}
 
 		// From spectator: back to where they were - a paused run goes on from its stage start (RunResume.cs)
 		bool fromSpectator = player.Team == CsTeam.Spectator || player.Team == CsTeam.None;
@@ -327,23 +315,15 @@ public partial class SurfTimer
 	}
 
 	/// <summary>
-	/// Sends a repeat-mode player back to the start of the stage they just finished, once any pending
-	/// save is done - the save trims the replay up to the LAST stage-enter marker, so teleporting back
-	/// before it runs would add a new marker and cut the replay wrong.
+	/// Sends a repeat-mode player back to the start of the stage they just finished. The stage's save already has its
+	/// replay end marker - the stage-enter marker the teleport adds isn't part of its trim (ReplayRecorder.ScheduleTrim).
 	/// </summary>
-	private void ScheduleRepeatTeleport(Player player, short stage, int attemptsLeft = 100)
+	private void ScheduleRepeatTeleport(Player player, short stage)
 	{
 		AddTimer(0.1f, () =>
 		{
 			if (!player.IsRepeatMode || !player.Controller.IsValid || !player.Controller.PawnIsAlive)
 				return;
-
-			if (player.ReplayRecorder.IsSaving)
-			{
-				if (attemptsLeft > 0)
-					ScheduleRepeatTeleport(player, stage, attemptsLeft - 1);
-				return;
-			}
 
 			TeleportToStage(player.Controller, stage);
 		});
