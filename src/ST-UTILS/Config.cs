@@ -49,7 +49,7 @@ public static class Config
 
 	/// <summary>
 	/// Pickers (!replay, !spec) as the clickable centre popup of the custom HUD instead of chat menus.
-	/// Needs an addon version that has the popup (st_menu) - with an older one the player would be put in
+	/// Needs an addon version that has the popup (z4_menu) - with an older one the player would be put in
 	/// cursor mode without a visible menu to close, so turn this off until the new addon is live.
 	/// </summary>
 	public static bool PopupMenus { get; private set; } = TimerSettings.GetBool("popup_menus", true);
@@ -300,11 +300,16 @@ public static class Config
 				: defaultValue;
 		}
 
+		/// <summary>The addon's layout (Source name - clients reject ".vxml" here)</summary>
+		public const string DefaultCustomHudLayout = "panorama/layout/custom_game/z4lab_custom_ui.xml";
+
 		public static string GetCustomHudLayout()
 		{
-			return ConfigDocument.RootElement.TryGetProperty("custom_hud_layout", out var value)
+			string layout = ConfigDocument.RootElement.TryGetProperty("custom_hud_layout", out var value)
 				? value.GetString()!
-				: "panorama/layout/custom_game/surftimer_hud.xml"; // Source name - clients reject ".vxml" here
+				: DefaultCustomHudLayout;
+			// The layout's old name (before z4lab-custom-ui renamed it) - existing configs keep working
+			return layout.EndsWith("/surftimer_hud.xml", StringComparison.OrdinalIgnoreCase) ? DefaultCustomHudLayout : layout;
 		}
 	}
 

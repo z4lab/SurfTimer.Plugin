@@ -1401,7 +1401,7 @@ public class PlayerHud
 		return rows;
 	}
 
-	// ---- Popup menu (st_menu) ----
+	// ---- Popup menu (z4_menu) ----
 	// Opened through MenuPresenter. Opening it puts the player in cursor mode (input capture), and
 	// clicks arrive in OnMenuClick. !cursor toggles cursor mode (with or without a menu); E closes the
 	// menu, and so does starting to move while the cursor is on. Rendered through the same cached

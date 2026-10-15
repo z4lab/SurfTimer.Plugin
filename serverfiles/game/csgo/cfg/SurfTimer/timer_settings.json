@@ -2,7 +2,7 @@
 	"replays_enabled": true,
 	"replays_pre": 64,
 	"custom_hud_enabled": true,
-	"custom_hud_layout": "panorama/layout/custom_game/surftimer_hud.xml",
+	"custom_hud_layout": "panorama/layout/custom_game/z4lab_custom_ui.xml",
 	"popup_menus": true,
 	"round_timer_freeze": true,
 	"points_segment_wr": 0,
