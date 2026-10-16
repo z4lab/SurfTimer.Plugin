@@ -20,5 +20,6 @@
 	"resume_expiry_days": 3,
 	"resume_expiry_vip_days": 7,
 	"clan_tags_enabled": true,
-	"country_clan_tag": true
+	"country_clan_tag": true,
+	"rank_badges": true
 }

@@ -320,6 +320,7 @@ public partial class SurfTimer
 		["replay_permanent_map_bot"] = ("Permanent map replay bot", "loops the map WR, not counted in the max"),
 		["clan_tags_enabled"] = ("Clan tags", "players' clan tags on the scoreboard"),
 		["country_clan_tag"] = ("Country tag", "[DE] in front of the clan tag"),
+		["rank_badges"] = ("Rank badges", "server points as the Premier badge on the scoreboard"),
 	};
 
 	private PanelPage AdminTimerSettingsPage() => new("Timer settings", ctx =>

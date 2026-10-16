@@ -105,7 +105,7 @@ public static class Config
 	/// Timer settings the !surfadmin panel can change live - written back to timer_settings.json.
 	/// </summary>
 	internal static readonly IReadOnlyList<string> LiveBoolSettings =
-		["popup_menus", "round_timer_freeze", "block_map_chat", "protect_replay_bots", "replay_bot_direct_spawn", "replays_enabled", "replay_permanent_map_bot", "clan_tags_enabled", "country_clan_tag"];
+		["popup_menus", "round_timer_freeze", "block_map_chat", "protect_replay_bots", "replay_bot_direct_spawn", "replays_enabled", "replay_permanent_map_bot", "clan_tags_enabled", "country_clan_tag", "rank_badges"];
 
 	internal static bool GetLiveBool(string key) => key switch
 	{
@@ -118,6 +118,7 @@ public static class Config
 		"replay_permanent_map_bot" => ReplayPermanentMapBot,
 		"clan_tags_enabled" => ClanTagsEnabled,
 		"country_clan_tag" => CountryClanTag,
+		"rank_badges" => RankBadges,
 		_ => false,
 	};
 
@@ -151,6 +152,7 @@ public static class Config
 		WorkshopContentPath = TimerSettings.GetString("workshop_content_path", "").Trim();
 		ClanTagsEnabled = TimerSettings.GetBool("clan_tags_enabled", true);
 		CountryClanTag = TimerSettings.GetBool("country_clan_tag", true);
+		RankBadges = TimerSettings.GetBool("rank_badges", false);
 	}
 
 	/// <summary>
@@ -163,6 +165,11 @@ public static class Config
 	/// Players' clan tags on the scoreboard - off clears them (and puts them back when turned on again).
 	/// </summary>
 	public static bool ClanTagsEnabled { get; private set; } = TimerSettings.GetBool("clan_tags_enabled", true);
+
+	/// <summary>
+	/// The scoreboard's Premier rating badge shows each player's server points (colored by the game by the number).
+	/// </summary>
+	public static bool RankBadges { get; private set; } = TimerSettings.GetBool("rank_badges", false);
 
 	/// <summary>
 	/// Seconds without movement, input or looking around after which a player's replay recording is
