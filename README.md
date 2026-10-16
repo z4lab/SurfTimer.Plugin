@@ -503,7 +503,7 @@ Info rows: SurfTimer version/commit, players and tickrate, memory.
 | Permanent map replay bot | Loops the map WR. Not counted in the max. |
 | Clan tags | Players' clan tags on the scoreboard. |
 | Country tag | `[DE]` in front of the clan tag. |
-| Rank badges | The scoreboard's Premier rating badge shows each player's server points, colored by the game (grey under 5,000, gold from 30,000). Unranked players and replay bots show 0. |
+| Rank badges | The scoreboard's Premier rating badge shows each player's server points, colored by the game (grey under 5,000, gold from 30,000). Unranked players and replay bots show 0. Needs `FollowCS2ServerGuidelines: false` in CounterStrikeSharp's `core.json` - with it on, the badges stay off (logged once). |
 | Idle threshold | Stops replay recording for idle players (0 = off, max 3600 s). |
 | Ghost orb respawn | Every how many ticks a player's ghost orb (Ghost & path) is spawned again where it moved: 1 is smoothest, higher spawns fewer entities (max 16). Default 1. `ghost_orb_ticks` |
 | Resume expiry | Days a player's saved run is kept after they leave (0 = never expires, max 365). Default 3. `resume_expiry_days` |

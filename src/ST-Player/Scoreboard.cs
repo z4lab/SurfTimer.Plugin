@@ -23,14 +23,22 @@ public partial class SurfTimer
 	/// </summary>
 	private void UpdateScoreboard()
 	{
-		bool badges = Config.RankBadges;
+		// CounterStrikeSharp's FollowCS2ServerGuidelines (core.json) blocks the rank fields - then they aren't touched
+		bool rankFields = !CoreConfig.FollowCS2ServerGuidelines;
+		if (Config.RankBadges && !rankFields && !_rankBadgesBlockedLogged)
+		{
+			_rankBadgesBlockedLogged = true;
+			_logger.LogWarning("[CS2 Surf] rank_badges is on, but CounterStrikeSharp's FollowCS2ServerGuidelines (core.json) blocks rank badges - they stay off");
+		}
+		bool badges = Config.RankBadges && rankFields;
 		foreach (var player in playerList.Values)
 		{
 			var controller = player.Controller;
 			if (!controller.IsValid || controller.IsBot)
 				continue;
 			SetScore(controller, player.Profile.ServerRank is int rank ? -rank : UnrankedScore);
-			SetRankBadge(controller, badges, (int)Math.Min(player.Profile.ServerPoints, int.MaxValue));
+			if (rankFields)
+				SetRankBadge(controller, badges, (int)Math.Min(player.Profile.ServerPoints, int.MaxValue));
 		}
 
 		foreach (var slot in CurrentMap?.ReplayManager?.Pool ?? [])
@@ -38,7 +46,8 @@ public partial class SurfTimer
 			if (slot.Controller != null && slot.Controller.IsValid)
 			{
 				SetScore(slot.Controller, ReplayBotScore);
-				SetRankBadge(slot.Controller, badges, 0);
+				if (rankFields)
+					SetRankBadge(slot.Controller, badges, 0);
 			}
 		}
 
@@ -58,6 +67,7 @@ public partial class SurfTimer
 	private const int RankBadgeWins = 10;
 	private const int RankRevealIntervalSeconds = 5;
 	private int _rankRevealSeconds = RankRevealIntervalSeconds;
+	private bool _rankBadgesBlockedLogged;
 
 	/// <summary>The Premier badge with the given rating - off: no badge (the game's default)</summary>
 	private static void SetRankBadge(CCSPlayerController controller, bool on, int rating)
