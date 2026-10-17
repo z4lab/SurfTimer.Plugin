@@ -114,6 +114,11 @@
 	"sounds_off": "Timer sounds {red}off{default}.",
 	"cursor_no_hud": "The mouse cursor needs the custom HUD, which is off on this server.",
 	"reset_confirm": "{yellow}Type !r again{default} within {0}s to reset your run ({1}).",
+	"noclip_on": "{lime}Noclip on{default} - your timer is off until {yellow}!r{default}.",
+	"noclip_off": "{yellow}Noclip off{default} - your timer stays off until {yellow}!r{default}.",
+	"noclip_not_alive": "{red}You have to be alive to noclip.",
+	"noclip_editor": "{red}The zone editor keeps you in noclip already.",
+	"noclip_no_saveloc": "{red}No savelocs while your timer is off{default} - {yellow}!r{default} to turn it on again.",
 	"resume_restored": "Your run was restored · {green}{0}{default} {grey}(!r to start over)",
 	"resume_restored_no_replay": "Your run was restored · {green}{0}{default} {grey}(no replay for this run · !r to start over)",
 	"resume_discarded": "{red}Your saved run couldn't be restored{default} - {0}."

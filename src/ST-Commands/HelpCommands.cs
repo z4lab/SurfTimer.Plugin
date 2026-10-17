@@ -66,6 +66,8 @@ public partial class SurfTimer
 		Add(HelpGroup.Practice, "telenext", "next saveloc in your set");
 		Add(HelpGroup.Practice, "saveloclist", "saveloc menu", aliases: ["slm"],
 			detail: "Tabs: My set, Recent (everyone's latest), Import, Info.");
+		Add(HelpGroup.Practice, "noclip", "fly - turns your timer off until !r", aliases: ["nc"],
+			detail: "Noclip on / off. Your run is reset and the timer stays off (no zones, no savelocs) until !r or !rs, which also end noclip. !noclip again lands you where you are. Map teleports: Options › Gameplay › Noclip teleports (normal / set back / disabled).");
 		Add(HelpGroup.Practice, "repeat", "repeat mode on / off",
 			detail: "After each stage you go back to that stage's start. Staged maps only, off every time you join.");
 

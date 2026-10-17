@@ -144,14 +144,15 @@ public partial class SurfTimer
 			LogTickError(ex, "ghost & path");
 		}
 
-		// The zone editor's noclip and undone map teleports (ZoneEditor.cs)
+		// The zone editor's and !noclip's noclip, map teleports by the player's option (Noclip.cs)
 		try
 		{
 			TickZoneEditor();
+			TickNoclip();
 		}
 		catch (Exception ex)
 		{
-			LogTickError(ex, "zone editor");
+			LogTickError(ex, "noclip");
 		}
 
 		// Zone outlines (ZoneDrawing.cs) - built while someone wants them, redrawn after round restarts

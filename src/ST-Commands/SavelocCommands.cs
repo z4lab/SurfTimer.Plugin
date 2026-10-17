@@ -74,6 +74,12 @@ public partial class SurfTimer
 		var controller = p.Controller;
 		if (map == null)
 			return;
+		// !noclip turned the timer off - a position flown to can't become a saveloc (spectating someone still works)
+		if (p.TimerDisabled && controller.PawnIsAlive)
+		{
+			controller.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["noclip_no_saveloc"]}");
+			return;
+		}
 
 		var session = map.Savelocs;
 		if (session.All.Count >= Config.SavelocLimit)
@@ -263,6 +269,11 @@ public partial class SurfTimer
 	/// <summary>Spectators / dead players can't load savelocs (they can still save them)</summary>
 	private static bool CanLoadSaveloc(Player p)
 	{
+		if (p.TimerDisabled)
+		{
+			p.Controller.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["noclip_no_saveloc"]}");
+			return false;
+		}
 		if (p.Controller.PawnIsAlive)
 			return true;
 		p.Controller.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["saveloc_spectating"]}");

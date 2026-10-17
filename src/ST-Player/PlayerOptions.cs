@@ -68,6 +68,17 @@ internal enum ChatEvent
 	BonusWr,
 }
 
+/// <summary>What map teleports (trigger_teleport) do to a player in noclip (!options - Gameplay, also the zone editor)</summary>
+internal enum NoclipTeleports
+{
+	/// <summary>They work as usual</summary>
+	Normal,
+	/// <summary>They happen, and the player is put back right away (Noclip.cs)</summary>
+	SetBack,
+	/// <summary>They don't touch the player at all (a hook on trigger_teleport, else like SetBack)</summary>
+	Disabled,
+}
+
 /// <summary>Which zone outlines a player sees (!options - Visibility)</summary>
 internal enum ZoneDisplay
 {
@@ -110,6 +121,7 @@ internal sealed class PlayerOptions
 	internal const string KeyChatConnects = "chat_connects";
 	internal const string KeyChatSaveloc = "chat_saveloc";
 	internal const string KeyConfirmReset = "confirm_reset";
+	internal const string KeyNoclipTeleports = "noclip_teleports";
 	internal const string KeyHudTop = "hud_top";
 	internal const string KeyHudSplits = "hud_splits"; // Old on / off switch - only read to migrate to KeyHudSplitTarget
 	internal const string KeyHudSplitTarget = "hud_splits_target";
@@ -206,6 +218,7 @@ internal sealed class PlayerOptions
 	private bool _trailMine, _trailsOthers, _trailsOwn, _trailsSpectate, _trailsBots;
 	private string _trailColor = "";
 	private ZoneDisplay _zonesShow = ZoneDisplay.Off;
+	private NoclipTeleports _noclipTeleports = NoclipTeleports.SetBack;
 	private SpeedAxes _speedAxes = SpeedAxes.XY;
 	private int _soundVolume = DefaultSoundVolume;
 	private string _centerFields = DefaultCenterFields;
@@ -269,6 +282,8 @@ internal sealed class PlayerOptions
 			&& Enum.TryParse(axes, ignoreCase: true, out SpeedAxes parsedAxes) && Enum.IsDefined(parsedAxes) ? parsedAxes : SpeedAxes.XY;
 		_zonesShow = _profile.Settings.TryGetValue(KeyZonesShow, out var zones)
 			&& Enum.TryParse(zones, ignoreCase: true, out ZoneDisplay display) && Enum.IsDefined(display) ? display : ZoneDisplay.Off;
+		_noclipTeleports = _profile.Settings.TryGetValue(KeyNoclipTeleports, out var noclip)
+			&& Enum.TryParse(noclip, ignoreCase: true, out NoclipTeleports noclipMode) && Enum.IsDefined(noclipMode) ? noclipMode : NoclipTeleports.SetBack;
 		_trailColor = _profile.Settings.TryGetValue(KeyTrailColor, out var trailColor) && TrailColors.IsValidCustom(trailColor) ? trailColor : "";
 		_soundVolume = _profile.Settings.TryGetValue(KeySoundVolume, out var volume) && int.TryParse(volume, out int percent)
 			&& percent is >= 0 and <= 100 ? percent : DefaultSoundVolume;
@@ -418,6 +433,17 @@ internal sealed class PlayerOptions
 
 	/// <summary>During a run !r has to be typed twice within a few seconds - the first one only warns</summary>
 	internal bool ConfirmReset { get => _confirmReset; set { _confirmReset = value; Save(KeyConfirmReset, value); } }
+
+	/// <summary>Map teleports in noclip (!noclip and the zone editor)</summary>
+	internal NoclipTeleports NoclipTeleports
+	{
+		get => _noclipTeleports;
+		set
+		{
+			_noclipTeleports = value;
+			_profile.SetSetting(KeyNoclipTeleports, value.ToString().ToLowerInvariant());
+		}
+	}
 
 	// ---- HUD ----
 

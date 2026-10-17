@@ -42,7 +42,7 @@ public partial class SurfTimer : BasePlugin
 
 	// Metadata
 	public override string ModuleName => $"z4lab/{Config.PluginName}";
-	public override string ModuleVersion => "1.3.0";
+	public override string ModuleVersion => "1.3.1";
 	public override string ModuleDescription => Config.PluginName;
 	public override string ModuleAuthor => "z4lab";
 
@@ -198,6 +198,7 @@ public partial class SurfTimer : BasePlugin
 	{
 		SurfTimerApiImpl.Clear();
 		RemoveAllGhosts(); // Their beams would stay on the map otherwise
+		RemoveTeleportTriggerHook();
 
 		// Running runs kept to resume (server shutdown / plugin reload) - a short wait so they reach the database
 		foreach (var player in playerList.Values)

@@ -32,6 +32,7 @@ Some menu rows ask you to type something in chat. Type `!cancel` to abort.
 | `!b [n]` | `!bonus` | Teleports you to bonus *n*. You stay on that bonus until you use `!r`, `!s` or `!b`. Without a number: bonus 1 if the map has only one, otherwise a picker with every bonus and its tier. |
 | `!end` | | Teleports you to the end of the course you're on (map, bonus, or the stage in stage mode). Only from that course's start zone. The timer stops and doesn't finish there. With several end zones you pick one from a menu. |
 | `!repeat` | | Turns repeat mode on or off: after each stage you go back to that stage's start. Staged maps only. Not saved, so it's off every time you join. |
+| `!noclip` | `!nc` | Fly through everything. Your run is reset and your timer stays **off** until `!r` or `!rs`, which also end noclip: no zones, no runs, no savelocs. `!noclip` again lands you where you are (the timer stays off); `!s`, `!b` and `!end` still teleport you. Dying ends noclip, not the turned-off timer. The HUD shows **Noclip**. Map teleports: Options › Gameplay › Noclip teleports. |
 
 </details>
 
@@ -311,6 +312,7 @@ Both message pages have a toggle for each kind, plus **All on** / **All off**:
 | Option | Default | Description |
 |---|---|---|
 | Confirm !r | **On** | During a run, `!r` has to be typed twice within 3 seconds. The first one only warns (chat and the Reset warning sound). Not for practice runs, the first 5 seconds of a run, or from spectator. |
+| Noclip teleports | **Set back** | What map teleports (`trigger_teleport`) do to you in noclip (`!noclip` and the zone editor). **Normal**: they work. **Set back**: you're put back right away. **Disabled**: they don't touch you at all. Disabled hooks `trigger_teleport` with the offsets from CS2Fixes' gamedata (`addons/cs2fixes/gamedata/cs2fixes.jsonc`); without CS2Fixes it works like set back. |
 
 </details>
 
@@ -420,7 +422,7 @@ Shows where zones are stored (database or map only), the stage/bonus/checkpoint 
 - **Reload from map** (danger): replaces the stored zones with the map's own `trigger_multiple` zones.
 - If the stage, bonus or checkpoint counts change, you're offered **Restart map now**. New numbered zones only work after a restart.
 
-**Zone editor.** You stay alive in **noclip** with your timer stopped. Map teleports are undone and zones don't fire for you.
+**Zone editor.** You stay alive in **noclip** with your timer stopped. Zones don't fire for you, and map teleports follow your Options › Gameplay › Noclip teleports (normal / set back / disabled, like `!noclip`).
 
 | Row | Description |
 |---|---|

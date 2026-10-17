@@ -74,6 +74,18 @@ public class Player
 	/// <summary>A first !r during a run asked for a second one until this tick (Options - Gameplay - Confirm !r)</summary>
 	internal int ResetConfirmUntilTick { get; set; }
 
+	/// <summary>!noclip: flying (kept every tick - maps reset move types; off when dying)</summary>
+	internal bool Noclip { get; set; }
+
+	/// <summary>!noclip turned the timer off: no zones, no runs, no savelocs until a !r / !rs (Noclip.cs)</summary>
+	internal bool TimerDisabled { get; set; }
+
+	/// <summary>In noclip: where the player was last tick - a bigger jump than noclip flies is a map teleport (Noclip.cs)</summary>
+	internal VectorT? NoclipLastPosition { get; set; }
+
+	/// <summary>Until this tick the plugin's own teleports of the player aren't taken for map teleports</summary>
+	internal int OwnTeleportUntilTick { get; set; }
+
 	/// <summary>Filter state the current map run left each stage start with - !rs back to one gives it again (MapFilters.cs)</summary>
 	internal Dictionary<short, FilterState> StageFilters { get; } = new();
 

@@ -38,7 +38,7 @@ public partial class SurfTimer
 		if (player.IsPlacementPending)
 			return HookResult.Continue; // Being placed - entered after it, by the zone tracker (ZoneTracker.cs)
 
-		bool editing = _zoneEditor != null && ReferenceEquals(_zoneEditor.Editor, player);
+		bool editing = (_zoneEditor != null && ReferenceEquals(_zoneEditor.Editor, player)) || player.TimerDisabled;
 		if (!editing && player.IsOnCourse(zone) && !player.TouchingTriggers.ContainsKey(zone.ZoneId))
 			HandleZoneEnter(player, zone);
 		return HookResult.Continue;

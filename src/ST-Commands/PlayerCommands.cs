@@ -20,6 +20,7 @@ public partial class SurfTimer
 
 		if (AskResetConfirm(oPlayer))
 			return;
+		EndNoclip(oPlayer); // !noclip's turned-off timer ends with !r
 
 		ClaimPlacement(oPlayer);
 		RespawnThenPlace(oPlayer, () => ResetToMapStart(oPlayer));
@@ -84,6 +85,8 @@ public partial class SurfTimer
 			if (target == null || !target.IsValid)
 				return;
 			filter?.Apply(target); // Before the teleport: the map's own triggers there can still give a name
+			if (playerList.TryGetValue(player.UserId ?? 0, out var teleported))
+				MarkOwnTeleport(teleported, position); // Not undone as a map teleport in noclip (Noclip.cs)
 			Extensions.Teleport(target, position, null, new VectorT(0, 0, 0));
 		});
 		return true;
@@ -96,6 +99,8 @@ public partial class SurfTimer
 	{
 		if (player == null || !playerList.TryGetValue(player.UserId ?? 0, out var oPlayer))
 			return;
+
+		EndNoclip(oPlayer); // !noclip's turned-off timer ends with !rs too
 
 		// From spectator: back to where they were - a paused run goes on from its stage start (RunResume.cs)
 		bool fromSpectator = player.Team == CsTeam.Spectator || player.Team == CsTeam.None;

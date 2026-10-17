@@ -39,12 +39,6 @@ internal sealed class ZoneEditorSession(Player editor, List<ZoneDefinition> draf
 	/// <summary>Aim mode: the tick of the last corner set - one per shot (penetration fires several impacts)</summary>
 	internal int LastAimTick { get; set; }
 
-	/// <summary>Where the editor was last tick - a bigger jump than noclip flies is a map teleport, undone</summary>
-	internal VectorT? LastPosition { get; set; }
-
-	/// <summary>Until this tick the editor's own teleports (menu) aren't undone</summary>
-	internal int OwnTeleportUntilTick { get; set; }
-
 	/// <summary>Aim mode: drawing a new shape - every shot adds a point (ShapePoints)</summary>
 	internal bool DrawingShape { get; set; }
 
@@ -73,8 +67,8 @@ public partial class SurfTimer
 	}
 
 	/// <summary>
-	/// Puts an admin into the zone editor: timer stopped, alive in noclip (map teleports undone, zones don't
-	/// fire for them), the map's zones copied into a draft and drawn for them. Returns an error when someone
+	/// Puts an admin into the zone editor: timer stopped, alive in noclip (map teleports by their Noclip teleports
+	/// option - Noclip.cs, zones don't fire for them), the map's zones copied into a draft and drawn for them. Returns an error when someone
 	/// else is editing.
 	/// </summary>
 	internal string? EnterZoneEditor(Player player)
@@ -106,42 +100,15 @@ public partial class SurfTimer
 					controller.Respawn();
 			});
 
+		if (player.Options.NoclipTeleports == NoclipTeleports.Disabled)
+			EnsureTeleportTriggerHook();
 		RedrawEditorOutlines();
 		_logger.LogInformation("[Zones] {Player} entered the zone editor on {Map}", controller.PlayerName, map.Name);
 		return null;
 	}
 
-	// More than noclip flies in one tick (sv_noclipspeed 5 = ~1250 u/s = ~20 units per tick)
-	private const float EditorTeleportJump = 200f;
-
-	/// <summary>
-	/// Every tick while someone edits: keeps them in noclip (maps reset move types) and undoes teleports the
-	/// map does to them (trigger_teleport) - a jump further than noclip can fly that the menu didn't make.
-	/// </summary>
-	private void TickZoneEditor()
-	{
-		var editor = ActiveZoneEditor;
-		var controller = editor?.Editor.Controller;
-		var pawn = controller != null && controller.PawnIsAlive ? controller.PlayerPawn.Value : null;
-		if (editor == null || pawn == null || !pawn.IsValid || pawn.AbsOrigin == null)
-		{
-			if (editor != null)
-				editor.LastPosition = null;
-			return;
-		}
-
-		if (pawn.MoveType != MoveType_t.MOVETYPE_NOCLIP)
-			SetMoveType(pawn, MoveType_t.MOVETYPE_NOCLIP);
-
-		var position = pawn.AbsOrigin.ToVector_t();
-		if (editor.LastPosition is VectorT last && Server.TickCount > editor.OwnTeleportUntilTick
-			&& (position - last).Length() > EditorTeleportJump)
-		{
-			Extensions.Teleport(pawn, last, null, new VectorT(0, 0, 0));
-			return; // LastPosition stays where the editor was
-		}
-		editor.LastPosition = position;
-	}
+	/// <summary>Ends the editor of an admin who disconnected - the noclip and map teleports are TickNoclip's (Noclip.cs)</summary>
+	private void TickZoneEditor() => _ = ActiveZoneEditor;
 
 	private static void SetMoveType(CBasePlayerPawn pawn, MoveType_t moveType)
 	{
@@ -156,8 +123,7 @@ public partial class SurfTimer
 		var pawn = editor.Editor.Controller.PlayerPawn.Value;
 		if (pawn == null || !pawn.IsValid)
 			return;
-		editor.OwnTeleportUntilTick = Server.TickCount + 4;
-		editor.LastPosition = position;
+		MarkOwnTeleport(editor.Editor, position);
 		if (angles is QAngleT view)
 			pawn.TeleportWithView(position, view, new VectorT(0, 0, 0));
 		else

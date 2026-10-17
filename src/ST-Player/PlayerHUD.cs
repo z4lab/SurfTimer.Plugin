@@ -145,6 +145,9 @@ public class PlayerHud
 	/// </summary>
 	private HudElement TimerElement(Player p)
 	{
+		if (p.TimerDisabled)
+			return new HudElement("", "Noclip", TimerColorPractice, Size: HudSize.XLarge);
+
 		string prefix = "";
 
 		if (p.Timer.IsPracticeMode)
@@ -557,6 +560,8 @@ public class PlayerHud
 		switch (kind)
 		{
 			case HudFieldKind.Timer:
+				if (p != null && p.TimerDisabled)
+					return new HudField(label, [Value("Noclip", CustomHud.ColorClass(TimerColorPractice))], Wide: true);
 				return new HudField(label, [Value(FormatTime(s.Ticks, PlayerTimer.TimeFormatStyle.Full), CustomHud.ColorClass(s.TimerColor))], Wide: true);
 
 			case HudFieldKind.SegmentTime:
@@ -1199,6 +1204,8 @@ public class PlayerHud
 			row.Add(new("Stage", $"{Math.Max((short)1, subject.Timer.Stage)}/{map.Stages}", TimerColor));
 
 		var flags = new List<string>();
+		if (subject.TimerDisabled)
+			flags.Add("Noclip");
 		if (subject.Timer.IsPracticeMode)
 			flags.Add("Practice");
 		if (subject.IsRepeatMode)

@@ -685,6 +685,23 @@ public partial class SurfTimer
 		return
 		[
 			ctx.Toggle("Confirm !r", options.ConfirmReset, "during a run: !r twice within 3 s to reset", on => options.ConfirmReset = on),
+			ctx.Act("Noclip teleports", options.NoclipTeleports switch
+			{
+				NoclipTeleports.Normal => "normal",
+				NoclipTeleports.Disabled => "disabled",
+				_ => "set back",
+			}, "map teleports in noclip: work / you're put back / ignored", () =>
+			{
+				options.NoclipTeleports = (NoclipTeleports)(((int)options.NoclipTeleports + 1) % 3);
+				if (options.NoclipTeleports == NoclipTeleports.Disabled)
+					EnsureTeleportTriggerHook();
+				ctx.Session.Status = options.NoclipTeleports switch
+				{
+					NoclipTeleports.Normal => "Map teleports work in noclip",
+					NoclipTeleports.Disabled => "Map teleports are ignored in noclip",
+					_ => "Map teleports are undone in noclip",
+				};
+			}),
 		];
 	});
 

@@ -17,7 +17,8 @@ public partial class SurfTimer
 		var map = CurrentMap;
 		var controller = player.Controller;
 		var pawn = controller.PlayerPawn.Value;
-		bool editing = _zoneEditor != null && ReferenceEquals(_zoneEditor.Editor, player);
+		// The zone editor and !noclip's turned-off timer: no zones
+		bool editing = (_zoneEditor != null && ReferenceEquals(_zoneEditor.Editor, player)) || player.TimerDisabled;
 		if (editing || map == null || player.IsPlacementPending || !controller.PawnIsAlive || pawn == null || !pawn.IsValid || pawn.AbsOrigin == null)
 		{
 			// Dead / spectating / being placed (RunResume.cs): forgotten without exit handlers (as a trigger's EndTouch
