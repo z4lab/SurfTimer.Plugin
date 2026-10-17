@@ -640,6 +640,7 @@ public partial class SurfTimer
 		int own = ChatEvents.Count(e => options.ChatOwn(e.Event));
 		int others = ChatEvents.Count(e => options.ChatOthers(e.Event));
 		string role = SurfTimerApiImpl.ChatTagTextOf(ctx.Player.Controller);
+		bool roleColor = SurfTimerApiImpl.ChatNameColorOf(ctx.Player.Controller) != null;
 		var rows = new List<HudMenuItem>
 		{
 			ctx.Nav("Own messages", $"{own} / {ChatEvents.Length} on", "your runs - and whoever you spectate (players and replay bots)",
@@ -648,9 +649,12 @@ public partial class SurfTimer
 			ctx.Toggle("Connect messages", options.ChatConnects, "players joining", on => options.ChatConnects = on),
 			ctx.Toggle("Saveloc messages", options.ChatSaveloc, "\"Teleported to #N\" when loading a saveloc", on => options.ChatSaveloc = on),
 		};
-		// Only for players with a role tag (e.g. [Admin] from the admin plugin's groups)
-		if (role.Length > 0)
-			rows.Add(ctx.Toggle("Show my role tag", !options.HideRoleTag, $"{role} before your name in chat", on => options.HideRoleTag = !on));
+		// Only for players with a role (e.g. [Admin] / a name color from the admin plugin's groups)
+		if (role.Length > 0 || roleColor)
+		{
+			string sub = role.Length > 0 ? $"{role} before your name{(roleColor ? " and your name color" : "")}" : "your role's name color";
+			rows.Add(ctx.Toggle("Show my role", !options.HideRoleTag, sub, on => options.HideRoleTag = !on));
+		}
 		return rows;
 	});
 

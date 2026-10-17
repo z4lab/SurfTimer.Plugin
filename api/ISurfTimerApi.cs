@@ -141,6 +141,13 @@ public interface ISurfTimerApi
 	/// </summary>
 	void SetChatTagProvider(Func<CCSPlayerController, string?>? provider);
 
+	/// <summary>
+	/// A player's name color in chat: a chat color name (red, purple, ...) or "team", null / unknown for the timer's own
+	/// (the root / admin / vip flag colors of chat_settings.json). One provider (the last set wins), null removes it.
+	/// Hidden together with the role tag (!options - Chat).
+	/// </summary>
+	void SetChatNameColorProvider(Func<CCSPlayerController, string?>? provider);
+
 	// ---- Server ----
 
 	/// <summary>

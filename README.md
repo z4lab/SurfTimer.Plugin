@@ -293,7 +293,7 @@ What the panel compares your run against:
 | Others' messages › | The same messages about **other players'** runs. PBs and WRs on by default, finishes and splits off. |
 | Connect messages | Players joining. |
 | Saveloc messages | "Teleported to #N" when you load a saveloc. |
-| Show my role tag | Only for players with a role tag (e.g. `[Admin]` from Admin.Plugin's groups): show it before your name in chat, or hide it. |
+| Show my role | Only for players with a role (e.g. `[Admin]` and a name color from Admin.Plugin's groups): show the tag before your name and the name color in chat, or hide both. |
 
 Both message pages have a toggle for each kind, plus **All on** / **All off**:
 
@@ -523,7 +523,7 @@ Info rows: SurfTimer version/commit, players and tickrate, memory.
 <summary>Server › Chat</summary>
 
 - **Chat processor**: on/off. Off means normal engine chat.
-- **Format**: placeholders `{rank} {ranknum} {points} {name} {message} {country} {team} {prefix} {role} {grey}` … You can also **Reset format**. `{role}` is the player's role tag from an addon (Admin.Plugin: the tag of their highest-priority permission group, set in `!admin` › Server › Roles); without `{role}` in the format the tag goes right before the name.
+- **Format**: placeholders `{rank} {ranknum} {points} {name} {message} {country} {team} {prefix} {role} {grey}` … You can also **Reset format**. `{role}` is the player's role tag from an addon (Admin.Plugin: the tag of their highest-priority permission group, set in `!admin` › Server › Roles); without `{role}` in the format the tag goes right before the name. A group's name color (same page) replaces the name colors below for its members.
 - **Prefix ›**: SurfTimer's chat prefix, typed in chat with color tags, e.g. `[{blue}Surf{bluegrey}Timer{default}]`. `default` goes back to the language file's. A preview is printed to you.
 - **Map chooser prefix ›** (one row per addon that registers its prefix): the same for that addon.
 - **Rank colors ›**: #1, #2, #3, #4–#10, other ranks, no points.

@@ -431,7 +431,7 @@ internal sealed class PlayerOptions
 	/// <summary>"Teleported to #N" after loading a saveloc (at most one per burst of loads)</summary>
 	internal bool ChatSaveloc { get => _chatSaveloc; set { _chatSaveloc = value; Save(KeyChatSaveloc, value); } }
 
-	/// <summary>The player's role tag (an addon's, e.g. [Admin]) left out of their chat lines</summary>
+	/// <summary>The player's role (an addon's tag, e.g. [Admin], and name color) left out of their chat lines</summary>
 	internal bool HideRoleTag { get => _hideRoleTag; set { _hideRoleTag = value; Save(KeyHideRoleTag, value); } }
 
 	// ---- Gameplay ----

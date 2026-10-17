@@ -44,6 +44,7 @@ internal sealed class SurfTimerApiImpl(SurfTimer plugin, ILogger logger) : ISurf
 		Sounds.ClearAddons();
 		AddonPrefixes.Clear();
 		ChatTagProvider = null;
+		ChatNameColorProvider = null;
 		HudFieldCatalog.ClearAddons();
 	}
 
@@ -329,6 +330,27 @@ internal sealed class SurfTimerApiImpl(SurfTimer plugin, ILogger logger) : ISurf
 	public string ChatPrefix(string key) => EffectivePrefix(key);
 
 	public void SetChatTagProvider(Func<CCSPlayerController, string?>? provider) => ChatTagProvider = provider;
+
+	public void SetChatNameColorProvider(Func<CCSPlayerController, string?>? provider) => ChatNameColorProvider = provider;
+
+	/// <summary>The addon's name colors (e.g. Admin.Plugin's groups) - null: the timer's flag colors for everyone</summary>
+	internal static Func<CCSPlayerController, string?>? ChatNameColorProvider { get; private set; }
+
+	/// <summary>A player's name color from the addon - a known color name or "team", else null (the timer's own)</summary>
+	internal static string? ChatNameColorOf(CCSPlayerController player)
+	{
+		try
+		{
+			string? color = ChatNameColorProvider?.Invoke(player)?.Trim();
+			return color != null && (ChatSettings.Colors.ContainsKey(color) || color.Equals(ChatSettings.TeamColor, StringComparison.OrdinalIgnoreCase))
+				? color
+				: null;
+		}
+		catch
+		{
+			return null;
+		}
+	}
 
 	/// <summary>The addon's role tags (e.g. Admin.Plugin's group tags) - null: nobody has one</summary>
 	internal static Func<CCSPlayerController, string?>? ChatTagProvider { get; private set; }

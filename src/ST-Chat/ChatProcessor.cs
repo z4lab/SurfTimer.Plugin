@@ -183,15 +183,18 @@ public partial class SurfTimer
 		};
 		string rankText = $"{ChatSettings.Color(rankColorName)}[{(rank != null ? $"#{rank}" : "-")}]{ChatColors.Default}";
 
-		string nameColorName = AdminManager.PlayerHasPermissions(sender, settings.Flags.Root) ? settings.NameColors.Root
+		// An addon's name color (Admin.Plugin's groups) unless the player hides their role, else the flag colors
+		bool showRole = player?.Options.HideRoleTag != true;
+		string nameColorName = (showRole ? SurfTimerApiImpl.ChatNameColorOf(sender) : null)
+			?? (AdminManager.PlayerHasPermissions(sender, settings.Flags.Root) ? settings.NameColors.Root
 			: AdminManager.PlayerHasPermissions(sender, settings.Flags.Admin) ? settings.NameColors.Admin
 			: AdminManager.PlayerHasPermissions(sender, settings.Flags.Vip) ? settings.NameColors.Vip
-			: settings.NameColors.Default;
+			: settings.NameColors.Default);
 		string name = Sanitize(sender.PlayerName);
 		string nameText = $"{ChatSettings.Color(nameColorName, sender.Team)}{name}{ChatColors.Default}";
 
 		// The role tag of an addon (Admin.Plugin's groups) - unless the player hid it (!options - Chat)
-		string role = player?.Options.HideRoleTag == true ? "" : SurfTimerApiImpl.ChatTagOf(sender);
+		string role = showRole ? SurfTimerApiImpl.ChatTagOf(sender) : "";
 		string roleText = role.Length > 0 ? $"{role}{ChatColors.Default}" : "";
 		bool roleToken = settings.Format.Contains("{role}", StringComparison.OrdinalIgnoreCase);
 
