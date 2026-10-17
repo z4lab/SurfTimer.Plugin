@@ -190,6 +190,11 @@ public partial class SurfTimer
 		string name = Sanitize(sender.PlayerName);
 		string nameText = $"{ChatSettings.Color(nameColorName, sender.Team)}{name}{ChatColors.Default}";
 
+		// The role tag of an addon (Admin.Plugin's groups) - unless the player hid it (!options - Chat)
+		string role = player?.Options.HideRoleTag == true ? "" : SurfTimerApiImpl.ChatTagOf(sender);
+		string roleText = role.Length > 0 ? $"{role}{ChatColors.Default}" : "";
+		bool roleToken = settings.Format.Contains("{role}", StringComparison.OrdinalIgnoreCase);
+
 		var prefixes = new List<string>();
 		if (sender.Team == CsTeam.Spectator)
 			prefixes.Add(settings.SpectatorPrefix);
@@ -221,7 +226,8 @@ public partial class SurfTimer
 			"rank" => rankText,
 			"ranknum" => rank?.ToString() ?? "-",
 			"points" => (player?.Profile.ServerPoints ?? 0).ToString("N0", System.Globalization.CultureInfo.InvariantCulture),
-			"name" => nameText,
+			"name" => !roleToken && roleText.Length > 0 ? $"{roleText} {nameText}" : nameText,
+			"role" => roleText,
 			"message" => $"{ChatColors.Default}{text}",
 			"prefix" => prefixText,
 			"country" => country,

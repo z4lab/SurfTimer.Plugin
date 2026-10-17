@@ -134,6 +134,13 @@ public interface ISurfTimerApi
 	/// <summary>The addon's chat prefix: the admin's (colors applied), else the default it registered</summary>
 	string ChatPrefix(string key);
 
+	/// <summary>
+	/// A player's role tag in chat - the {role} placeholder, right before the name when the format has none. The provider
+	/// returns the tag with {color} tags (e.g. "{purple}[Admin]"), or null / "" for none. One provider (the last set
+	/// wins), null removes it. Players can hide their own tag (!options - Chat).
+	/// </summary>
+	void SetChatTagProvider(Func<CCSPlayerController, string?>? provider);
+
 	// ---- Server ----
 
 	/// <summary>

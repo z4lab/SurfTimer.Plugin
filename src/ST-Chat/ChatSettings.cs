@@ -10,7 +10,7 @@ namespace SurfTimer;
 /// Created with the defaults when missing; changed through !surfadmin (Server - Chat).
 /// Format placeholders: {rank} (colored [#n] / [-]), {ranknum}, {points}, {name} (colored), {message},
 /// {country} (ISO code, unknown_country if unknown), {team} (CT / T / SPEC), {prefix} (team / spec /
-/// dead tags) and color names like {grey}.
+/// dead tags), {role} (an addon's role tag - without it the tag goes right before the name) and color names like {grey}.
 /// </summary>
 internal sealed class ChatSettings
 {

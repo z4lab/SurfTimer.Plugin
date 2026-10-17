@@ -120,6 +120,7 @@ internal sealed class PlayerOptions
 	internal const string KeyChatOthersPrefix = "chat_others_";
 	internal const string KeyChatConnects = "chat_connects";
 	internal const string KeyChatSaveloc = "chat_saveloc";
+	internal const string KeyHideRoleTag = "hide_role_tag";
 	internal const string KeyConfirmReset = "confirm_reset";
 	internal const string KeyNoclipTeleports = "noclip_teleports";
 	internal const string KeyHudTop = "hud_top";
@@ -209,7 +210,7 @@ internal sealed class PlayerOptions
 	private readonly PlayerProfile _profile;
 
 	private bool _hideLegs, _hidePlayers, _hideBots;
-	private bool _chatConnects, _chatSaveloc;
+	private bool _chatConnects, _chatSaveloc, _hideRoleTag;
 	private readonly Dictionary<ChatEvent, bool> _chatOwn = new(), _chatOthers = new();
 	private bool _confirmReset;
 	private bool _hudTop, _hudSpectators, _hudSplitsKeep;
@@ -265,6 +266,7 @@ internal sealed class PlayerOptions
 		}
 		_chatConnects = Bool(KeyChatConnects, true);
 		_chatSaveloc = Bool(KeyChatSaveloc, true);
+		_hideRoleTag = Bool(KeyHideRoleTag, false);
 		_confirmReset = Bool(KeyConfirmReset, true);
 		_hudTop = Bool(KeyHudTop, true);
 		_hudSplitTarget = _profile.Settings.TryGetValue(KeyHudSplitTarget, out var target)
@@ -428,6 +430,9 @@ internal sealed class PlayerOptions
 
 	/// <summary>"Teleported to #N" after loading a saveloc (at most one per burst of loads)</summary>
 	internal bool ChatSaveloc { get => _chatSaveloc; set { _chatSaveloc = value; Save(KeyChatSaveloc, value); } }
+
+	/// <summary>The player's role tag (an addon's, e.g. [Admin]) left out of their chat lines</summary>
+	internal bool HideRoleTag { get => _hideRoleTag; set { _hideRoleTag = value; Save(KeyHideRoleTag, value); } }
 
 	// ---- Gameplay ----
 

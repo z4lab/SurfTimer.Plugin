@@ -43,6 +43,7 @@ internal sealed class SurfTimerApiImpl(SurfTimer plugin, ILogger logger) : ISurf
 		ForcedCvars.Clear();
 		Sounds.ClearAddons();
 		AddonPrefixes.Clear();
+		ChatTagProvider = null;
 		HudFieldCatalog.ClearAddons();
 	}
 
@@ -326,6 +327,34 @@ internal sealed class SurfTimerApiImpl(SurfTimer plugin, ILogger logger) : ISurf
 		AddonPrefixes[key] = new AddonPrefix(key, label, defaultPrefix);
 
 	public string ChatPrefix(string key) => EffectivePrefix(key);
+
+	public void SetChatTagProvider(Func<CCSPlayerController, string?>? provider) => ChatTagProvider = provider;
+
+	/// <summary>The addon's role tags (e.g. Admin.Plugin's group tags) - null: nobody has one</summary>
+	internal static Func<CCSPlayerController, string?>? ChatTagProvider { get; private set; }
+
+	/// <summary>A player's role tag with colors applied - "" for none (also when the addon fails)</summary>
+	internal static string ChatTagOf(CCSPlayerController player)
+	{
+		string tag = RawChatTagOf(player);
+		return tag.Length == 0 ? "" : ChatSettings.Colorize(tag);
+	}
+
+	/// <summary>A player's role tag as plain text (color tags left out) - "" for none</summary>
+	internal static string ChatTagTextOf(CCSPlayerController player) =>
+		System.Text.RegularExpressions.Regex.Replace(RawChatTagOf(player), @"\{[a-z]+\}", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase).Trim();
+
+	private static string RawChatTagOf(CCSPlayerController player)
+	{
+		try
+		{
+			return ChatTagProvider?.Invoke(player)?.Trim() ?? "";
+		}
+		catch
+		{
+			return "";
+		}
+	}
 
 	internal static string EffectivePrefix(string key)
 	{

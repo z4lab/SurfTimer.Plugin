@@ -639,14 +639,19 @@ public partial class SurfTimer
 		var options = ctx.Player.Options;
 		int own = ChatEvents.Count(e => options.ChatOwn(e.Event));
 		int others = ChatEvents.Count(e => options.ChatOthers(e.Event));
-		return
-		[
+		string role = SurfTimerApiImpl.ChatTagTextOf(ctx.Player.Controller);
+		var rows = new List<HudMenuItem>
+		{
 			ctx.Nav("Own messages", $"{own} / {ChatEvents.Length} on", "your runs - and whoever you spectate (players and replay bots)",
 				() => OptionsChatEventsPage(own: true)),
 			ctx.Nav("Others' messages", $"{others} / {ChatEvents.Length} on", "other players' runs", () => OptionsChatEventsPage(own: false)),
 			ctx.Toggle("Connect messages", options.ChatConnects, "players joining", on => options.ChatConnects = on),
 			ctx.Toggle("Saveloc messages", options.ChatSaveloc, "\"Teleported to #N\" when loading a saveloc", on => options.ChatSaveloc = on),
-		];
+		};
+		// Only for players with a role tag (e.g. [Admin] from the admin plugin's groups)
+		if (role.Length > 0)
+			rows.Add(ctx.Toggle("Show my role tag", !options.HideRoleTag, $"{role} before your name in chat", on => options.HideRoleTag = !on));
+		return rows;
 	});
 
 	/// <summary>Every run message on / off - for your own runs (and whoever you spectate) or for other players'</summary>
