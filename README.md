@@ -333,20 +333,6 @@ Every sound plays only for you, at your volume. Turning a sound on plays a sampl
 | Reset warning | On | The first `!r` during a run (Options › Gameplay › Confirm !r). |
 | Missed PB | On | Your run (map, stage or bonus) got slower than your PB of it. Once per run. |
 | Missed WR | On | Your run got slower than the WR. Once per run. |
-
-**Game sounds** (Options › Sound › Game sounds): sounds of the game itself, each group on or off for you. All on by default, independent of the timer's sounds above.
-
-| Group | What it silences |
-|---|---|
-| Footsteps & landing | Walking, running, ladders, landing and jumping. |
-| Fall damage | The fall damage sound. |
-| Water | Wading, swimming, splashes, the underwater ambience, drowning. |
-| Damage & death | Hits, deaths, headshots. |
-| Weapons & items | Weapon sounds, switching and pickups. Other players' shots too, with their tracers and impacts. |
-| Map sounds | Everything the map plays: ambience, map music, props. |
-| Other game sounds | Every other sound of a player, for example the surf wind. |
-
-Every game sound reaches you as a sound message from the server, and you are taken off the recipients of the groups you turned off. The groups come from CS2's sound event names (`GameSoundNames.cs`, generated from the game's `soundevents/*.vsndevts`). Some of your own movement sounds are played by your game itself (client-side prediction), so the server can't silence those.
 | Map vote / Vote countdown | On | *Only with [SurfTimer.MapChooser](https://github.com/z4lab/SurfTimer.MapChooser).* A vote starts / its last 3 seconds. Addons add their sounds here. |
 
 The server can change which CS2 sound event each kind plays in `timer_settings.json`: `sound_timer_start`, `sound_ahead_pb`, `sound_pb`, `sound_record`, `sound_others_record`, `sound_reset_confirm`, `sound_missed_pb`, `sound_missed_wr` (`""` = no sound).
