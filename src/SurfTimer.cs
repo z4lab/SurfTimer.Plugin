@@ -42,7 +42,7 @@ public partial class SurfTimer : BasePlugin
 
 	// Metadata
 	public override string ModuleName => $"z4lab/{Config.PluginName}";
-	public override string ModuleVersion => "1.3.1";
+	public override string ModuleVersion => "1.3.2";
 	public override string ModuleDescription => Config.PluginName;
 	public override string ModuleAuthor => "z4lab";
 
@@ -255,6 +255,8 @@ public partial class SurfTimer : BasePlugin
 		RegisterListener<Listeners.OnMapEnd>(OnMapEnd);
 		// Tick listener
 		RegisterListener<Listeners.OnTick>(OnTick);
+		// Game sounds players turned off (see ST-Player/GameSounds.cs)
+		HookGameSounds();
 		// Block map scripts' chat and bot kicks (see MapCommandFilter.cs)
 		RegisterMapCommandFilter();
 		// Hiding players / bots per viewer, and undoing maps that hide players (see Visibility.cs)

@@ -707,6 +707,28 @@ public partial class SurfTimer
 
 	// ---- Sound ----
 
+	/// <summary>Game sounds (GameSounds.cs): each group on / off for this player, independent of the timer's sounds</summary>
+	private PanelPage OptionsGameSoundsPage() => new("Game sounds", ctx =>
+	{
+		var options = ctx.Player.Options;
+		var rows = GameSoundGroups.Select(entry => ctx.Toggle(entry.Label, options.GameSoundOn(entry.Group), entry.Sub, on =>
+		{
+			options.SetGameSoundOn(entry.Group, on);
+			RebuildGameSoundMutes();
+		})).ToList();
+
+		void All(bool on)
+		{
+			foreach (var entry in GameSoundGroups)
+				options.SetGameSoundOn(entry.Group, on);
+			RebuildGameSoundMutes();
+			ctx.Session.Status = on ? "All game sounds on" : "All game sounds off";
+		}
+		rows.Add(ctx.Act("All on", "", "", () => All(true)));
+		rows.Add(ctx.Act("All off", "", "", () => All(false)));
+		return rows;
+	});
+
 	/// <summary>
 	/// Sound tab: the main switch (also !quake), the volume, and each kind of sound - the timer's, then the addons'.
 	/// </summary>
@@ -716,6 +738,8 @@ public partial class SurfTimer
 		var rows = new List<HudMenuItem>
 		{
 			ctx.Toggle("Sounds", options.SoundsEnabled, "all timer sounds · same as !quake", on => options.SoundsEnabled = on),
+			ctx.Nav("Game sounds", $"{GameSoundGroups.Count(g => options.GameSoundOn(g.Group))}/{GameSoundGroups.Length} on",
+				"footsteps, water, weapons, map sounds ...", OptionsGameSoundsPage),
 		};
 		if (!options.SoundsEnabled)
 			return rows;

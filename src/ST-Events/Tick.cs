@@ -155,6 +155,19 @@ public partial class SurfTimer
 			LogTickError(ex, "noclip");
 		}
 
+		// Who silenced which game sounds (GameSounds.cs) - players come and go
+		if (Server.TickCount % 32 == 16)
+		{
+			try
+			{
+				RebuildGameSoundMutes();
+			}
+			catch (Exception ex)
+			{
+				LogTickError(ex, "game sounds");
+			}
+		}
+
 		// Zone outlines (ZoneDrawing.cs) - built while someone wants them, redrawn after round restarts
 		if (Server.TickCount % 32 == 0)
 		{

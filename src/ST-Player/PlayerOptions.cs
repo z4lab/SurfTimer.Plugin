@@ -187,6 +187,7 @@ internal sealed class PlayerOptions
 	internal const string KeySounds = "sounds";
 	/// <summary>Per kind of sound: sound_&lt;key&gt; (Sounds.Categories)</summary>
 	internal const string KeySoundPrefix = "sound_";
+	internal const string KeyGameSoundPrefix = "game_sound_";
 
 	/// <summary>Sound volume steps in !options (percent) - the default is subtle</summary>
 	internal static readonly int[] SoundVolumeSteps = [0, 10, 20, 30, 50, 75, 100];
@@ -521,6 +522,12 @@ internal sealed class PlayerOptions
 		_profile.Settings.TryGetValue(KeySoundPrefix + category.Key, out var stored) ? stored is "1" or "true" : category.DefaultOn;
 
 	internal void SetSoundOn(SoundCategory category, bool on) => Save(KeySoundPrefix + category.Key, on);
+
+	/// <summary>A group of game sounds (footsteps, water, map sounds ...) - on unless turned off (GameSounds.cs)</summary>
+	internal bool GameSoundOn(GameSoundGroup group) =>
+		!_profile.Settings.TryGetValue(KeyGameSoundPrefix + group.ToString().ToLowerInvariant(), out var stored) || stored is "1" or "true";
+
+	internal void SetGameSoundOn(GameSoundGroup group, bool on) => Save(KeyGameSoundPrefix + group.ToString().ToLowerInvariant(), on);
 
 	/// <summary>Volume of plugin / addon sounds (e.g. the map chooser's vote beeps), 0-100 percent</summary>
 	internal int SoundVolume
