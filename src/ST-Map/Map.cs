@@ -575,6 +575,9 @@ public class Map : MapEntity
 	/// Loads every course's WR and completions (from course_stats - no replay data) and, for WRs whose
 	/// replay changed since the last load, their replay. Called on map load and after every saved time.
 	/// </summary>
+	/// <summary>Every time of the map's courses for "[rank/finishers]" in chat - null until loaded (CourseRanks)</summary>
+	internal CourseRanks? Ranks { get; private set; }
+
 	internal async Task LoadMapRecordRuns([CallerMemberName] string methodName = "")
 	{
 		var records = await TimeRepository.GetMapRecordsAsync(this.ID);
@@ -618,6 +621,10 @@ public class Map : MapEntity
 
 		// Ranks moved - the HUD's #10 / group / rank-above split targets are loaded again when next needed
 		Server.NextFrame(SplitTargets.Clear);
+
+		// Every time of the map's courses, for the ranks in chat - swapped in on the main thread
+		var ranks = await CourseRanks.LoadAsync(this.ID);
+		Server.NextFrame(() => Ranks = ranks);
 	}
 
 	/// <summary>

@@ -219,6 +219,43 @@ internal static class TimeRepository
 		internal CourseKind Kind => (CourseKind)KindId;
 	}
 
+	internal sealed class BoardTimeRow
+	{
+		public byte KindId { get; set; }
+		public short Number { get; set; }
+		public byte StyleId { get; set; }
+		public int PlayerId { get; set; }
+		public int RunTime { get; set; }
+
+		internal CourseKind Kind => (CourseKind)KindId;
+	}
+
+	/// <summary>Every visible PB time of the map's courses - the in-memory ranks (CourseRanks)</summary>
+	internal static Task<List<BoardTimeRow>> GetMapBoardTimesAsync(int mapId) =>
+		SurfTimer.DB.QueryAsync<BoardTimeRow>(@"
+			SELECT c.`kind_id`, c.`number`, t.`style_id`, t.`player_id`, t.`run_time_ticks` AS RunTime
+			FROM `{p}times` t JOIN `{p}courses` c ON c.`id` = t.`course_id`
+			WHERE c.`map_id` = @MapId AND t.`hidden` = 0",
+			new { MapId = mapId });
+
+	internal sealed class PbSplitRow
+	{
+		public byte StyleId { get; set; }
+		public int PlayerId { get; set; }
+		public short SplitNumber { get; set; }
+		public int EnterTicks { get; set; }
+	}
+
+	/// <summary>The splits of every visible map PB of the map - split ranks (CourseRanks)</summary>
+	internal static Task<List<PbSplitRow>> GetMapPbSplitsAsync(int mapId) =>
+		SurfTimer.DB.QueryAsync<PbSplitRow>(@"
+			SELECT t.`style_id`, t.`player_id`, s.`split_number`, s.`enter_ticks`
+			FROM `{p}time_splits` s
+			JOIN `{p}times` t ON t.`id` = s.`time_id`
+			JOIN `{p}courses` c ON c.`id` = t.`course_id`
+			WHERE c.`map_id` = @MapId AND c.`kind_id` = @Kind AND t.`hidden` = 0",
+			new { MapId = mapId, Kind = (byte)CourseKind.Map });
+
 	/// <summary>
 	/// Completions and the WR time id of every course of the map (course_stats) - no blobs.
 	/// </summary>

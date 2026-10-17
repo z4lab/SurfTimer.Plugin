@@ -287,6 +287,8 @@ What the panel compares your run against:
 <details>
 <summary><b>Chat</b></summary>
 
+Every finish and split message shows the time's rank after it, `1:23.456 [3/120]`: the rank on that course (map, stage, bonus or checkpoint segment) and how many players have finished it. A run that isn't a PB shows where it would place, practice runs too. Splits inside a map run (CP / stage splits) are ranked among the splits of every player's map PB. The times are kept in memory (loaded with the map's records), so the rank is there right away.
+
 | Option | Description |
 |---|---|
 | Own messages › | Run messages about **your** runs. They also count for whoever you **spectate**: a player's messages, or a replay bot's splits and finish (compared with your own PB there). All on by default. |

@@ -1764,12 +1764,15 @@ public class PlayerHud
 			}
 		}
 
+		// The time at this checkpoint with its rank among every map PB's split here: "1:23.456 [3/120]"
+		string splitTime = CourseRanks.SplitTime(_player, playerCurrentCheckpoint, _player.Timer.Ticks);
+
 		// The runner and their spectators by their own toggle, others by theirs (!options - Chat)
 		string message = atStage
 			? LocalizationService.LocalizerNonNull["stage_split_message",
-				playerCurrentCheckpoint + 1, FormatTime(_player.Timer.Ticks), currentSpeed.ToString("0"), strPbDifference, strWrDifference]
+				playerCurrentCheckpoint + 1, splitTime, currentSpeed.ToString("0"), strPbDifference, strWrDifference]
 			: LocalizationService.LocalizerNonNull["checkpoint_message",
-				playerCurrentCheckpoint, FormatTime(_player.Timer.Ticks), currentSpeed.ToString("0"), strPbDifference, strWrDifference];
+				playerCurrentCheckpoint, splitTime, currentSpeed.ToString("0"), strPbDifference, strWrDifference];
 		ChatAnnounce.Run(ChatEvent.SplitMap, _player, $"{Config.PluginPrefix} {message}", ChatAnnounce.About(_player, message));
 
 #if DEBUG
@@ -1852,7 +1855,7 @@ public class PlayerHud
 		}
 
 		string message = LocalizationService.LocalizerNonNull["stage_message",
-			stage, FormatTime(stageRunTime), exitSpeed.ToString("0"), strPbDifference, strWrDifference];
+			stage, CourseRanks.Time(_player, 2, stage, stageRunTime), exitSpeed.ToString("0"), strPbDifference, strWrDifference];
 		ChatAnnounce.Run(ChatEvent.SplitSegment, _player, $"{Config.PluginPrefix} {message}", ChatAnnounce.About(_player, message));
 	}
 
@@ -1920,7 +1923,7 @@ public class PlayerHud
 		}
 
 		string message = LocalizationService.LocalizerNonNull["checkpoint_message",
-			checkpoint, FormatTime(checkpointRunTime), exitSpeed.ToString("0"), strPbDifference, strWrDifference];
+			checkpoint, CourseRanks.Time(_player, 3, checkpoint, checkpointRunTime), exitSpeed.ToString("0"), strPbDifference, strWrDifference];
 		ChatAnnounce.Run(ChatEvent.SplitSegment, _player, $"{Config.PluginPrefix} {message}", ChatAnnounce.About(_player, message));
 	}
 }
