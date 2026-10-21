@@ -315,7 +315,6 @@ public partial class SurfTimer
 		["round_timer_freeze"] = ("Freeze round timer", "CS2's round timer stands at 13:37 (it can't run out)"),
 		["block_map_chat"] = ("Block map chat", "map scripts' say messages"),
 		["protect_replay_bots"] = ("Protect replay bots", "block map bot kicks"),
-		["replay_bot_direct_spawn"] = ("Direct bot spawn", "CreateBot instead of bot_quota"),
 		["replays_enabled"] = ("Replays", "record and play replays"),
 		["replay_permanent_map_bot"] = ("Permanent map replay bot", "loops the map WR, not counted in the max"),
 		["clan_tags_enabled"] = ("Clan tags", "players' clan tags on the scoreboard"),

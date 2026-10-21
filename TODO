@@ -63,5 +63,3 @@
   + Stage Replays during Map runs
   + Stage Replays in `IsStageMode`
   + Bonus Replays
-+ Replay bots are not being spawned on `Linear` maps
-  + Needs the CS2Fixes NAV mesh patch to work with our implementation

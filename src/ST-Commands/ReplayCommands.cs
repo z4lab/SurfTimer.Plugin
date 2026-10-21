@@ -2,7 +2,6 @@ using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Core.Attributes.Registration;
 using CounterStrikeSharp.API.Modules.Commands;
-using CounterStrikeSharp.API.Modules.Cvars;
 using CounterStrikeSharp.API.Modules.Menu;
 using CounterStrikeSharp.API.Modules.Utils;
 using Microsoft.Extensions.Logging;
@@ -194,7 +193,7 @@ public partial class SurfTimer
 			case ReplayReuseResult.Spawning:
 				slot!.PendingSpectatorUserId = player.UserId;
 				player.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["replay_spawning"]}");
-				SpawnReplayBotDirectly(slot);
+				SpawnReplayBot();
 				break;
 
 			case ReplayReuseResult.ReclaimedIdle:
@@ -249,28 +248,14 @@ public partial class SurfTimer
 	}
 
 	/// <summary>
-	/// Creates the bot for a slot awaiting one through CreateBot, so it also works on maps without a
-	/// nav mesh. The bot is claimed by the slot in OnPlayerSpawn like any other bot. If direct creation
-	/// isn't available, bot_quota (raised in OnTick) still asks the engine for a bot as before.
+	/// Adds the bot for a slot awaiting one with bot_add, which works on maps without a nav mesh with
+	/// CS2Fixes' BotNavIgnore patch (bot_quota alone doesn't). The bot is claimed by the slot in
+	/// OnPlayerSpawn like any other bot.
 	/// </summary>
-	private void SpawnReplayBotDirectly(ReplayPlayer slot)
+	private static void SpawnReplayBot()
 	{
-		// Quota first: with more bots than bot_quota the bot manager kicks one (normal mode), and with
-		// the quota already matching it doesn't add a bot of its own on maps that have a nav mesh
-		ConVar.Find("bot_quota")?.SetValue(CurrentMap.ReplayManager.Pool.Count);
-
-		var bot = ReplayBotSpawner.TryCreate();
-		if (bot == null)
-			return;
-
-		// Normally it spawns by itself (OnPlayerTeam respawns bots awaited by a slot) - make sure it does
-		AddTimer(0.5f, () =>
-		{
-			if (!bot.IsValid || bot.PawnIsAlive || slot.Controller != null)
-				return;
-
-			bot.ChangeTeam(CsTeam.Terrorist);
-			bot.Respawn();
-		});
+		// bot_add raises bot_quota by one, so it ends at the pool size - and with the quota one below
+		// it, the bot manager doesn't add a bot of its own on maps that have a nav mesh
+		Server.ExecuteCommand($"bot_quota {CurrentMap.ReplayManager.Pool.Count - 1}; bot_add_t");
 	}
 }

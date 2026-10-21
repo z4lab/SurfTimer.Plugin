@@ -84,12 +84,6 @@ public static class Config
 	public static bool ProtectReplayBots { get; private set; } = TimerSettings.GetBool("protect_replay_bots", true);
 
 	/// <summary>
-	/// Creates replay bots through the game's CreateBot function (works on maps without a nav mesh,
-	/// where bot_add/bot_quota do nothing). Falls back to bot_quota when off or the signature breaks.
-	/// </summary>
-	public static bool ReplayBotDirectSpawn { get; private set; } = TimerSettings.GetBool("replay_bot_direct_spawn", true);
-
-	/// <summary>
 	/// Default airborne speed cap for bhops inside start zones (u/s, 0 = no cap) - maps can override it
 	/// with their start_speed_cap setting.
 	/// </summary>
@@ -105,7 +99,7 @@ public static class Config
 	/// Timer settings the !surfadmin panel can change live - written back to timer_settings.json.
 	/// </summary>
 	internal static readonly IReadOnlyList<string> LiveBoolSettings =
-		["popup_menus", "round_timer_freeze", "block_map_chat", "protect_replay_bots", "replay_bot_direct_spawn", "replays_enabled", "replay_permanent_map_bot", "clan_tags_enabled", "country_clan_tag", "rank_badges"];
+		["popup_menus", "round_timer_freeze", "block_map_chat", "protect_replay_bots", "replays_enabled", "replay_permanent_map_bot", "clan_tags_enabled", "country_clan_tag", "rank_badges"];
 
 	internal static bool GetLiveBool(string key) => key switch
 	{
@@ -113,7 +107,6 @@ public static class Config
 		"round_timer_freeze" => RoundTimerFreeze,
 		"block_map_chat" => BlockMapChat,
 		"protect_replay_bots" => ProtectReplayBots,
-		"replay_bot_direct_spawn" => ReplayBotDirectSpawn,
 		"replays_enabled" => ReplaysEnabled,
 		"replay_permanent_map_bot" => ReplayPermanentMapBot,
 		"clan_tags_enabled" => ClanTagsEnabled,
@@ -139,7 +132,6 @@ public static class Config
 		PointsSegmentWr = TimerSettings.GetInt("points_segment_wr", 0);
 		BlockMapChat = TimerSettings.GetBool("block_map_chat", true);
 		ProtectReplayBots = TimerSettings.GetBool("protect_replay_bots", true);
-		ReplayBotDirectSpawn = TimerSettings.GetBool("replay_bot_direct_spawn", true);
 		StartSpeedCap = TimerSettings.GetInt("start_speed_cap", 260);
 		StartExitSpeedLimit = TimerSettings.GetInt("start_exit_speed_limit", 600);
 		ReplayPoolCap = Math.Clamp(TimerSettings.GetInt("replay_pool_cap", 5), 1, 10);

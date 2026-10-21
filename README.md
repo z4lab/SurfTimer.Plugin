@@ -503,7 +503,6 @@ Info rows: SurfTimer version/commit, players and tickrate, memory.
 | Freeze round timer | CS2's round timer (top centre) stands still at 13:37. A round time that runs out would kick every player as idle. |
 | Block map chat | Blocks the map scripts' `say` messages. |
 | Protect replay bots | Blocks map bot kicks. |
-| Direct bot spawn | CreateBot instead of bot_quota. |
 | Replays | Record and play replays. |
 | Permanent map replay bot | Loops the map WR. Not counted in the max. |
 | Clan tags | Players' clan tags on the scoreboard. |

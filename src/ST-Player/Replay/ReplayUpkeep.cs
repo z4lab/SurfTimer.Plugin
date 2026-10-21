@@ -124,7 +124,7 @@ public partial class SurfTimer
 			manager.Pool.Add(slot);
 			_permanentStalledSince = null;
 			_logger.LogInformation("[Replay] Permanent map bot: spawning for the map WR ({Player}, time {TimeId})", wr!.RecordPlayerName, wr.MapTimeID);
-			SpawnReplayBotDirectly(slot);
+			SpawnReplayBot();
 			return;
 		}
 
