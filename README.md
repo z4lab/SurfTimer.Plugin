@@ -94,6 +94,7 @@ outputs still pending when you teleport.
 | `!btop [map] [n]` | `!bonustop` | Bonus records. |
 | `!rank` | | Your rank on this map for your current style. |
 | `!profile [name]` | `!p` | Your profile, or another player's (online or offline). Tabs: **Overview**, **Points**, **Records**, **Recent**, **This map**, **Tiers**. |
+| `!top [page]` | | Players by server rank (normal style), 10 per page. A player opens their profile. |
 
 </details>
 

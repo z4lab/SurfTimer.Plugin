@@ -81,6 +81,8 @@ public partial class SurfTimer
 		Add(HelpGroup.Records, "cptop", "checkpoint records", "[map] [n]", ["ctop"]);
 		Add(HelpGroup.Records, "profile", "your profile or another player's", "[name]", ["p"],
 			"Online or offline players. Tabs: Overview, Points, Records, Recent, This map, Tiers.");
+		Add(HelpGroup.Records, "top", "top players by server rank", "[page]",
+			detail: "10 per page, Previous / Next page at the bottom. A player opens their profile.");
 
 		// Spectate
 		Add(HelpGroup.Spectate, "spec", "spectate a player or bot", "[name]",

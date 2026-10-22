@@ -233,6 +233,32 @@ internal static class PlayerRepository
 		return rows.ToDictionary(r => r.PlayerId, r => ((int)r.Rank, r.Points));
 	}
 
+	internal sealed class TopRow
+	{
+		public int PlayerId { get; set; }
+		public string? Name { get; set; }
+		public string? CountryCode { get; set; }
+		public long Points { get; set; }
+		public long Rank { get; set; }
+	}
+
+	/// <summary>
+	/// One page of the server rank list (normal style, !top) and the number of ranked players. Same rank
+	/// rule as GetServerRanksAsync.
+	/// </summary>
+	internal static async Task<(List<TopRow> Rows, long Total)> GetTopAsync(int offset, int limit)
+	{
+		var rows = await SurfTimer.DB.QueryAsync<TopRow>(@"
+			SELECT ps.`player_id`, p.`name`, p.`country_code`, ps.`points`,
+				(SELECT COUNT(*) FROM `{p}player_stats` o WHERE o.`style_id` = 0 AND o.`points` > ps.`points`) + 1 AS `Rank`
+			FROM `{p}player_stats` ps JOIN `{p}players` p ON p.`id` = ps.`player_id`
+			WHERE ps.`style_id` = 0 AND ps.`points` > 0
+			ORDER BY ps.`points` DESC, ps.`player_id` LIMIT @Limit OFFSET @Offset", new { Offset = offset, Limit = limit });
+		long total = await SurfTimer.DB.ExecuteScalarAsync<long>(
+			"SELECT COUNT(*) FROM `{p}player_stats` WHERE `style_id` = 0 AND `points` > 0");
+		return (rows, total);
+	}
+
 	// ---- Timer bans ----
 
 	internal sealed class BanRow
