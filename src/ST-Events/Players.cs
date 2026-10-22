@@ -1,6 +1,7 @@
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Core.Attributes.Registration;
+using CounterStrikeSharp.API.Modules.Cvars;
 using CounterStrikeSharp.API.Modules.Utils;
 using MaxMind.GeoIP2;
 using Microsoft.Extensions.Logging;
@@ -10,6 +11,9 @@ namespace SurfTimer;
 public partial class SurfTimer
 {
 	private bool _customHudRecreatePending;
+
+	// The last player left a hibernating server - the next one to connect reloads the map (OnClientConnect)
+	private bool _reloadMapOnConnect;
 
 	[GameEventHandler]
 	public HookResult OnPlayerSpawn(EventPlayerSpawn @event, GameEventInfo info)
@@ -319,37 +323,28 @@ public partial class SurfTimer
 					PlayerStateService.SaveFinal(playerData, "disconnect"); // The running run, to resume (any server)
 					StatsService.Flush(playerData, final: true); // Also closes the session
 					playerList.TryRemove(userId, out _);
-				}
 
-				if (!playerList.Values.Any(p => p.Controller.IsValid && !p.Controller.IsBot))
-					OnLastHumanLeft();
+					// Only players who were in count - clients dropping mid-connect (addon downloads) don't
+					_reloadMapOnConnect = !playerList.Values.Any(p => p.Controller.IsValid && !p.Controller.IsBot)
+						&& ConVar.Find("sv_hibernate_when_empty")?.GetPrimitiveValue<bool>() == true;
+				}
 			}
 			return HookResult.Continue;
 		}
 	}
 
 	/// <summary>
-	/// The server is empty and goes to hibernation, which removes the bots and resets the game cvars
-	/// (ResetGameConVarsToDefaults). Start over as on map load: the replay bots go now (the permanent map bot
-	/// comes back once a player plays), server_settings.cfg runs again for the next first player.
+	/// Hibernation removes the replay bots and they don't come back - so the first player connecting to
+	/// the emptied server reloads the map, and joins it fresh like after a map change.
 	/// </summary>
-	private void OnLastHumanLeft()
+	private void OnClientConnect(int playerSlot, string name, string ipAddress)
 	{
-		_serverSettingsAppliedForPlayers = false;
-
-		var pool = CurrentMap?.ReplayManager.Pool;
-		if (pool == null || pool.Count == 0)
+		if (!_reloadMapOnConnect)
 			return;
 
-		_logger.LogInformation("[Replay] Server empty - removing {Count} replay bot(s)", pool.Count);
-		for (int i = pool.Count - 1; i >= 0; i--)
-		{
-			var slot = pool[i];
-			if (slot.Controller != null && slot.Controller.IsValid)
-				CurrentMap!.KickReplayBot(i); // Removes the slot too, unless the bot has no user id
-			if (i < pool.Count && pool[i] == slot)
-				pool.RemoveAt(i);
-			slot.Reset(); // After the kick - it clears the controller
-		}
+		_reloadMapOnConnect = false;
+		_logger.LogInformation("[{Prefix}] First player ({Name}) after hibernation - reloading {Map}",
+			Config.PluginName, name, Server.MapName);
+		Server.NextFrame(() => ChangeLevelTo(Server.MapName));
 	}
 }

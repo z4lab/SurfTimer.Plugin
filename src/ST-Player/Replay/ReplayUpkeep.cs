@@ -1,5 +1,4 @@
 using CounterStrikeSharp.API;
-using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Utils;
 using Microsoft.Extensions.Logging;
 
@@ -50,17 +49,6 @@ public partial class SurfTimer
 		for (int i = pool.Count - 1; i >= 0; i--)
 		{
 			var slot = pool[i];
-
-			// The bot left without a disconnect event (removed while the server hibernated) - free the slot,
-			// the permanent map bot is then spawned again below once a player is in
-			if (slot.Controller != null && (!slot.Controller.IsValid || slot.Controller.Connected != PlayerConnectedState.Connected))
-			{
-				_logger.LogInformation("[Replay] Bot of slot '{Player}' is gone (permanent {Permanent}) - freeing the slot",
-					slot.RecordPlayerName, slot.IsPermanent);
-				slot.Reset();
-				pool.RemoveAt(i);
-				continue;
-			}
 
 			if (slot.Controller == null)
 			{

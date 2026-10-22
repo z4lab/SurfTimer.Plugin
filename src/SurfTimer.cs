@@ -42,7 +42,7 @@ public partial class SurfTimer : BasePlugin
 
 	// Metadata
 	public override string ModuleName => $"z4lab/{Config.PluginName}";
-	public override string ModuleVersion => "1.3.10";
+	public override string ModuleVersion => "1.3.11";
 	public override string ModuleDescription => Config.PluginName;
 	public override string ModuleAuthor => "z4lab";
 
@@ -63,6 +63,7 @@ public partial class SurfTimer : BasePlugin
 	{
 		// After the game mode config of the new map (see ApplyServerSettings) - twice, as its timing varies
 		_serverSettingsAppliedForPlayers = false;
+		_reloadMapOnConnect = false;
 		AddTimer(2f, () => ApplyServerSettings("map start"), CounterStrikeSharp.API.Modules.Timers.TimerFlags.STOP_ON_MAPCHANGE);
 		AddTimer(10f, () => ApplyServerSettings("map start, again"), CounterStrikeSharp.API.Modules.Timers.TimerFlags.STOP_ON_MAPCHANGE);
 
@@ -253,6 +254,8 @@ public partial class SurfTimer : BasePlugin
 		RegisterListener<Listeners.OnMapStart>(OnMapStart);
 		// Map End Hook
 		RegisterListener<Listeners.OnMapEnd>(OnMapEnd);
+		// First player after hibernation reloads the map (see Players.cs)
+		RegisterListener<Listeners.OnClientConnect>(OnClientConnect);
 		// Tick listener
 		RegisterListener<Listeners.OnTick>(OnTick);
 		// Block map scripts' chat and bot kicks (see MapCommandFilter.cs)
