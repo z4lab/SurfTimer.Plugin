@@ -293,6 +293,7 @@ Every finish and split message shows the time's rank after it, `1:23.456 [3/120]
 |---|---|
 | Own messages › | Run messages about **your** runs. They also count for whoever you **spectate**: a player's messages, or a replay bot's splits and finish (compared with your own PB there). All on by default. |
 | Others' messages › | The same messages about **other players'** runs. PBs and WRs on by default, finishes and splits off. |
+| Compact messages | Run messages in a short form, e.g. `Player CP1 WR 11.609 [1/6] -00.046 (was 11.656)` instead of `Player has set a new Checkpoint 1 record with a time of …`. Splits drop the speeds. Off by default. |
 | Connect messages | Players joining. |
 | Saveloc messages | "Teleported to #N" when you load a saveloc. |
 | Show my role | Only for players with a role (e.g. `[Admin]` and a name color from Admin.Plugin's groups): show the tag before your name and the name color in chat, or hide both. |

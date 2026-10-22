@@ -120,6 +120,7 @@ internal sealed class PlayerOptions
 	internal const string KeyChatOthersPrefix = "chat_others_";
 	internal const string KeyChatConnects = "chat_connects";
 	internal const string KeyChatSaveloc = "chat_saveloc";
+	internal const string KeyChatCompact = "chat_compact";
 	internal const string KeyHideRoleTag = "hide_role_tag";
 	internal const string KeyConfirmReset = "confirm_reset";
 	internal const string KeyNoclipTeleports = "noclip_teleports";
@@ -210,7 +211,7 @@ internal sealed class PlayerOptions
 	private readonly PlayerProfile _profile;
 
 	private bool _hideLegs, _hidePlayers, _hideBots;
-	private bool _chatConnects, _chatSaveloc, _hideRoleTag;
+	private bool _chatConnects, _chatSaveloc, _chatCompact, _hideRoleTag;
 	private readonly Dictionary<ChatEvent, bool> _chatOwn = new(), _chatOthers = new();
 	private bool _confirmReset;
 	private bool _hudTop, _hudSpectators, _hudSplitsKeep;
@@ -266,6 +267,7 @@ internal sealed class PlayerOptions
 		}
 		_chatConnects = Bool(KeyChatConnects, true);
 		_chatSaveloc = Bool(KeyChatSaveloc, true);
+		_chatCompact = Bool(KeyChatCompact, false);
 		_hideRoleTag = Bool(KeyHideRoleTag, false);
 		_confirmReset = Bool(KeyConfirmReset, true);
 		_hudTop = Bool(KeyHudTop, true);
@@ -430,6 +432,9 @@ internal sealed class PlayerOptions
 
 	/// <summary>"Teleported to #N" after loading a saveloc (at most one per burst of loads)</summary>
 	internal bool ChatSaveloc { get => _chatSaveloc; set { _chatSaveloc = value; Save(KeyChatSaveloc, value); } }
+
+	/// <summary>Run messages in their short form (the *_compact lang keys) - off by default</summary>
+	internal bool ChatCompact { get => _chatCompact; set { _chatCompact = value; Save(KeyChatCompact, value); } }
 
 	/// <summary>The player's role (an addon's tag, e.g. [Admin], and name color) left out of their chat lines</summary>
 	internal bool HideRoleTag { get => _hideRoleTag; set { _hideRoleTag = value; Save(KeyHideRoleTag, value); } }

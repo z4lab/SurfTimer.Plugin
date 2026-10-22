@@ -84,7 +84,6 @@ public partial class SurfTimer
 			player.Timer.Stop(); // The final time stays on the HUD
 			player.CountAttempt(0, 0, finished: true);
 			bool saveMapTime = false;
-			string PracticeString = "";
 			// The time with its rank among the map's times: "1:23.456 [3/120]"
 			string rankedTime = CourseRanks.Time(player, 0, 0, player.Timer.Ticks);
 
@@ -92,44 +91,43 @@ public partial class SurfTimer
 			// or announced, whatever the time
 			if (player.Timer.IsPracticeMode)
 			{
-				ChatAnnounce.Run(ChatEvent.MapFinish, player, $"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["map_practice_finish",
+				ChatAnnounce.Run(ChatEvent.MapFinish, player, ChatAnnounce.Msg("map_practice_finish",
 					rankedTime,
 					PracticeDiff(player.Timer.Ticks, player.Stats.PB[pStyle].RunTime),
-					PracticeDiff(player.Timer.Ticks, CurrentMap.WR[pStyle].RunTime)]}", null);
+					PracticeDiff(player.Timer.Ticks, CurrentMap.WR[pStyle].RunTime)), null);
 			}
 			else if (player.Timer.Ticks < CurrentMap.WR[pStyle].RunTime) // Player beat the Map WR
 			{
 				saveMapTime = true;
 				int timeImprove = CurrentMap.WR[pStyle].RunTime - player.Timer.Ticks;
-				ChatAnnounce.Record(ChatEvent.MapWr, player, $"{Config.PluginPrefix} {PracticeString}{LocalizationService.LocalizerNonNull["mapwr_improved",
-					player.Controller.PlayerName, rankedTime, PlayerHud.FormatTime(timeImprove), PlayerHud.FormatTime(CurrentMap.WR[pStyle].RunTime)]}");
+				ChatAnnounce.Record(ChatEvent.MapWr, player, ChatAnnounce.Msg("mapwr_improved",
+					player.Controller.PlayerName, rankedTime, PlayerHud.FormatTime(timeImprove), PlayerHud.FormatTime(CurrentMap.WR[pStyle].RunTime)));
 			}
 			else if (CurrentMap.WR[pStyle].ID == -1) // No record was set on the map
 			{
 				saveMapTime = true;
-				ChatAnnounce.Record(ChatEvent.MapWr, player, $"{Config.PluginPrefix} {PracticeString}{LocalizationService.LocalizerNonNull["mapwr_set",
-					player.Controller.PlayerName, rankedTime]}");
+				ChatAnnounce.Record(ChatEvent.MapWr, player, ChatAnnounce.Msg("mapwr_set", player.Controller.PlayerName, rankedTime));
 			}
 			else if (player.Stats.PB[pStyle].RunTime <= 0) // Player first ever PersonalBest for the map
 			{
 				saveMapTime = true;
 				ChatAnnounce.Pb(ChatEvent.MapPb, player,
-					$"{Config.PluginPrefix} {PracticeString}{LocalizationService.LocalizerNonNull["mappb_set", rankedTime]}",
-					$"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["mappb_set_others", player.Controller.PlayerName, rankedTime]}");
+					ChatAnnounce.Msg("mappb_set", rankedTime),
+					ChatAnnounce.Msg("mappb_set_others", player.Controller.PlayerName, rankedTime));
 			}
 			else if (player.Timer.Ticks < player.Stats.PB[pStyle].RunTime) // Player beating their existing PersonalBest for the map
 			{
 				saveMapTime = true;
 				int timeImprove = player.Stats.PB[pStyle].RunTime - player.Timer.Ticks;
-				string improved = $"{Config.PluginPrefix} {PracticeString}{LocalizationService.LocalizerNonNull["mappb_improved",
-					player.Controller.PlayerName, rankedTime, PlayerHud.FormatTime(timeImprove), PlayerHud.FormatTime(player.Stats.PB[pStyle].RunTime)]}";
+				var improved = ChatAnnounce.Msg("mappb_improved",
+					player.Controller.PlayerName, rankedTime, PlayerHud.FormatTime(timeImprove), PlayerHud.FormatTime(player.Stats.PB[pStyle].RunTime));
 				ChatAnnounce.Pb(ChatEvent.MapPb, player, improved, improved);
 			}
 			else // Player did not beat their existing PersonalBest for the map nor the map record
 			{
 				ChatAnnounce.Run(ChatEvent.MapFinish, player,
-					$"{Config.PluginPrefix} {PracticeString}{LocalizationService.LocalizerNonNull["mappb_missed", rankedTime]}",
-					$"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["map_finish_others", player.Controller.PlayerName, rankedTime]}");
+					ChatAnnounce.Msg("mappb_missed", rankedTime),
+					ChatAnnounce.Msg("map_finish_others", player.Controller.PlayerName, rankedTime));
 			}
 
 			if (saveMapTime && !player.Timer.IsPracticeMode)
@@ -542,9 +540,6 @@ public partial class SurfTimer
 		player.Stats.ThisRun.EndVelZ = velocity.Z; // End pre speed for the run
 
 		bool saveBonusTime = false;
-		string PracticeString = "";
-		if (player.Timer.IsPracticeMode)
-			PracticeString = $"({ChatColors.Grey}Practice{ChatColors.Default}) ";
 		// The time with its rank among the bonus' times: "1:23.456 [3/120]"
 		string rankedTime = CourseRanks.Time(player, 1, bonus_idx, player.Timer.Ticks);
 
@@ -552,36 +547,35 @@ public partial class SurfTimer
 		{
 			saveBonusTime = true;
 			int timeImprove = CurrentMap.BonusWR[bonus_idx][pStyle].RunTime - player.Timer.Ticks;
-			BonusMessage(ChatEvent.BonusWr, player, $"{Config.PluginPrefix} {PracticeString}{LocalizationService.LocalizerNonNull["bonuswr_improved",
-				player.Controller.PlayerName, bonus_idx, rankedTime, PlayerHud.FormatTime(timeImprove), PlayerHud.FormatTime(CurrentMap.BonusWR[bonus_idx][pStyle].RunTime)]}", null);
+			BonusMessage(ChatEvent.BonusWr, player, ChatAnnounce.Msg("bonuswr_improved",
+				player.Controller.PlayerName, bonus_idx, rankedTime, PlayerHud.FormatTime(timeImprove), PlayerHud.FormatTime(CurrentMap.BonusWR[bonus_idx][pStyle].RunTime)), null);
 		}
 		else if (CurrentMap.BonusWR[bonus_idx][pStyle].ID == -1) // No Bonus record was set on the map
 		{
 			saveBonusTime = true;
-			BonusMessage(ChatEvent.BonusWr, player, $"{Config.PluginPrefix} {PracticeString}{LocalizationService.LocalizerNonNull["bonuswr_set",
-				player.Controller.PlayerName, bonus_idx, rankedTime]}", null);
+			BonusMessage(ChatEvent.BonusWr, player, ChatAnnounce.Msg("bonuswr_set", player.Controller.PlayerName, bonus_idx, rankedTime), null);
 		}
 		else if (player.Stats.BonusPB[bonus_idx][pStyle].RunTime <= 0) // Player first ever PersonalBest for the bonus
 		{
 			saveBonusTime = true;
 			BonusMessage(ChatEvent.BonusPb, player,
-				$"{Config.PluginPrefix} {PracticeString}{LocalizationService.LocalizerNonNull["bonuspb_set", bonus_idx, rankedTime]}",
-				$"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["bonuspb_set_others", player.Controller.PlayerName, bonus_idx, rankedTime]}");
+				ChatAnnounce.Msg("bonuspb_set", bonus_idx, rankedTime),
+				ChatAnnounce.Msg("bonuspb_set_others", player.Controller.PlayerName, bonus_idx, rankedTime));
 		}
 		else if (player.Timer.Ticks < player.Stats.BonusPB[bonus_idx][pStyle].RunTime) // Player beating their existing PersonalBest for the bonus
 		{
 			saveBonusTime = true;
 			int timeImprove = player.Stats.BonusPB[bonus_idx][pStyle].RunTime - player.Timer.Ticks;
-			BonusMessage(ChatEvent.BonusPb, player, $"{Config.PluginPrefix} {PracticeString}{LocalizationService.LocalizerNonNull["bonuspb_improved",
-				player.Controller.PlayerName, bonus_idx, rankedTime, PlayerHud.FormatTime(timeImprove), PlayerHud.FormatTime(player.Stats.BonusPB[bonus_idx][pStyle].RunTime)]}", null);
+			BonusMessage(ChatEvent.BonusPb, player, ChatAnnounce.Msg("bonuspb_improved",
+				player.Controller.PlayerName, bonus_idx, rankedTime, PlayerHud.FormatTime(timeImprove), PlayerHud.FormatTime(player.Stats.BonusPB[bonus_idx][pStyle].RunTime)), null);
 		}
 		else // Player did not beat their existing personal best for the bonus
 		{
 			int pbTime = player.Stats.BonusPB[bonus_idx][pStyle].RunTime;
 			BonusMessage(ChatEvent.BonusFinish, player,
-				$"{Config.PluginPrefix} {PracticeString}{LocalizationService.LocalizerNonNull["bonuspb_missed",
-					bonus_idx, rankedTime, PlayerHud.FormatTime(player.Timer.Ticks - pbTime), PlayerHud.FormatTime(pbTime)]}",
-				$"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["bonus_finish_others", player.Controller.PlayerName, bonus_idx, rankedTime]}");
+				ChatAnnounce.Msg("bonuspb_missed",
+					bonus_idx, rankedTime, PlayerHud.FormatTime(player.Timer.Ticks - pbTime), PlayerHud.FormatTime(pbTime)),
+				ChatAnnounce.Msg("bonus_finish_others", player.Controller.PlayerName, bonus_idx, rankedTime));
 		}
 
 		if (!player.Timer.IsPracticeMode)
@@ -600,18 +594,18 @@ public partial class SurfTimer
 
 
 	/// <summary>
-	/// A bonus finish message: records / PBs with their sound; practice runs only to the runner and their spectators.
-	/// othersText null: the same text for everyone (records, improved PBs - they name the runner).
+	/// A bonus finish message: records / PBs with their sound; practice runs only to the runner and their spectators,
+	/// marked "(Practice)". othersText null: the same text for everyone (records, improved PBs - they name the runner).
 	/// </summary>
-	private static void BonusMessage(ChatEvent ev, Player player, string ownText, string? othersText)
+	private static void BonusMessage(ChatEvent ev, Player player, ChatAnnounce.Text ownText, ChatAnnounce.Text? othersText)
 	{
-		string? others = player.Timer.IsPracticeMode ? null : othersText ?? ownText;
+		var others = othersText ?? ownText;
 		if (player.Timer.IsPracticeMode)
-			ChatAnnounce.Run(ev, player, ownText, null);
+			ChatAnnounce.Run(ev, player, ownText.Practice(), null);
 		else if (ev == ChatEvent.BonusWr)
 			ChatAnnounce.Record(ev, player, ownText);
 		else if (ev == ChatEvent.BonusPb)
-			ChatAnnounce.Pb(ev, player, ownText, others!);
+			ChatAnnounce.Pb(ev, player, ownText, others);
 		else
 			ChatAnnounce.Run(ev, player, ownText, others);
 	}

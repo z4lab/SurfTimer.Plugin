@@ -1768,12 +1768,10 @@ public class PlayerHud
 		string splitTime = CourseRanks.SplitTime(_player, playerCurrentCheckpoint, _player.Timer.Ticks);
 
 		// The runner and their spectators by their own toggle, others by theirs (!options - Chat)
-		string message = atStage
-			? LocalizationService.LocalizerNonNull["stage_split_message",
-				playerCurrentCheckpoint + 1, splitTime, currentSpeed.ToString("0"), strPbDifference, strWrDifference]
-			: LocalizationService.LocalizerNonNull["checkpoint_message",
-				playerCurrentCheckpoint, splitTime, currentSpeed.ToString("0"), strPbDifference, strWrDifference];
-		ChatAnnounce.Run(ChatEvent.SplitMap, _player, $"{Config.PluginPrefix} {message}", ChatAnnounce.About(_player, message));
+		var message = ChatAnnounce.Msg(atStage ? "stage_split_message" : "checkpoint_message",
+			atStage ? playerCurrentCheckpoint + 1 : playerCurrentCheckpoint, splitTime, currentSpeed.ToString("0"), strPbDifference, strWrDifference,
+			TimeOnly(strPbDifference), TimeOnly(strWrDifference));
+		ChatAnnounce.Run(ChatEvent.SplitMap, _player, message, ChatAnnounce.About(_player, message));
 
 #if DEBUG
 		Console.WriteLine(
@@ -1854,9 +1852,10 @@ public class PlayerHud
 			strWrDifference += ChatColors.Default + ")";
 		}
 
-		string message = LocalizationService.LocalizerNonNull["stage_message",
-			stage, CourseRanks.Time(_player, 2, stage, stageRunTime), exitSpeed.ToString("0"), strPbDifference, strWrDifference];
-		ChatAnnounce.Run(ChatEvent.SplitSegment, _player, $"{Config.PluginPrefix} {message}", ChatAnnounce.About(_player, message));
+		var message = ChatAnnounce.Msg("stage_message",
+			stage, CourseRanks.Time(_player, 2, stage, stageRunTime), exitSpeed.ToString("0"), strPbDifference, strWrDifference,
+			TimeOnly(strPbDifference), TimeOnly(strWrDifference));
+		ChatAnnounce.Run(ChatEvent.SplitSegment, _player, message, ChatAnnounce.About(_player, message));
 	}
 
 	/// <summary>
@@ -1922,8 +1921,12 @@ public class PlayerHud
 			strWrDifference += ChatColors.Default + ")";
 		}
 
-		string message = LocalizationService.LocalizerNonNull["checkpoint_message",
-			checkpoint, CourseRanks.Time(_player, 3, checkpoint, checkpointRunTime), exitSpeed.ToString("0"), strPbDifference, strWrDifference];
-		ChatAnnounce.Run(ChatEvent.SplitSegment, _player, $"{Config.PluginPrefix} {message}", ChatAnnounce.About(_player, message));
+		var message = ChatAnnounce.Msg("checkpoint_message",
+			checkpoint, CourseRanks.Time(_player, 3, checkpoint, checkpointRunTime), exitSpeed.ToString("0"), strPbDifference, strWrDifference,
+			TimeOnly(strPbDifference), TimeOnly(strWrDifference));
+		ChatAnnounce.Run(ChatEvent.SplitSegment, _player, message, ChatAnnounce.About(_player, message));
 	}
+
+	/// <summary>A split difference "time (speed)" without its speed - for compact messages</summary>
+	private static string TimeOnly(string difference) => difference[..difference.IndexOf(" (")];
 }

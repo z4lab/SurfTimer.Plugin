@@ -253,25 +253,25 @@ public class CurrentRun : RunStatsEntity
 			if (stage_run_time < SurfTimer.CurrentMap.StageWR[stage][pStyle].RunTime) // Player beat the Stage WR
 			{
 				int timeImprove = SurfTimer.CurrentMap.StageWR[stage][pStyle].RunTime - stage_run_time;
-				ChatAnnounce.Record(ChatEvent.StageWr, player, $"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["stagewr_improved",
-					player.Controller.PlayerName, stage, rankedTime, PlayerHud.FormatTime(timeImprove), PlayerHud.FormatTime(SurfTimer.CurrentMap.StageWR[stage][pStyle].RunTime)]}");
+				ChatAnnounce.Record(ChatEvent.StageWr, player, ChatAnnounce.Msg("stagewr_improved",
+					player.Controller.PlayerName, stage, rankedTime, PlayerHud.FormatTime(timeImprove), PlayerHud.FormatTime(SurfTimer.CurrentMap.StageWR[stage][pStyle].RunTime)));
 			}
 			else if (SurfTimer.CurrentMap.StageWR[stage][pStyle].ID == -1) // No Stage record was set on the map
 			{
-				ChatAnnounce.Record(ChatEvent.StageWr, player, $"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["stagewr_set",
-					player.Controller.PlayerName, stage, rankedTime]}");
+				ChatAnnounce.Record(ChatEvent.StageWr, player, ChatAnnounce.Msg("stagewr_set",
+					player.Controller.PlayerName, stage, rankedTime));
 			}
 			else if (player.Stats.StagePB[stage][pStyle] != null && player.Stats.StagePB[stage][pStyle].ID == -1) // Player first Stage personal best
 			{
 				ChatAnnounce.Pb(ChatEvent.StagePb, player,
-					$"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["stagepb_set", stage, rankedTime]}",
-					$"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["stagepb_set_others", player.Controller.PlayerName, stage, rankedTime]}");
+					ChatAnnounce.Msg("stagepb_set", stage, rankedTime),
+					ChatAnnounce.Msg("stagepb_set_others", player.Controller.PlayerName, stage, rankedTime));
 			}
 			else if (player.Stats.StagePB[stage][pStyle] != null && player.Stats.StagePB[stage][pStyle].RunTime > stage_run_time) // Player beating their existing Stage personal best
 			{
 				int timeImprove = player.Stats.StagePB[stage][pStyle].RunTime - stage_run_time;
-				string improved = $"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["stagepb_improved",
-					player.Controller.PlayerName, stage, rankedTime, PlayerHud.FormatTime(timeImprove), PlayerHud.FormatTime(player.Stats.StagePB[stage][pStyle].RunTime)]}";
+				var improved = ChatAnnounce.Msg("stagepb_improved",
+					player.Controller.PlayerName, stage, rankedTime, PlayerHud.FormatTime(timeImprove), PlayerHud.FormatTime(player.Stats.StagePB[stage][pStyle].RunTime));
 				ChatAnnounce.Pb(ChatEvent.StagePb, player, improved, improved);
 			}
 
@@ -290,9 +290,9 @@ public class CurrentRun : RunStatsEntity
 			if (stage_run_time > SurfTimer.CurrentMap.StageWR[stage][pStyle].RunTime && player.Timer.IsStageMode) // Player is behind the Stage WR for the map
 			{
 				int timeImprove = stage_run_time - SurfTimer.CurrentMap.StageWR[stage][pStyle].RunTime;
-				string missed = LocalizationService.LocalizerNonNull["stagewr_missed",
-					stage, rankedTime, PlayerHud.FormatTime(timeImprove), PlayerHud.FormatTime(SurfTimer.CurrentMap.StageWR[stage][pStyle].RunTime)];
-				ChatAnnounce.Run(ChatEvent.SplitSegment, player, $"{Config.PluginPrefix} {missed}", ChatAnnounce.About(player, missed));
+				var missed = ChatAnnounce.Msg("stagewr_missed",
+					stage, rankedTime, PlayerHud.FormatTime(timeImprove), PlayerHud.FormatTime(SurfTimer.CurrentMap.StageWR[stage][pStyle].RunTime));
+				ChatAnnounce.Run(ChatEvent.SplitSegment, player, missed, ChatAnnounce.About(player, missed));
 			}
 		}
 	}
@@ -330,25 +330,25 @@ public class CurrentRun : RunStatsEntity
 			if (checkpoint_run_time < SurfTimer.CurrentMap.CheckpointWR[checkpoint][pStyle].RunTime) // Player beat the Checkpoint WR
 			{
 				int timeImprove = SurfTimer.CurrentMap.CheckpointWR[checkpoint][pStyle].RunTime - checkpoint_run_time;
-				ChatAnnounce.Record(ChatEvent.CpWr, player, $"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["checkpointwr_improved",
-					player.Controller.PlayerName, checkpoint, rankedTime, PlayerHud.FormatTime(timeImprove), PlayerHud.FormatTime(SurfTimer.CurrentMap.CheckpointWR[checkpoint][pStyle].RunTime)]}");
+				ChatAnnounce.Record(ChatEvent.CpWr, player, ChatAnnounce.Msg("checkpointwr_improved",
+					player.Controller.PlayerName, checkpoint, rankedTime, PlayerHud.FormatTime(timeImprove), PlayerHud.FormatTime(SurfTimer.CurrentMap.CheckpointWR[checkpoint][pStyle].RunTime)));
 			}
 			else if (SurfTimer.CurrentMap.CheckpointWR[checkpoint][pStyle].ID == -1) // No Checkpoint record was set on the map
 			{
-				ChatAnnounce.Record(ChatEvent.CpWr, player, $"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["checkpointwr_set",
-					player.Controller.PlayerName, checkpoint, rankedTime]}");
+				ChatAnnounce.Record(ChatEvent.CpWr, player, ChatAnnounce.Msg("checkpointwr_set",
+					player.Controller.PlayerName, checkpoint, rankedTime));
 			}
 			else if (player.Stats.CheckpointPB[checkpoint][pStyle] != null && player.Stats.CheckpointPB[checkpoint][pStyle].ID == -1) // Player first Checkpoint personal best
 			{
 				ChatAnnounce.Pb(ChatEvent.CpPb, player,
-					$"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["checkpointpb_set", checkpoint, rankedTime]}",
-					$"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["checkpointpb_set_others", player.Controller.PlayerName, checkpoint, rankedTime]}");
+					ChatAnnounce.Msg("checkpointpb_set", checkpoint, rankedTime),
+					ChatAnnounce.Msg("checkpointpb_set_others", player.Controller.PlayerName, checkpoint, rankedTime));
 			}
 			else if (player.Stats.CheckpointPB[checkpoint][pStyle] != null && player.Stats.CheckpointPB[checkpoint][pStyle].RunTime > checkpoint_run_time) // Player beating their existing Checkpoint personal best
 			{
 				int timeImprove = player.Stats.CheckpointPB[checkpoint][pStyle].RunTime - checkpoint_run_time;
-				string improved = $"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["checkpointpb_improved",
-					player.Controller.PlayerName, checkpoint, rankedTime, PlayerHud.FormatTime(timeImprove), PlayerHud.FormatTime(player.Stats.CheckpointPB[checkpoint][pStyle].RunTime)]}";
+				var improved = ChatAnnounce.Msg("checkpointpb_improved",
+					player.Controller.PlayerName, checkpoint, rankedTime, PlayerHud.FormatTime(timeImprove), PlayerHud.FormatTime(player.Stats.CheckpointPB[checkpoint][pStyle].RunTime));
 				ChatAnnounce.Pb(ChatEvent.CpPb, player, improved, improved);
 			}
 

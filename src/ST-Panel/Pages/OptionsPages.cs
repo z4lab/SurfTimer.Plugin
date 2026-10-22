@@ -646,6 +646,8 @@ public partial class SurfTimer
 			ctx.Nav("Own messages", $"{own} / {ChatEvents.Length} on", "your runs - and whoever you spectate (players and replay bots)",
 				() => OptionsChatEventsPage(own: true)),
 			ctx.Nav("Others' messages", $"{others} / {ChatEvents.Length} on", "other players' runs", () => OptionsChatEventsPage(own: false)),
+			ctx.Toggle("Compact messages", options.ChatCompact, "short run messages, e.g. \"CP1 WR 11.609 [1/6] -00.046\"",
+				on => options.ChatCompact = on),
 			ctx.Toggle("Connect messages", options.ChatConnects, "players joining", on => options.ChatConnects = on),
 			ctx.Toggle("Saveloc messages", options.ChatSaveloc, "\"Teleported to #N\" when loading a saveloc", on => options.ChatSaveloc = on),
 		};
