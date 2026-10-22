@@ -320,9 +320,36 @@ public partial class SurfTimer
 					StatsService.Flush(playerData, final: true); // Also closes the session
 					playerList.TryRemove(userId, out _);
 				}
+
+				if (!playerList.Values.Any(p => p.Controller.IsValid && !p.Controller.IsBot))
+					OnLastHumanLeft();
 			}
 			return HookResult.Continue;
 		}
 	}
 
+	/// <summary>
+	/// The server is empty and goes to hibernation, which removes the bots and resets the game cvars
+	/// (ResetGameConVarsToDefaults). Start over as on map load: the replay bots go now (the permanent map bot
+	/// comes back once a player plays), server_settings.cfg runs again for the next first player.
+	/// </summary>
+	private void OnLastHumanLeft()
+	{
+		_serverSettingsAppliedForPlayers = false;
+
+		var pool = CurrentMap?.ReplayManager.Pool;
+		if (pool == null || pool.Count == 0)
+			return;
+
+		_logger.LogInformation("[Replay] Server empty - removing {Count} replay bot(s)", pool.Count);
+		for (int i = pool.Count - 1; i >= 0; i--)
+		{
+			var slot = pool[i];
+			if (slot.Controller != null && slot.Controller.IsValid)
+				CurrentMap!.KickReplayBot(i); // Removes the slot too, unless the bot has no user id
+			if (i < pool.Count && pool[i] == slot)
+				pool.RemoveAt(i);
+			slot.Reset(); // After the kick - it clears the controller
+		}
+	}
 }
