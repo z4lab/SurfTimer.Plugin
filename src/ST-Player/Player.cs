@@ -535,16 +535,25 @@ public class Player
 		var recorder = this.ReplayRecorder;
 		recorder.Reset();
 		recorder.Start();
+		if (startZone == ZoneType.StageStart)
+		{
+			recorder.CurrentSituation = ReplayFrameSituation.STAGE_ZONE_ENTER;
+			recorder.StageEnterSituations.Add(recorder.Frames.Count);
+			return;
+		}
 		recorder.CurrentSituation = ReplayFrameSituation.START_ZONE_ENTER;
 		(startZone == ZoneType.BonusStart ? recorder.BonusSituations : recorder.MapSituations).Add(recorder.Frames.Count);
 	}
 
+	/// <summary>
+	/// Back from idle in a start zone: recording starts over with the zone's enter marker - the stage / checkpoint trims
+	/// need it to find the run's start.
+	/// </summary>
 	private void RestartRecordingInStartZone()
 	{
-		if (!this.IsTouchingAnyStartZone)
-			return;
-
-		this.ReplayRecorder.Reset();
-		this.ReplayRecorder.Start();
+		var zone = this.TouchingTriggers.Values.FirstOrDefault(zone =>
+			zone.Type is ZoneType.MapStart or ZoneType.StageStart or ZoneType.BonusStart);
+		if (zone != null)
+			BeginStartZoneRecording(zone.Type);
 	}
 }
