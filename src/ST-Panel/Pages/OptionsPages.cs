@@ -5,13 +5,13 @@ using CounterStrikeSharp.API.Modules.Commands;
 namespace SurfTimer;
 
 /// <summary>
-/// !options - the player's own options, same popup as !surfadmin: visibility, HUD layout, chat messages and
-/// repeat mode. Everything but repeat mode is saved (player_settings).
+/// !options - the player's own options, same popup as !surfadmin: visibility, HUD, compare, chat, gameplay and sound.
+/// All saved (player_settings).
 /// </summary>
 public partial class SurfTimer
 {
-	[ConsoleCommand("css_options", "Your options: visibility, HUD, chat messages, repeat mode.")]
-	[ConsoleCommand("css_settings", "Your options: visibility, HUD, chat messages, repeat mode.")]
+	[ConsoleCommand("css_options", "Your options: visibility, HUD, compare, chat, gameplay, sound.")]
+	[ConsoleCommand("css_settings", "Your options: visibility, HUD, compare, chat, gameplay, sound.")]
 	[CommandHelper(whoCanExecute: CommandUsage.CLIENT_ONLY)]
 	public void OptionsCommand(CCSPlayerController? player, CommandInfo command)
 	{
@@ -28,6 +28,7 @@ public partial class SurfTimer
 	[
 		new("Visibility", null, OptionsVisibilityRoot),
 		new("HUD", null, OptionsHudRoot),
+		new("Compare", null, OptionsCompareRoot),
 		new("Chat", null, OptionsChatRoot),
 		new("Gameplay", null, OptionsGameplayRoot),
 		new("Sound", null, OptionsSoundRoot),
@@ -179,6 +180,7 @@ public partial class SurfTimer
 		return rows;
 	});
 
+	/// <summary>HUD: one page per part of the HUD, each with its position. What it compares against is the Compare tab.</summary>
 	private PanelPage OptionsHudRoot() => new("HUD", ctx =>
 	{
 		var options = ctx.Player.Options;
@@ -188,40 +190,105 @@ public partial class SurfTimer
 			rows.Add(PanelContext.Info("Custom HUD is off", "", "these options apply once the server enables it"));
 
 		string? preset = PlayerOptions.HudPresets.FirstOrDefault(p => p.Fields == options.HudFields).Name;
-		foreach (var (name, fields) in PlayerOptions.HudPresets)
-		{
-			rows.Add(ctx.Act(name, preset == name ? "current" : "", DescribeHud(fields), () =>
-			{
-				options.TrySetHudFields(fields);
-				ctx.Session.Status = $"HUD layout: {name}";
-			}));
-		}
+		rows.Add(ctx.Nav("Bottom HUD", preset ?? "custom", "layout and position", OptionsBottomHudPage));
+		rows.Add(ctx.Nav("Center HUD", options.CenterHud ? $"{options.CenterLines.Sum(l => l.Count)} fields" : "off",
+			"fields around the crosshair", OptionsCenterHudPage));
+		rows.Add(ctx.Nav("Top bar", options.HudTop ? "on" : "off", "rank, PB and WR", OptionsTopBarPage));
+		rows.Add(ctx.Nav("Splits panel", SplitTargetLabel(options.HudSplitTarget), "left side", OptionsSplitsPanelPage));
+		rows.Add(ctx.Nav("Spectator list", options.HudSpectators ? "on" : "off", "right side", OptionsSpectatorsPage));
+		rows.Add(ctx.Nav("Speed", $"{Extensions.SpeedLabel(options.SpeedAxes)} · {SpeedColorLabel(options)}", "axes and color", OptionsSpeedPage));
+		rows.Add(ctx.Nav("Share HUD", "", "your HUD as a code - !hudexport / !hudimport", OptionsShareHudPage));
+		return rows;
+	});
 
+	/// <summary>Bottom HUD: a preset or a custom layout, and its height</summary>
+	private PanelPage OptionsBottomHudPage() => new("Bottom HUD", ctx =>
+	{
+		var options = ctx.Player.Options;
+		string? preset = PlayerOptions.HudPresets.FirstOrDefault(p => p.Fields == options.HudFields).Name;
+		var rows = PlayerOptions.HudPresets.Select(p => ctx.Act(p.Name, preset == p.Name ? "current" : "", DescribeHud(p.Fields), () =>
+		{
+			options.TrySetHudFields(p.Fields);
+			ctx.Session.Status = $"HUD layout: {p.Name}";
+		})).ToList();
 		rows.Add(ctx.Nav("Custom layout", preset ?? "custom", "fields, order and rows", () => OptionsLayoutPage(BottomLayout)));
-		rows.Add(ctx.Act("Speed", Extensions.SpeedLabel(options.SpeedAxes), "XY horizontal · XYZ 3D · Z vertical", () =>
+		rows.Add(HudPositionRow(ctx, CustomHud.Center, "0-10 · 100-300px from the bottom"));
+		return rows;
+	});
+
+	private PanelPage OptionsTopBarPage() => new("Top bar", ctx =>
+	[
+		ctx.Toggle("Top bar", ctx.Player.Options.HudTop, "rank, PB and WR", on => ctx.Player.Options.HudTop = on),
+		HudPositionRow(ctx, CustomHud.Top, "0-10 · 40-240px from the top"),
+	]);
+
+	/// <summary>The splits panel's look - what it compares against is in the Compare tab</summary>
+	private PanelPage OptionsSplitsPanelPage() => new("Splits panel", ctx =>
+	{
+		var options = ctx.Player.Options;
+		var rows = new List<HudMenuItem>
 		{
-			options.SpeedAxes = (SpeedAxes)(((int)options.SpeedAxes + 1) % 3);
-			ctx.Session.Status = options.SpeedAxes switch
+			PanelContext.Info("Compares against", SplitTargetLabel(options.HudSplitTarget), "Compare tab › Splits panel"),
+		};
+		if (options.HudSplits)
+			rows.Add(ctx.Toggle("Keep last splits", options.HudSplitsKeep, "after a fail / reset, until your next run starts",
+				on => options.HudSplitsKeep = on));
+		rows.Add(HudPositionRow(ctx, CustomHud.Left, "0-10 · 200-600px from the top"));
+		return rows;
+	});
+
+	private PanelPage OptionsSpectatorsPage() => new("Spectator list", ctx =>
+	[
+		ctx.Toggle("Spectator list", ctx.Player.Options.HudSpectators, "right side", on => ctx.Player.Options.HudSpectators = on),
+		HudPositionRow(ctx, CustomHud.Right, "0-10 · 200-600px from the top"),
+	]);
+
+	/// <summary>HUD codes (HudPresets.cs): all HUD and Compare settings as a code to share</summary>
+	private PanelPage OptionsShareHudPage() => new("Share HUD", ctx =>
+	[
+		ctx.Act("Export HUD", "", "a code for all your HUD and Compare settings - !hudexport", () =>
+		{
+			ctx.Session.Status = "Making your HUD code…";
+			ExportHud(ctx.Player, ctx.Session);
+		}),
+		ctx.Ask("Import HUD", "", "type a HUD code in chat - !hudimport <code>",
+			LocalizationService.LocalizerNonNull["prompt_hud_code"], text =>
 			{
-				SpeedAxes.XYZ => "Speed shows XYZ (3D)",
-				SpeedAxes.Z => "Speed shows Z (vertical, negative = falling)",
-				_ => "Speed shows XY (horizontal)",
-			};
-		}));
-		rows.Add(ctx.Toggle("Center HUD", options.CenterHud, "fields around the crosshair", on => options.CenterHud = on));
-		rows.Add(ctx.Nav("Center HUD settings", options.CenterHud ? $"{options.CenterLines.Sum(l => l.Count)} fields" : "off",
-			"fields, lines, size, height", OptionsCenterHudPage));
-		rows.Add(ctx.Nav("Ghost & path", GhostLabel(options), "a run's path ahead of you and a ghost racing you", OptionsGhostPage));
-		rows.Add(ctx.Nav("Speed color", SpeedColorLabel(options), "gradient, gain / loss or one color", OptionsSpeedColorPage));
-		rows.Add(ctx.Act("Timer warning", options.TimerWarning == TimerWarning.Wr ? "WR" : "PB", "the timer turns yellow once slower", () =>
+				string? error = ImportHud(ctx.Player, text, ctx.Session);
+				if (error == null)
+					ctx.Session.Status = "Looking up the code…";
+				return error;
+			}),
+	]);
+
+	/// <summary>A HUD part's position: each click one step further down (top / sides) or up (bottom), after the last back to the default</summary>
+	private static HudMenuItem HudPositionRow(PanelContext ctx, string slot, string sub)
+	{
+		var options = ctx.Player.Options;
+		int? own = options.OwnHudPosition(slot);
+		return ctx.Act("Position", own is int shift ? $"{shift}" : $"default ({CustomHud.SlotShift[slot]})", sub, () =>
 		{
-			options.TimerWarning = options.TimerWarning == TimerWarning.Wr ? TimerWarning.Pb : TimerWarning.Wr;
-			ctx.Session.Status = options.TimerWarning == TimerWarning.Wr
-				? "Timer turns yellow once slower than the WR"
-				: "Timer turns yellow once slower than your PB";
-		}));
-		rows.Add(ctx.Toggle("Top bar", options.HudTop, "rank, PB and WR", on => options.HudTop = on));
-		rows.Add(ctx.Nav("Splits panel", SplitTargetLabel(options.HudSplitTarget), "left side - compare against", OptionsSplitTargetPage));
+			int? next = own switch
+			{
+				null => 0,
+				>= CustomHud.MaxShift => null,
+				int value => value + 1,
+			};
+			options.SetHudPosition(slot, next);
+			ctx.Session.Status = next is int n ? $"Position: {n}" : "Position: default";
+		});
+	}
+
+	// ---- Compare ----
+
+	/// <summary>Compare: what the run races against - the splits panel, pace, timer warning and the ghost</summary>
+	private PanelPage OptionsCompareRoot() => new("Compare", ctx =>
+	{
+		var options = ctx.Player.Options;
+		var rows = new List<HudMenuItem>
+		{
+			ctx.Nav("Splits panel", SplitTargetLabel(options.HudSplitTarget), "left side - compare against", OptionsSplitTargetPage),
+		};
 		if (options.HudSplits)
 		{
 			rows.Add(ctx.Toggle("Pace", options.HudPace, "projected finish, live - under the splits", on => options.HudPace = on));
@@ -229,41 +296,14 @@ public partial class SurfTimer
 				rows.Add(ctx.Toggle("Energy vs reference", options.HudPaceEnergy, "energy / speed vs the reference at the same spot",
 					on => options.HudPaceEnergy = on));
 		}
-		if (options.HudSplits)
-			rows.Add(ctx.Toggle("Keep last splits", options.HudSplitsKeep, "after a fail / reset, until your next run starts",
-				on => options.HudSplitsKeep = on));
-		rows.Add(ctx.Toggle("Spectator list", options.HudSpectators, "right side", on => options.HudSpectators = on));
-		// HUD codes (HudPresets.cs): all of this page's settings as a code to share
-		rows.Add(ctx.Act("Export HUD", "", "a code for all your HUD settings - !hudexport", () =>
+		rows.Add(ctx.Act("Timer warning", options.TimerWarning == TimerWarning.Wr ? "WR" : "PB", "the timer turns yellow once slower", () =>
 		{
-			ctx.Session.Status = "Making your HUD code…";
-			ExportHud(ctx.Player, ctx.Session);
+			options.TimerWarning = options.TimerWarning == TimerWarning.Wr ? TimerWarning.Pb : TimerWarning.Wr;
+			ctx.Session.Status = options.TimerWarning == TimerWarning.Wr
+				? "Timer turns yellow once slower than the WR"
+				: "Timer turns yellow once slower than your PB";
 		}));
-		rows.Add(ctx.Ask("Import HUD", "", "type a HUD code in chat - !hudimport <code>",
-			LocalizationService.LocalizerNonNull["prompt_hud_code"], text =>
-			{
-				string? error = ImportHud(ctx.Player, text, ctx.Session);
-				if (error == null)
-					ctx.Session.Status = "Looking up the code…";
-				return error;
-			}));
-
-		// Positions: each click one step further down (top / sides) or up (bottom), after the last back to the default
-		foreach (var (slot, label, sub) in HudPositionRows)
-		{
-			int? own = options.OwnHudPosition(slot);
-			rows.Add(ctx.Act(label, own is int shift ? $"{shift}" : $"default ({CustomHud.SlotShift[slot]})", sub, () =>
-			{
-				int? next = own switch
-				{
-					null => 0,
-					>= CustomHud.MaxShift => null,
-					int value => value + 1,
-				};
-				options.SetHudPosition(slot, next);
-				ctx.Session.Status = next is int n ? $"{label}: {n}" : $"{label}: default";
-			}));
-		}
+		rows.Add(ctx.Nav("Ghost & path", GhostLabel(options), "a run's path ahead of you and a ghost racing you", OptionsGhostPage));
 		return rows;
 	});
 
@@ -316,12 +356,25 @@ public partial class SurfTimer
 		return rows;
 	});
 
-	/// <summary>Speed color of the HUD's speed, prespeed and center speed: Nord gradient, gain / loss, or one Nord color</summary>
-	private PanelPage OptionsSpeedColorPage() => new("Speed color", ctx =>
+	/// <summary>
+	/// Speed: its axes, and the color of the HUD's speed, prespeed and center speed: Nord gradient, gain / loss, or one
+	/// Nord color
+	/// </summary>
+	private PanelPage OptionsSpeedPage() => new("Speed", ctx =>
 	{
 		var options = ctx.Player.Options;
 		var rows = new List<HudMenuItem>
 		{
+			ctx.Act("Axes", Extensions.SpeedLabel(options.SpeedAxes), "XY horizontal · XYZ 3D · Z vertical", () =>
+			{
+				options.SpeedAxes = (SpeedAxes)(((int)options.SpeedAxes + 1) % 3);
+				ctx.Session.Status = options.SpeedAxes switch
+				{
+					SpeedAxes.XYZ => "Speed shows XYZ (3D)",
+					SpeedAxes.Z => "Speed shows Z (vertical, negative = falling)",
+					_ => "Speed shows XY (horizontal)",
+				};
+			}),
 			ctx.Act("Gradient", options.SpeedColor == SpeedColorMode.Gradient ? "current" : "", "slow blue to fast red", () =>
 			{
 				options.SpeedColor = SpeedColorMode.Gradient;
@@ -347,14 +400,6 @@ public partial class SurfTimer
 		}
 		return rows;
 	});
-
-	private static readonly (string Slot, string Label, string Sub)[] HudPositionRows =
-	[
-		(CustomHud.Top, "Top position", "0-10 · 40-240px from the top"),
-		(CustomHud.Center, "Bottom position", "0-10 · 100-300px from the bottom"),
-		(CustomHud.Left, "Splits position", "0-10 · 200-600px from the top"),
-		(CustomHud.Right, "Spectators position", "0-10 · 200-600px from the top"),
-	];
 
 	// ---- Ghost & path ----
 

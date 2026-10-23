@@ -14,7 +14,7 @@ public class PlayerHud
 	private readonly string TimerColor = "#88C0D0";
 	private readonly string TimerColorPractice = "#B48EAD";
 	private readonly string TimerColorActive = "#A3BE8C";
-	/// <summary>Running, but already slower than the PB (or WR - !options - HUD - Timer warning)</summary>
+	/// <summary>Running, but already slower than the PB (or WR - !options - Compare - Timer warning)</summary>
 	private readonly string TimerColorMissed = "#EBCB8B";
 	private readonly string RankColorPb = "#81A1C1";
 	private readonly string RankColorWr = "#EBCB8B";
@@ -725,7 +725,7 @@ public class PlayerHud
 		}
 	}
 
-	// ---- Speed colour (!options - HUD - Speed color) ----
+	// ---- Speed colour (!options - HUD - Speed) ----
 
 	private string _speedClass = "nc-snow";
 	private string _centerSpeedClass = "nc-snow";
@@ -888,7 +888,7 @@ public class PlayerHud
 		SendClass(CustomHud.MidId, "hidden", !any);
 	}
 
-	// ---- Live pace and energy (!options - HUD - Pace, Energy field) ----
+	// ---- Live pace and energy (!options - Compare - Pace, Energy field) ----
 
 	private readonly PaceTracker _pace = new();
 	private float? _lastEnergy;
@@ -1241,7 +1241,7 @@ public class PlayerHud
 		return rows;
 	}
 
-	// The splits panel as last shown during a map run, and whose run it was (!options - Keep last splits)
+	// The splits panel as last shown during a map run, and whose run it was (!options - HUD - Splits panel - Keep last splits)
 	private List<List<HudElement>>? _keptSplitRows;
 	private Player? _keptSplitSubject;
 

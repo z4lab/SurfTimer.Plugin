@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging;
 namespace SurfTimer;
 
 /// <summary>
-/// HUD codes (hud_presets): every HUD option of a player as an 8 character code - !hudexport / !options - HUD - Export
+/// HUD codes (hud_presets): every HUD option of a player as an 8 character code - !hudexport / !options - HUD - Share HUD - Export
 /// gives yours, !hudimport &lt;code&gt; takes someone's. Codes stay forever; the same setup always gets the same code.
 /// </summary>
 internal static class HudPresets

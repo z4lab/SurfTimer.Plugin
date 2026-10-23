@@ -11,7 +11,7 @@ internal enum SpeedAxes
 	Z,
 }
 
-/// <summary>How speeds are coloured in the HUD (!options - HUD - Speed color)</summary>
+/// <summary>How speeds are coloured in the HUD (!options - HUD - Speed)</summary>
 internal enum SpeedColorMode
 {
 	/// <summary>Nord gradient: slow cool blue to fast red</summary>
@@ -22,14 +22,14 @@ internal enum SpeedColorMode
 	Static,
 }
 
-/// <summary>What the running timer turns yellow at once it's slower (!options - HUD)</summary>
+/// <summary>What the running timer turns yellow at once it's slower (!options - Compare)</summary>
 internal enum TimerWarning
 {
 	Pb,
 	Wr,
 }
 
-/// <summary>The run the ghost path / orb follow (!options - HUD - Ghost &amp; path)</summary>
+/// <summary>The run the ghost path / orb follow (!options - Compare - Ghost &amp; path)</summary>
 internal enum GhostTarget
 {
 	/// <summary>The splits panel's target (PB if it's off)</summary>
@@ -89,7 +89,7 @@ internal enum ZoneDisplay
 	All,
 }
 
-/// <summary>What the HUD splits panel compares the run against (!options - HUD)</summary>
+/// <summary>What the HUD splits panel compares the run against (!options - Compare)</summary>
 internal enum SplitTarget
 {
 	Off,
@@ -356,7 +356,7 @@ internal sealed class PlayerOptions
 	private static string CenterOffsetKey(int line) => line == 0 ? KeyCenterSpeedOffset : KeyCenterOffsetPrefix + line;
 
 	/// <summary>
-	/// Every setting of !options - HUD - what a HUD code (HudPresets) carries. Only these are taken from a code.
+	/// Every setting of !options - HUD and Compare - what a HUD code (HudPresets) carries. Only these are taken from a code.
 	/// </summary>
 	internal static readonly IReadOnlyList<string> HudKeys =
 	[

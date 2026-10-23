@@ -6,7 +6,7 @@ using CounterStrikeSharp.API.Modules.Utils;
 namespace SurfTimer;
 
 /// <summary>
-/// Ghost &amp; path (!options - HUD - Ghost &amp; path): a target run (PB, WR, next rank, #10, a group's last rank - the
+/// Ghost &amp; path (!options - Compare - Ghost &amp; path): a target run (PB, WR, next rank, #10, a group's last rank - the
 /// pace's reference runs, ReferenceRuns) drawn only for its player and whoever spectates them:
 /// - the path a few seconds ahead of where they are on it, in beam segments coloured by the target's speed there, with a
 ///   square where it jumped and a triangle where it crouched (down) / stood up (up) - in a start zone from the start;

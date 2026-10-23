@@ -17,7 +17,7 @@ internal sealed record PaceReference(string Key, int TotalTicks, Dictionary<int,
 internal readonly record struct PaceResult(int PaceTicks, int DeltaTicks, bool Live, float? SpeedDiff, float? EnergyDiff);
 
 /// <summary>
-/// Live pace of a run (!options - HUD - Pace): where the runner is on the reference run's path - the replay tick
+/// Live pace of a run (!options - Compare - Pace): where the runner is on the reference run's path - the replay tick
 /// closest to their position, searched around the last match (like shavit's replay time difference) - tells how far
 /// ahead / behind they are right now, and so the projected finish (reference time + that difference). Without a replay:
 /// LiveSplit's "current pace" from the splits. One per viewer's HUD.

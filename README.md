@@ -127,8 +127,8 @@ outputs still pending when you teleport.
 | `!hide` | Options › Visibility › Hide players |
 | `!hidebots` | Options › Visibility › Hide replay bots |
 | `!quake` | Options › Sound › Sounds (all timer sounds on / off) |
-| `!hudexport` | Options › HUD › Export HUD |
-| `!hudimport <code>` | Options › HUD › Import HUD |
+| `!hudexport` | Options › HUD › Share HUD › Export HUD |
+| `!hudimport <code>` | Options › HUD › Share HUD › Import HUD |
 
 </details>
 
@@ -170,6 +170,21 @@ If the server has the custom HUD turned off, a note at the top says so. Your set
 
 The HUD uses the [Nord](https://www.nordtheme.com) colors. Its accent (field borders, side panels, menus) is blue on CT and yellow on T - while spectating, the team of who you watch.
 
+One page per part of the HUD. Each part's **Position** moves it one step per press (0-10). After 10 it goes back to the server's default.
+
+| Option | Default | Description |
+|---|---|---|
+| Bottom HUD › | Default | The timer and speed fields at the bottom: a preset or your own layout, and its position (see below). |
+| Center HUD › | Off | Fields in three lines around the crosshair (custom HUD): by default your speed just above it (see below). |
+| Top bar › | On | Map, tier and stage, then a smaller row with rank, PB and WR. With [SurfTimer.MapChooser](https://github.com/z4lab/SurfTimer.MapChooser), a third row shows the time left, the running vote and the map's end (needs the HUD addon with four top rows). **Position**: default (4), 40-240px from the top. |
+| Splits panel › | | The left-side panel. What it compares against is set in the **Compare** tab. **Keep last splits** (on, only shown when the panel is on): keeps the last run's splits after a fail or reset, until your next run starts. **Position**: default (5), 200-600px from the top. |
+| Spectator list › | On | Right side. **Position**: default (5), 200-600px from the top. |
+| Speed › | XY · Gradient | **Axes**: each press switches **XY** (horizontal) → **XYZ** (3D) → **Z** (vertical, negative = falling). Applies to the HUD speed, prespeed and split speeds. **Color** of the speed and prespeed (the center HUD too, unless it has its own color): **Gradient** (Nord colors, slow blue → fast red), **Gain / loss** (white, green while gaining speed, red while losing), or one Nord color (snow, frost, teal, blue, deep blue, red, orange, yellow, green, purple). |
+| Share HUD › | | **Export HUD** makes a code for **all** your HUD and Compare settings (layouts, center HUD, colors, positions, splits, pace, ghost & path), shown in chat - e.g. `7K2M9QPX`. The same settings always get the same code, and codes stay forever. Same as `!hudexport`. **Import HUD**: type a code in chat, every HUD and Compare setting becomes the code's, settings the code doesn't have go back to their defaults. Same as `!hudimport <code>`. |
+
+<details>
+<summary>HUD › Bottom HUD</summary>
+
 | Option | Default | Description |
 |---|---|---|
 | **Default** preset | ✔ | Timer, Speed \| Prespeed, Keys, Sync |
@@ -177,24 +192,9 @@ The HUD uses the [Nord](https://www.nordtheme.com) colors. Its accent (field bor
 | **Minimal** preset | | Timer, Speed |
 | **Keys first** preset | | Keys, Timer, Speed \| Prespeed, Sync |
 | Custom layout › | | Set each field yourself (see below). |
-| Speed | XY | Each press switches: **XY** (horizontal) → **XYZ** (3D) → **Z** (vertical, negative = falling). Applies to the HUD speed, prespeed and split speeds. |
-| Center HUD | Off | Fields in three lines around the crosshair (custom HUD): by default your speed just above it. |
-| Center HUD settings › | | See below. |
-| Ghost & path › | Off | A run's path ahead of you and a ghost racing you - see below. |
-| Speed color › | Gradient | How the speed and prespeed are colored (the center HUD too, unless it has its own color): **Gradient** (Nord colors, slow blue → fast red), **Gain / loss** (white, green while gaining speed, red while losing), or one Nord color (snow, frost, teal, blue, deep blue, red, orange, yellow, green, purple). |
-| Timer warning | PB | The running timer is green, and turns yellow once your run is slower than your **PB** of it (map, stage or bonus) - or the **WR**. Practice runs stay purple. |
-| Top bar | On | Map, tier and stage, then a smaller row with rank, PB and WR. With [SurfTimer.MapChooser](https://github.com/z4lab/SurfTimer.MapChooser), a third row shows the time left, the running vote and the map's end (needs the HUD addon with four top rows). |
-| Splits panel › | PB | Left-side panel that compares your run against a target (see below). |
-| Keep last splits | On | *Only shown when the splits panel is on.* Keeps the last run's splits after a fail or reset, until your next run starts. |
-| Pace | Off | *Only shown when the splits panel is on.* Under the splits: your projected finish time, live, and how far ahead (green) or behind (red) you are - against the splits panel's target (in stage / bonus mode: that stage's / bonus's PB, or its WR for any other target). It matches your position on the target run's replay every update, so it moves while you surf, not only at checkpoints. Without a replay it's worked out from the splits (shown with a `~`). The splits panel shows 4 splits instead of 6 then. |
-| Energy vs reference | Off | *Only shown with Pace on.* Under the pace: your energy and speed compared to the target run at the same spot (+ green / − red). |
-| Spectator list | On | Right side. |
-| Export HUD | | Makes a code for **all** your HUD settings (everything on this page: layouts, center HUD, colors, positions, splits, pace, ghost & path), shown in chat - e.g. `7K2M9QPX`. The same settings always get the same code, and codes stay forever. Same as `!hudexport`. |
-| Import HUD | | Type a code in chat: every HUD setting becomes the code's, settings the code doesn't have go back to their defaults. Same as `!hudimport <code>`. |
-| Top position | default (4) | Each press moves the top bar one step down (0-10, 40-240px from the top). After 10 it goes back to the server's default. |
-| Bottom position | default (3) | Same for the bottom HUD (timer, speed): 0-10, 100-300px from the bottom. |
-| Splits position | default (5) | Same for the splits panel on the left: 0-10, 200-600px from the top. |
-| Spectators position | default (5) | Same for the spectator list on the right: 0-10, 200-600px from the top. |
+| Position | default (3) | 100-300px from the bottom. |
+
+</details>
 
 <details>
 <summary>HUD fields</summary>
@@ -203,13 +203,13 @@ Every field below can go into the bottom HUD and the center HUD:
 
 | Field | Shows |
 |---|---|
-| Timer | Run time. Green running, yellow once slower than your PB / WR (Timer warning), purple in practice. |
+| Timer | Run time. Green running, yellow once slower than your PB / WR (Compare › Timer warning), purple in practice. |
 | Segment time | Time in the current stage / checkpoint. |
 | Speed / Prespeed | On your speed axes. Prespeed: live in a start zone, then the speed you left it with. |
 | Keys | W A S D, jump (J), crouch (C). The center shows held keys, `_` for released ones. |
 | Sync / Segment sync | Strafe sync of the run / of the current stage or checkpoint. |
 | Energy | See below. |
-| Pace / Pace delta | Projected finish and how far ahead (green) or behind (red), against the splits panel's target (see Pace above). |
+| Pace / Pace delta | Projected finish and how far ahead (green) or behind (red), against the splits panel's target (see Compare › Pace). |
 | Energy vs ref / Speed vs ref | Your energy / speed compared to the target run at the same spot. |
 | Last split | Your last checkpoint / stage and its difference to the splits panel's target. |
 | Stage / CP | Stage 3/7, CP 4/12 or Bonus 2. |
@@ -222,7 +222,7 @@ A field without a value (no PB yet, no target run, spectating a replay) shows N/
 </details>
 
 <details>
-<summary>HUD › Custom layout</summary>
+<summary>HUD › Bottom HUD › Custom layout</summary>
 
 The bottom HUD has up to **2 rows** of **4 slots** each. The **Timer takes 2 slots**. Each field can be used once.
 
@@ -237,25 +237,7 @@ For each field:
 </details>
 
 <details>
-<summary>HUD › Ghost & path</summary>
-
-Only you and the players spectating you see these.
-
-| Row | Description |
-|---|---|
-| Path | The path of the run you follow, the next few seconds of it ahead of where you are on it, colored by its speed there (Nord gradient, slow blue → fast red). In a start zone it shows the start of the run, so you can preview the route. Shown in runs and practice. |
-| Jump & crouch markers | On the path: a flat **square** where the run jumped, a **triangle pointing down** where it crouched and **pointing up** where it stood up again. |
-| Path length | 2 / 4 / 6 / 8 seconds of the run ahead of you (default 4). |
-| Ghost | An orb where the run was at your current run time - ahead of you when it was faster. Shown while your timer runs, colored by its speed. |
-| Run › | Which run: the **splits target** (default), your **PB**, the **WR**, the **next rank** (the time one rank above yours), **top 10**, or the last rank of **Group 1 – 5**. In stage / bonus mode: that stage's / bonus's PB (Personal best) or WR (anything else). |
-| Following | The run's time - or why there's nothing to show (no such run yet, no replay stored for it). |
-
-Both need the run's stored replay.
-
-</details>
-
-<details>
-<summary>HUD › Center HUD settings</summary>
+<summary>HUD › Center HUD</summary>
 
 Three lines around the crosshair: **line 1** above it, **line 2** at it, **line 3** below it. Each line shows up to **3 fields** in one text (`1234 · 01:23.456`), colored like its first field.
 
@@ -271,9 +253,23 @@ Three lines around the crosshair: **line 1** above it, **line 2** at it, **line 
 Addons can show a message in a line for a few seconds (e.g. a kick notice from Admin.Plugin). The line shows the message instead of its fields, then goes back to them.
 
 </details>
+</details>
 
 <details>
-<summary>HUD › Splits panel</summary>
+<summary><b>Compare</b></summary>
+
+What your run races against.
+
+| Option | Default | Description |
+|---|---|---|
+| Splits panel › | PB | The left-side panel that compares your run against a target (see below). |
+| Pace | Off | *Only shown when the splits panel is on.* Under the splits: your projected finish time, live, and how far ahead (green) or behind (red) you are - against the splits panel's target (in stage / bonus mode: that stage's / bonus's PB, or its WR for any other target). It matches your position on the target run's replay every update, so it moves while you surf, not only at checkpoints. Without a replay it's worked out from the splits (shown with a `~`). The splits panel shows 4 splits instead of 6 then. |
+| Energy vs reference | Off | *Only shown with Pace on.* Under the pace: your energy and speed compared to the target run at the same spot (+ green / − red). |
+| Timer warning | PB | The running timer is green, and turns yellow once your run is slower than your **PB** of it (map, stage or bonus) - or the **WR**. Practice runs stay purple. |
+| Ghost & path › | Off | A run's path ahead of you and a ghost racing you - see below. |
+
+<details>
+<summary>Compare › Splits panel</summary>
 
 What the panel compares your run against:
 - **Off**
@@ -281,6 +277,24 @@ What the panel compares your run against:
 - **World record**
 - **Top 10**: the #10 time, or the time one rank above you
 - **Group 1 – 5**: the points groups of this map. The menu shows each group's rank range. Groups appear once a map has 11 or more completions.
+
+</details>
+
+<details>
+<summary>Compare › Ghost & path</summary>
+
+Only you and the players spectating you see these.
+
+| Row | Description |
+|---|---|
+| Path | The path of the run you follow, the next few seconds of it ahead of where you are on it, colored by its speed there (Nord gradient, slow blue → fast red). In a start zone it shows the start of the run, so you can preview the route. Shown in runs and practice. |
+| Jump & crouch markers | On the path: a flat **square** where the run jumped, a **triangle pointing down** where it crouched and **pointing up** where it stood up again. |
+| Path length | 2 / 4 / 6 / 8 seconds of the run ahead of you (default 4). |
+| Ghost | An orb where the run was at your current run time - ahead of you when it was faster. Shown while your timer runs, colored by its speed. |
+| Run › | Which run: the **splits target** (default), your **PB**, the **WR**, the **next rank** (the time one rank above yours), **top 10**, or the last rank of **Group 1 – 5**. In stage / bonus mode: that stage's / bonus's PB (Personal best) or WR (anything else). |
+| Following | The run's time - or why there's nothing to show (no such run yet, no replay stored for it). |
+
+Both need the run's stored replay.
 
 </details>
 </details>
