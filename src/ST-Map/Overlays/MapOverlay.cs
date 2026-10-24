@@ -61,8 +61,8 @@ internal static class OverlayKinds
 }
 
 /// <summary>
-/// Map triggers and player clips, drawn for the players who turn them on (!options - Visibility - Triggers &amp; clips,
-/// !showtriggers / !showclips): each kind on / off in its own color, per player. CS2 maps have nothing visible to show
+/// Map triggers and player clips, drawn for the admins who turn them on (!options - Visibility - Triggers &amp; clips,
+/// !showtriggers / !showclips - anyone with an admin panel section): each kind on / off in its own color, per player. CS2 maps have nothing visible to show
 /// for either (trigger models carry only physics, clips are part of the world collision), so their edges are drawn
 /// with beams: triggers as their rotated bounds (from the entities), clips from the map's world physics read from its
 /// VPK in the background (ClipGeometry.cs). Only edges within overlay_draw_distance of a viewer get a beam - one per
@@ -113,7 +113,7 @@ public partial class SurfTimer
 	private void TickMapOverlay()
 	{
 		var viewers = CurrentMap == null ? [] : playerList.Values
-			.Where(p => p.Controller.IsValid && !p.Controller.IsBot && p.Options.AnyOverlay).ToList();
+			.Where(p => p.Controller.IsValid && !p.Controller.IsBot && p.Options.AnyOverlay && AdminPermissions.CanOpen(p.Controller)).ToList();
 		if (viewers.Count == 0)
 		{
 			if (_overlayBeams.Count > 0)

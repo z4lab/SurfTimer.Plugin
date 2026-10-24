@@ -41,8 +41,8 @@ public partial class SurfTimer
 		var player = ctx.Player;
 		var options = player.Options;
 		int overlays = OverlayKinds.All.Count(options.OverlayOn);
-		return
-		[
+		var rows = new List<HudMenuItem>
+		{
 			ctx.Toggle("Hide own legs", options.HideLegs, "first person only - others still see you", on =>
 			{
 				options.HideLegs = on;
@@ -70,9 +70,12 @@ public partial class SurfTimer
 				options.ZonesShow = (ZoneDisplay)(((int)options.ZonesShow + 1) % 3);
 				ctx.Session.Status = options.ZonesShow == ZoneDisplay.Off ? "Zones hidden" : "Zones shown";
 			}),
-			ctx.Nav("Triggers & clips", overlays > 0 ? $"{overlays} / {OverlayKinds.All.Length} on" : "off",
-				"map triggers and player clips - !showtriggers / !showclips", OptionsOverlayPage),
-		];
+		};
+		// Admins only (anyone with an admin panel section) - nobody else sees the row
+		if (AdminPermissions.CanOpen(player.Controller))
+			rows.Add(ctx.Nav("Triggers & clips", overlays > 0 ? $"{overlays} / {OverlayKinds.All.Length} on" : "off",
+				"map triggers and player clips - admins only · !showtriggers / !showclips", OptionsOverlayPage));
+		return rows;
 	});
 
 	// ---- Triggers & clips ----

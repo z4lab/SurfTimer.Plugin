@@ -98,9 +98,11 @@ public partial class SurfTimer
 		Add(HelpGroup.Options, "hidebots", "hide replay bots on / off");
 		Add(HelpGroup.Options, "hideself", "hide your own legs on / off");
 		Add(HelpGroup.Options, "showtriggers", "draw the map's triggers on / off", aliases: ["triggers"],
-			detail: "Teleport, push, multiple, hurt and other triggers near you, drawn as outlines. Each kind on / off and its color: Options › Visibility › Triggers & clips.");
+			detail: "Teleport, push, multiple, hurt and other triggers near you, drawn as outlines. Each kind on / off and its color: Options › Visibility › Triggers & clips. Admins only.",
+			visible: AdminPermissions.CanOpen);
 		Add(HelpGroup.Options, "showclips", "draw the map's player clips on / off", aliases: ["clips"],
-			detail: "The map's invisible walls near you, drawn as outlines. Color: Options › Visibility › Triggers & clips › Player clips.");
+			detail: "The map's invisible walls near you, drawn as outlines. Color: Options › Visibility › Triggers & clips › Player clips. Admins only.",
+			visible: AdminPermissions.CanOpen);
 		Add(HelpGroup.Options, "quake", "all timer sounds on / off");
 		Add(HelpGroup.Options, "hudexport", "a code for all your HUD settings",
 			detail: "Every !options - HUD and Compare setting as an 8 character code. Others take it with !hudimport <code>. Codes stay forever.");

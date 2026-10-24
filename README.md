@@ -126,8 +126,8 @@ outputs still pending when you teleport.
 | `!hideself` | Options › Visibility › Hide own legs |
 | `!hide` | Options › Visibility › Hide players |
 | `!hidebots` | Options › Visibility › Hide replay bots |
-| `!showtriggers` / `!triggers` | Options › Visibility › Triggers & clips: every trigger kind on, or all off if any is on |
-| `!showclips` / `!clips` | Options › Visibility › Triggers & clips › Player clips › Show |
+| `!showtriggers` / `!triggers` | Options › Visibility › Triggers & clips: every trigger kind on, or all off if any is on. *Admins only.* |
+| `!showclips` / `!clips` | Options › Visibility › Triggers & clips › Player clips › Show. *Admins only.* |
 | `!quake` | Options › Sound › Sounds (all timer sounds on / off) |
 | `!hudexport` | Options › HUD › Share HUD › Export HUD |
 | `!hudimport <code>` | Options › HUD › Share HUD › Import HUD |
@@ -148,7 +148,7 @@ Everything here is saved to your profile. The menu reopens on the tab and page w
 | Hide replay bots | Off | Hides replay bots for you only. The bot you spectate stays visible. |
 | Trails › | | Opens the trail settings below. |
 | Show zones | Off | Zone outlines. Each press switches: **off → start & end → all** (all includes checkpoints and special zones). |
-| Triggers & clips › | Off | Opens the trigger and player clip settings below. |
+| Triggers & clips › | Off | *Only shown to **admins** (anyone with an admin panel section).* Opens the trigger and player clip settings below. |
 
 <details>
 <summary>Visibility › Trails</summary>
@@ -168,7 +168,7 @@ Everything here is saved to your profile. The menu reopens on the tab and page w
 <details>
 <summary>Visibility › Triggers & clips</summary>
 
-The map's triggers and player clips near you, drawn as outlines for you only. CS2 maps have nothing visible for either, so the edges are drawn with beams: triggers as their (rotated) bounds, player clips from the map's collision. Only edges within the server's draw distance (Admin › Server › Timer settings › Triggers & clips distance, 2000 units by default) are drawn, at most the nearest 1000.
+*Admins only* (anyone with an admin panel section): nobody else sees this page or can use `!showtriggers` / `!showclips`, and saved settings of a player who loses admin aren't drawn. The map's triggers and player clips near you, drawn as outlines for you only. CS2 maps have nothing visible for either, so the edges are drawn with beams: triggers as their (rotated) bounds, player clips from the map's collision. Only edges within the server's draw distance (Admin › Server › Timer settings › Triggers & clips distance, 2000 units by default) are drawn, at most the nearest 1000.
 
 | Option | Default | Description |
 |---|---|---|

@@ -288,7 +288,7 @@ public partial class SurfTimer
 	[CommandHelper(whoCanExecute: CommandUsage.CLIENT_ONLY)]
 	public void PlayerToggleTriggers(CCSPlayerController? player, CommandInfo command)
 	{
-		if (player == null || !playerList.TryGetValue(player.UserId ?? 0, out var oPlayer))
+		if (player == null || !playerList.TryGetValue(player.UserId ?? 0, out var oPlayer) || !CanUseOverlay(player))
 			return;
 
 		// Any kind on: all off, else all on
@@ -303,12 +303,21 @@ public partial class SurfTimer
 	[CommandHelper(whoCanExecute: CommandUsage.CLIENT_ONLY)]
 	public void PlayerToggleClips(CCSPlayerController? player, CommandInfo command)
 	{
-		if (player == null || !playerList.TryGetValue(player.UserId ?? 0, out var oPlayer))
+		if (player == null || !playerList.TryGetValue(player.UserId ?? 0, out var oPlayer) || !CanUseOverlay(player))
 			return;
 
 		bool on = !oPlayer.Options.OverlayOn(OverlayKind.Clip);
 		oPlayer.Options.SetOverlayOn(OverlayKind.Clip, on);
 		PrintOptionChanged(player, on ? "showclips_on" : "showclips_off");
+	}
+
+	/// <summary>Triggers &amp; clips are for admins (anyone with an admin panel section) - everyone else is told so</summary>
+	private static bool CanUseOverlay(CCSPlayerController player)
+	{
+		if (AdminPermissions.CanOpen(player))
+			return true;
+		player.PrintToChat($"{Config.PluginPrefix} {LocalizationService.LocalizerNonNull["overlay_admin_only"]}");
+		return false;
 	}
 
 	[ConsoleCommand("css_repeat", "Toggle repeat mode - sends you back to the start of each stage you finish")]

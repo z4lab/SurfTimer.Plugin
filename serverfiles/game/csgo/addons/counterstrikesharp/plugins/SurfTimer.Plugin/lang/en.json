@@ -116,6 +116,7 @@
 	"showtriggers_off": "Map triggers are now {red}hidden{default}.",
 	"showclips_on": "Player clips are now {lime}shown{default} for you.",
 	"showclips_off": "Player clips are now {red}hidden{default}.",
+	"overlay_admin_only": "{red}Showing triggers and clips is for admins only.",
 	"options_hint": "{grey}(more in {yellow}!options{grey})",
 	"prespeed_capped": "{grey}Prespeed capped: {red}{0}{grey} → {yellow}{1}{grey} u/s (XY)",
 	"chat_gagged": "{red}You are gagged and can't chat.",
