@@ -1768,7 +1768,7 @@ public class PlayerHud
 		string splitTime = CourseRanks.SplitTime(_player, playerCurrentCheckpoint, _player.Timer.Ticks);
 
 		// The runner and their spectators by their own toggle, others by theirs (!options - Chat)
-		var message = ChatAnnounce.Msg(atStage ? "stage_split_message" : "checkpoint_message",
+		var message = ChatAnnounce.Msg(atStage ? "stage_split_message" : "checkpoint_split_message",
 			atStage ? playerCurrentCheckpoint + 1 : playerCurrentCheckpoint, splitTime, currentSpeed.ToString("0"), strPbDifference, strWrDifference,
 			TimeOnly(strPbDifference), TimeOnly(strWrDifference));
 		ChatAnnounce.Run(ChatEvent.SplitMap, _player, message, ChatAnnounce.About(_player, message));

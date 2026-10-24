@@ -446,14 +446,12 @@ public partial class SurfTimer
 			int checkpoint_run_time = player.Timer.Ticks - player.Stats.ThisRun.RunTime;
 			Sounds.CheckAheadOfPb(player, checkpoint);
 
-			// Print Checkpoint completion message (non-staged maps compare against the standalone
-			// Checkpoint PB/WR records; the rare staged-map-with-checkpoint-zones case falls back to
-			// the generic per-run split message since no standalone Checkpoint records exist there).
+			// The segment vs its own CP PB / WR (non-staged maps only, staged maps have no Checkpoint
+			// records), then the run's split vs the map PB's / WR's split here - like at stage starts.
 			// Printed before the save so it compares against the previous PB.
 			if (SurfTimer.CurrentMap.Stages == 0)
 				player.HUD.DisplayCheckpointSegmentMessage(checkpoint, checkpoint_run_time, velocity);
-			else
-				player.HUD.DisplayCheckpointMessages();
+			player.HUD.DisplayCheckpointMessages();
 
 			// Save Checkpoint segment MapTime during a Map run (non-staged maps only)
 			if (SurfTimer.CurrentMap.Stages == 0 && !failed_checkpoint && !player.Timer.IsPracticeMode)
