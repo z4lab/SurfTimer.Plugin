@@ -141,6 +141,7 @@ public static class Config
 		ResumeExpiryVipDays = Math.Clamp(TimerSettings.GetInt("resume_expiry_vip_days", 7), 0, 365);
 		SavelocLimit = Math.Max(1, TimerSettings.GetInt("saveloc_limit", 10000));
 		GhostOrbTicks = Math.Clamp(TimerSettings.GetInt("ghost_orb_ticks", 1), 1, 16);
+		OverlayDrawDistance = Math.Clamp(TimerSettings.GetInt("overlay_draw_distance", 2000), 250, 8000);
 		WorkshopContentPath = TimerSettings.GetString("workshop_content_path", "").Trim();
 		ClanTagsEnabled = TimerSettings.GetBool("clan_tags_enabled", true);
 		CountryClanTag = TimerSettings.GetBool("country_clan_tag", true);
@@ -181,6 +182,12 @@ public static class Config
 	/// spawns fewer entities.
 	/// </summary>
 	public static int GhostOrbTicks { get; private set; } = Math.Clamp(TimerSettings.GetInt("ghost_orb_ticks", 1), 1, 16);
+
+	/// <summary>
+	/// How far around a player map triggers and player clips are drawn (MapOverlay.cs), in units (250-8000). About a
+	/// second ahead at surf speed - further only adds beams nobody looks at.
+	/// </summary>
+	public static int OverlayDrawDistance { get; private set; } = Math.Clamp(TimerSettings.GetInt("overlay_draw_distance", 2000), 250, 8000);
 
 	public static int IdleThresholdSeconds { get; private set; } = Math.Max(0, TimerSettings.GetInt("idle_threshold_seconds", 60));
 

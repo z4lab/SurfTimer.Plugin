@@ -126,6 +126,8 @@ outputs still pending when you teleport.
 | `!hideself` | Options › Visibility › Hide own legs |
 | `!hide` | Options › Visibility › Hide players |
 | `!hidebots` | Options › Visibility › Hide replay bots |
+| `!showtriggers` / `!triggers` | Options › Visibility › Triggers & clips: every trigger kind on, or all off if any is on |
+| `!showclips` / `!clips` | Options › Visibility › Triggers & clips › Player clips › Show |
 | `!quake` | Options › Sound › Sounds (all timer sounds on / off) |
 | `!hudexport` | Options › HUD › Share HUD › Export HUD |
 | `!hudimport <code>` | Options › HUD › Share HUD › Import HUD |
@@ -146,6 +148,7 @@ Everything here is saved to your profile. The menu reopens on the tab and page w
 | Hide replay bots | Off | Hides replay bots for you only. The bot you spectate stays visible. |
 | Trails › | | Opens the trail settings below. |
 | Show zones | Off | Zone outlines. Each press switches: **off → start & end → all** (all includes checkpoints and special zones). |
+| Triggers & clips › | Off | Opens the trigger and player clip settings below. |
 
 <details>
 <summary>Visibility › Trails</summary>
@@ -159,6 +162,26 @@ Everything here is saved to your profile. The menu reopens on the tab and page w
 | Spectated trail | On | Trail of the player or bot you spectate. |
 | Replay bot trails | On | |
 | My trail color › | group color | *Only for **top 3, VIP and admin**.* Choose **Group color** (your rank or role color), **Rainbow**, a **Hex color** (type `#RRGGBB` in chat) or a color from the palette. |
+
+</details>
+
+<details>
+<summary>Visibility › Triggers & clips</summary>
+
+The map's triggers and player clips near you, drawn as outlines for you only. CS2 maps have nothing visible for either, so the edges are drawn with beams: triggers as their (rotated) bounds, player clips from the map's collision. Only edges within the server's draw distance (Admin › Server › Timer settings › Triggers & clips distance, 2000 units by default) are drawn, at most the nearest 1000.
+
+| Option | Default | Description |
+|---|---|---|
+| Teleport triggers › | Off, purple | `trigger_teleport`: where the map teleports you. |
+| Push triggers › | Off, cyan | `trigger_push`: boosters and push areas. |
+| Multiple triggers › | Off, orange | `trigger_multiple` / `trigger_once`: boosters, gravity and other map logic. Zone triggers (`map_start`, ...) aren't drawn here, **Show zones** shows them. |
+| Hurt triggers › | Off, red | `trigger_hurt`: damage and kill areas. |
+| Other triggers › | Off, white | Every other trigger (sound areas aren't drawn). |
+| Player clips › | Off, pink | The map's invisible walls. Read from the map's files the first time someone turns them on, so they appear after a moment. |
+| All on / All off | | Every kind at once. |
+| Draw distance | (info) | The server's draw distance. |
+
+Each kind opens a page with **Show** (on / off) and its color: **Default color**, a **Hex color** (type `#RRGGBB` in chat) or a color from the palette.
 
 </details>
 </details>
@@ -526,6 +549,7 @@ Info rows: SurfTimer version/commit, players and tickrate, memory.
 | Rank badges | The scoreboard's Premier rating badge shows each player's server points, colored by the game (grey under 5,000, gold from 30,000). Unranked players and replay bots show 0. Needs `FollowCS2ServerGuidelines: false` in CounterStrikeSharp's `core.json` - with it on, the badges stay off (logged once). |
 | Idle threshold | Stops replay recording for idle players (0 = off, max 3600 s). |
 | Ghost orb respawn | Every how many ticks a player's ghost orb (Ghost & path) is spawned again where it moved: 1 is smoothest, higher spawns fewer entities (max 16). Default 1. `ghost_orb_ticks` |
+| Triggers & clips distance | How far around a player map triggers and player clips are drawn (Options › Visibility › Triggers & clips), 250–8000 units. Default 2000, about a second ahead at surf speed. `overlay_draw_distance` |
 | Resume expiry | Days a player's saved run is kept after they leave (0 = never expires, max 365). Default 3. `resume_expiry_days` |
 | Resume expiry (VIP) | The same for VIPs (VIP, admin or root flag from chat_settings.json). Default 7. `resume_expiry_vip_days` |
 | Replay bots max | How many requested bots can run at a time (1–10). |

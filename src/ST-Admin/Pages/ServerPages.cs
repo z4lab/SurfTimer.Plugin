@@ -352,6 +352,8 @@ public partial class SurfTimer
 		rows.Add(ctx.Nav("Ghost orb respawn", Config.GhostOrbTicks == 1 ? "every tick" : $"every {Config.GhostOrbTicks} ticks",
 			"smoother ghost orb (1) or fewer entities",
 			() => AdminNumberSettingPage("Ghost orb respawn", "ghost_orb_ticks", () => Config.GhostOrbTicks, [1], 1, 16, " ticks")));
+		rows.Add(ctx.Nav("Triggers & clips distance", $"{Config.OverlayDrawDistance} u", "how far around a player they are drawn",
+			() => AdminNumberSettingPage("Triggers & clips distance", "overlay_draw_distance", () => Config.OverlayDrawDistance, [250, 1000], 250, 8000, " u")));
 
 		rows.Add(ctx.Nav("Start speed cap", Config.StartSpeedCap <= 0 ? "no cap" : $"{Config.StartSpeedCap} u/s", "default for all maps",
 			() => AdminNumberSettingPage("Start speed cap", "start_speed_cap", () => Config.StartSpeedCap, [10, 50], 0, 10000, " u/s")));

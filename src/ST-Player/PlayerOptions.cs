@@ -89,6 +89,20 @@ internal enum ZoneDisplay
 	All,
 }
 
+/// <summary>What the map overlay draws (!options - Visibility - Triggers &amp; clips, MapOverlay.cs) - each on / off with its own color</summary>
+internal enum OverlayKind
+{
+	Teleport,
+	Push,
+	/// <summary>trigger_multiple / trigger_once (boosters, gravity and other map logic) - not the zone triggers</summary>
+	Multiple,
+	Hurt,
+	/// <summary>Every other trigger_*</summary>
+	Other,
+	/// <summary>Player clips (the map's world collision)</summary>
+	Clip,
+}
+
 /// <summary>What the HUD splits panel compares the run against (!options - Compare)</summary>
 internal enum SplitTarget
 {
@@ -137,6 +151,8 @@ internal sealed class PlayerOptions
 	internal const string KeyTrailsBots = "trails_bots";
 	internal const string KeyTrailColor = "trail_color";
 	internal const string KeyZonesShow = "zones_show";
+	/// <summary>Map overlay per kind: overlay_&lt;kind&gt; on / off, overlay_&lt;kind&gt;_color "#RRGGBB" ("" = the kind's default)</summary>
+	internal const string KeyOverlayPrefix = "overlay_";
 	internal const string KeySpeedAxes = "speed_axes";
 	internal const string KeySoundVolume = "sound_volume";
 	/// <summary>The center HUD (custom HUD middle slots - fields around the crosshair) on / off</summary>
@@ -220,6 +236,8 @@ internal sealed class PlayerOptions
 	private bool _trailMine, _trailsOthers, _trailsOwn, _trailsSpectate, _trailsBots;
 	private string _trailColor = "";
 	private ZoneDisplay _zonesShow = ZoneDisplay.Off;
+	private readonly bool[] _overlayOn = new bool[Enum.GetValues<OverlayKind>().Length];
+	private readonly string[] _overlayColor = new string[Enum.GetValues<OverlayKind>().Length];
 	private NoclipTeleports _noclipTeleports = NoclipTeleports.SetBack;
 	private SpeedAxes _speedAxes = SpeedAxes.XY;
 	private int _soundVolume = DefaultSoundVolume;
@@ -286,6 +304,13 @@ internal sealed class PlayerOptions
 			&& Enum.TryParse(axes, ignoreCase: true, out SpeedAxes parsedAxes) && Enum.IsDefined(parsedAxes) ? parsedAxes : SpeedAxes.XY;
 		_zonesShow = _profile.Settings.TryGetValue(KeyZonesShow, out var zones)
 			&& Enum.TryParse(zones, ignoreCase: true, out ZoneDisplay display) && Enum.IsDefined(display) ? display : ZoneDisplay.Off;
+		foreach (var kind in Enum.GetValues<OverlayKind>())
+		{
+			_overlayOn[(int)kind] = Bool(OverlayKey(kind), false);
+			_overlayColor[(int)kind] = _profile.Settings.TryGetValue(OverlayKey(kind) + "_color", out var overlayColor)
+				&& TrailColors.IsHex(overlayColor) ? overlayColor.ToUpperInvariant() : "";
+		}
+		AnyOverlay = _overlayOn.Contains(true);
 		_noclipTeleports = _profile.Settings.TryGetValue(KeyNoclipTeleports, out var noclip)
 			&& Enum.TryParse(noclip, ignoreCase: true, out NoclipTeleports noclipMode) && Enum.IsDefined(noclipMode) ? noclipMode : NoclipTeleports.SetBack;
 		_trailColor = _profile.Settings.TryGetValue(KeyTrailColor, out var trailColor) && TrailColors.IsValidCustom(trailColor) ? trailColor : "";
@@ -674,6 +699,29 @@ internal sealed class PlayerOptions
 			_profile.SetSetting(KeyZonesShow, value.ToString().ToLowerInvariant());
 		}
 	}
+
+	/// <summary>Any map overlay kind is on - read every refresh (MapOverlay.cs)</summary>
+	internal bool AnyOverlay { get; private set; }
+
+	internal bool OverlayOn(OverlayKind kind) => _overlayOn[(int)kind];
+
+	internal void SetOverlayOn(OverlayKind kind, bool on)
+	{
+		_overlayOn[(int)kind] = on;
+		AnyOverlay = _overlayOn.Contains(true);
+		Save(OverlayKey(kind), on);
+	}
+
+	/// <summary>The player's own color of a kind ("#RRGGBB") - empty = the kind's default</summary>
+	internal string OverlayColor(OverlayKind kind) => _overlayColor[(int)kind];
+
+	internal void SetOverlayColor(OverlayKind kind, string hex)
+	{
+		_overlayColor[(int)kind] = TrailColors.IsHex(hex) ? hex.ToUpperInvariant() : "";
+		_profile.SetSetting(OverlayKey(kind) + "_color", _overlayColor[(int)kind]);
+	}
+
+	private static string OverlayKey(OverlayKind kind) => KeyOverlayPrefix + kind.ToString().ToLowerInvariant();
 
 	// ---- Trails ----
 

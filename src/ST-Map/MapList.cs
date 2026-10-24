@@ -322,23 +322,8 @@ public partial class SurfTimer
 	/// <summary>Whether a nested map VPK holds a compiled map (.vmap_c) - null when it can't be read</summary>
 	private static bool? HoldsCompiledMap(string outerPath, long outerDataStart, VpkEntry entry)
 	{
-		if (entry.Preload > 0 || entry.Length == 0)
-			return null; // Starts in the tree's preload data - not worth reassembling for a check
-
-		string archivePath;
-		long position;
-		if (entry.ArchiveIndex == VpkSameFile)
-		{
-			archivePath = outerPath;
-			position = outerDataStart + entry.Offset;
-		}
-		else
-		{
-			if (!outerPath.EndsWith("_dir.vpk", StringComparison.OrdinalIgnoreCase))
-				return null;
-			archivePath = outerPath[..^"_dir.vpk".Length] + $"_{entry.ArchiveIndex:000}.vpk";
-			position = entry.Offset;
-		}
+		if (EntryLocation(outerPath, outerDataStart, entry) is not (string archivePath, long position))
+			return null;
 
 		try
 		{
@@ -353,6 +338,70 @@ public partial class SurfTimer
 		{
 			return null;
 		}
+	}
+
+	/// <summary>
+	/// Where an entry's data is: in the directory file itself (after its tree) or in a numbered archive part next to a
+	/// _dir.vpk. Null for entries that start in the tree's preload data - not worth reassembling.
+	/// </summary>
+	private static (string Path, long Position)? EntryLocation(string vpkPath, long dataStart, VpkEntry entry)
+	{
+		if (entry.Preload > 0 || entry.Length == 0)
+			return null;
+		if (entry.ArchiveIndex == VpkSameFile)
+			return (vpkPath, dataStart + entry.Offset);
+		if (!vpkPath.EndsWith("_dir.vpk", StringComparison.OrdinalIgnoreCase))
+			return null;
+		return (vpkPath[..^"_dir.vpk".Length] + $"_{entry.ArchiveIndex:000}.vpk", entry.Offset);
+	}
+
+	/// <summary>
+	/// A file of a map's own VPK, e.g. maps/&lt;map&gt;/world_physics.vmdl_c: from its workshop addon (the folders of
+	/// its item, which carry the map as a nested maps/&lt;map&gt;.vpk), else from game/csgo/maps/&lt;map&gt;.vpk. Null when it
+	/// isn't found. Any thread - the paths come from the main thread.
+	/// </summary>
+	internal static byte[]? ReadMapVpkFile(IEnumerable<string> addonFolders, string localVpk, string mapName, string extension,
+		string directory, string file)
+	{
+		foreach (var folder in addonFolders.Where(Directory.Exists))
+		{
+			foreach (var outer in Directory.EnumerateFiles(folder, "*.vpk"))
+			{
+				List<VpkEntry>? entries;
+				long dataStart;
+				using (var stream = new FileStream(outer, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+					entries = ReadVpkTree(stream, out dataStart);
+				var map = entries?.FirstOrDefault(e => e.Extension.Equals("vpk", StringComparison.OrdinalIgnoreCase)
+					&& e.Directory.Equals("maps", StringComparison.OrdinalIgnoreCase)
+					&& e.File.Equals(mapName, StringComparison.OrdinalIgnoreCase));
+				if (map is not { Length: > 0 } nested || EntryLocation(outer, dataStart, nested) is not (string path, long position))
+					continue;
+
+				var bytes = ReadVpkFile(path, position, extension, directory, file);
+				if (bytes != null)
+					return bytes;
+			}
+		}
+		return File.Exists(localVpk) ? ReadVpkFile(localVpk, 0, extension, directory, file) : null;
+	}
+
+	/// <summary>One file of the VPK that starts at position (a whole file, or one nested in an addon's VPK)</summary>
+	private static byte[]? ReadVpkFile(string path, long position, string extension, string directory, string file)
+	{
+		using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+		stream.Seek(position, SeekOrigin.Begin);
+		var entries = ReadVpkTree(stream, out long dataStart);
+		var entry = entries?.FirstOrDefault(e => e.Extension.Equals(extension, StringComparison.OrdinalIgnoreCase)
+			&& e.Directory.Equals(directory, StringComparison.OrdinalIgnoreCase)
+			&& e.File.Equals(file, StringComparison.OrdinalIgnoreCase));
+		// Map VPKs keep their files in themselves - entries in other parts or the preload data aren't read
+		if (entry is not { Length: > 0, Preload: 0, ArchiveIndex: VpkSameFile } found)
+			return null;
+
+		var bytes = new byte[found.Length];
+		stream.Seek(dataStart + found.Offset, SeekOrigin.Begin);
+		stream.ReadExactly(bytes);
+		return bytes;
 	}
 
 	private static string ReadVpkString(BinaryReader reader)

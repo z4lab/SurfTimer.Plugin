@@ -283,6 +283,34 @@ public partial class SurfTimer
 		PrintOptionChanged(player, oPlayer.Options.HideBots ? "hidebots_on" : "hidebots_off");
 	}
 
+	[ConsoleCommand("css_showtriggers", "Toggle drawing the map's triggers (each kind and its color in !options - Visibility)")]
+	[ConsoleCommand("css_triggers", "Toggle drawing the map's triggers (each kind and its color in !options - Visibility)")]
+	[CommandHelper(whoCanExecute: CommandUsage.CLIENT_ONLY)]
+	public void PlayerToggleTriggers(CCSPlayerController? player, CommandInfo command)
+	{
+		if (player == null || !playerList.TryGetValue(player.UserId ?? 0, out var oPlayer))
+			return;
+
+		// Any kind on: all off, else all on
+		bool on = !OverlayKinds.Triggers.Any(oPlayer.Options.OverlayOn);
+		foreach (var kind in OverlayKinds.Triggers)
+			oPlayer.Options.SetOverlayOn(kind, on);
+		PrintOptionChanged(player, on ? "showtriggers_on" : "showtriggers_off");
+	}
+
+	[ConsoleCommand("css_showclips", "Toggle drawing the map's player clips (color in !options - Visibility)")]
+	[ConsoleCommand("css_clips", "Toggle drawing the map's player clips (color in !options - Visibility)")]
+	[CommandHelper(whoCanExecute: CommandUsage.CLIENT_ONLY)]
+	public void PlayerToggleClips(CCSPlayerController? player, CommandInfo command)
+	{
+		if (player == null || !playerList.TryGetValue(player.UserId ?? 0, out var oPlayer))
+			return;
+
+		bool on = !oPlayer.Options.OverlayOn(OverlayKind.Clip);
+		oPlayer.Options.SetOverlayOn(OverlayKind.Clip, on);
+		PrintOptionChanged(player, on ? "showclips_on" : "showclips_off");
+	}
+
 	[ConsoleCommand("css_repeat", "Toggle repeat mode - sends you back to the start of each stage you finish")]
 	[CommandHelper(whoCanExecute: CommandUsage.CLIENT_ONLY)]
 	public void PlayerToggleRepeat(CCSPlayerController? player, CommandInfo command)

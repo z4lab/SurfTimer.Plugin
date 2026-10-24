@@ -168,6 +168,19 @@ public partial class SurfTimer
 			}
 		}
 
+		// Map triggers and player clips near players who turned them on (MapOverlay.cs)
+		if (Server.TickCount % OverlayRefreshTicks == 0)
+		{
+			try
+			{
+				TickMapOverlay();
+			}
+			catch (Exception ex)
+			{
+				LogTickError(ex, "map overlay");
+			}
+		}
+
 		// Bots never carry weapons (round restarts / respawns hand out the default loadout) - Weapons.cs
 		if (Server.TickCount % 16 == 0)
 		{

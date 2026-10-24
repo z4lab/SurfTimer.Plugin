@@ -42,7 +42,7 @@ public partial class SurfTimer : BasePlugin
 
 	// Metadata
 	public override string ModuleName => $"z4lab/{Config.PluginName}";
-	public override string ModuleVersion => "1.4.3";
+	public override string ModuleVersion => "1.4.4";
 	public override string ModuleDescription => Config.PluginName;
 	public override string ModuleAuthor => "z4lab";
 
@@ -139,6 +139,7 @@ public partial class SurfTimer : BasePlugin
 		ForgetGhosts();
 		_zoneEditor = null; // The editor's draft goes with the map (unsaved changes are lost)
 		ForgetZoneOutlines();
+		ForgetMapOverlay();
 
 		// Clear/reset stuff here
 		ReferenceRuns.Clear(); // The live pace's reference paths belong to the map

@@ -71,13 +71,19 @@ public partial class SurfTimer
 		bool zoneBeams = ZoneBeamsExist;
 		bool ghosts = _ghosts.Count > 0;
 		bool trails = _trails.Count > 0;
-		if (!hidePawns && !trails && !zoneBeams && !ghosts)
+		bool overlay = OverlayBeamsExist;
+		if (!hidePawns && !trails && !zoneBeams && !ghosts && !overlay)
 			return;
 
 		foreach ((CCheckTransmitInfo info, CCSPlayerController? viewer) in infoList)
 		{
 			if (viewer == null || !viewer.IsValid || viewer.IsBot)
 				continue;
+
+			// Map triggers / clips only for the viewers who turned them on, each its own (see MapOverlay.cs)
+			if (overlay)
+				FilterOverlayTransmit(info, viewer);
+
 			if (!playerList.TryGetValue(viewer.UserId ?? 0, out var player))
 			{
 				// Still loading: no trail / ghost beams yet - once its options are known it gets the ones it wants

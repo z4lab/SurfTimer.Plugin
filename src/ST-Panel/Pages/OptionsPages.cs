@@ -40,6 +40,7 @@ public partial class SurfTimer
 	{
 		var player = ctx.Player;
 		var options = player.Options;
+		int overlays = OverlayKinds.All.Count(options.OverlayOn);
 		return
 		[
 			ctx.Toggle("Hide own legs", options.HideLegs, "first person only - others still see you", on =>
@@ -69,7 +70,66 @@ public partial class SurfTimer
 				options.ZonesShow = (ZoneDisplay)(((int)options.ZonesShow + 1) % 3);
 				ctx.Session.Status = options.ZonesShow == ZoneDisplay.Off ? "Zones hidden" : "Zones shown";
 			}),
+			ctx.Nav("Triggers & clips", overlays > 0 ? $"{overlays} / {OverlayKinds.All.Length} on" : "off",
+				"map triggers and player clips - !showtriggers / !showclips", OptionsOverlayPage),
 		];
+	});
+
+	// ---- Triggers & clips ----
+
+	/// <summary>Triggers &amp; clips (MapOverlay.cs): every kind with whether it's shown and its color</summary>
+	private PanelPage OptionsOverlayPage() => new("Triggers & clips", ctx =>
+	{
+		var options = ctx.Player.Options;
+		var rows = OverlayKinds.All.Select(kind => ctx.Nav(OverlayKinds.Label(kind),
+			options.OverlayOn(kind) ? $"on · {TrailColors.Describe(OverlayKinds.ColorOf(options, kind))}" : "off",
+			OverlayKinds.Sub(kind), () => OptionsOverlayKindPage(kind))).ToList();
+
+		void All(bool on)
+		{
+			foreach (var kind in OverlayKinds.All)
+				options.SetOverlayOn(kind, on);
+			ctx.Session.Status = on ? "All shown" : "All hidden";
+		}
+		rows.Add(ctx.Act("All on", "", "", () => All(true)));
+		rows.Add(ctx.Act("All off", "", "", () => All(false)));
+		rows.Add(PanelContext.Info("Draw distance", $"{Config.OverlayDrawDistance} units", "around you - set by the server"));
+		return rows;
+	});
+
+	/// <summary>One kind: shown or not, and its color - the default, a palette color or any hex color</summary>
+	private PanelPage OptionsOverlayKindPage(OverlayKind kind) => new(OverlayKinds.Label(kind), ctx =>
+	{
+		var options = ctx.Player.Options;
+		string label = OverlayKinds.Label(kind);
+		string own = options.OverlayColor(kind);
+
+		void Pick(string hex, string name)
+		{
+			options.SetOverlayColor(kind, hex);
+			ctx.Session.Status = $"{label}: {name}";
+		}
+
+		var rows = new List<HudMenuItem>
+		{
+			ctx.Toggle("Show", options.OverlayOn(kind), OverlayKinds.Sub(kind), on =>
+			{
+				options.SetOverlayOn(kind, on);
+				ctx.Session.Status = on ? $"{label} shown" : $"{label} hidden";
+			}),
+			ctx.Act("Default color", own.Length == 0 ? "current" : "", TrailColors.Describe(OverlayKinds.DefaultColor(kind)), () => Pick("", "default color")),
+			ctx.Ask("Hex color", TrailColors.Describe(own).StartsWith('#') ? own : "", "e.g. #FF8800",
+				"Type a color in chat as #RRGGBB, e.g. #FF8800", text =>
+				{
+					if (!TrailColors.IsHex(text))
+						return "A color like #FF8800 (# and 6 hex digits)";
+					Pick(text.ToUpperInvariant(), text.ToUpperInvariant());
+					return null;
+				}),
+		};
+		rows.AddRange(TrailColors.Palette.Select(c => ctx.Act(c.Name, own.Equals(c.Hex, StringComparison.OrdinalIgnoreCase) ? "current" : "", c.Hex,
+			() => Pick(c.Hex, c.Name))));
+		return rows;
 	});
 
 	// ---- Trails ----

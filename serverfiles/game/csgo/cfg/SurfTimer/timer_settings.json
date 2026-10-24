@@ -16,6 +16,7 @@
 	"replay_permanent_map_bot": false,
 	"idle_threshold_seconds": 60,
 	"ghost_orb_ticks": 1,
+	"overlay_draw_distance": 2000,
 	"resume_expiry_days": 3,
 	"resume_expiry_vip_days": 7,
 	"clan_tags_enabled": true,

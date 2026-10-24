@@ -23,6 +23,9 @@
 		<PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
 		<!-- Add Dapper, to ensure Dapper.dll is included in the output -->
 		<PackageReference Include="Dapper" Version="2.1.79" />
+		<!-- Reads the map's world physics for the player clip overlay (ClipGeometry.cs) - only its physics part is used,
+		     so its texture / export dependencies (SkiaSharp, glTF, ...) aren't shipped -->
+		<PackageReference Include="ValveResourceFormat" Version="20.1.7467" />
 	</ItemGroup>
 
 	<!-- Public API for addons - deployed to shared/SurfTimer.Api/ (build.ps1), never next to the plugin: a copy here
@@ -59,7 +62,13 @@
 					  $(OutDir)Dapper.dll;
 					  $(OutDir)MaxMind.Db.dll;
 					  $(OutDir)MaxMind.GeoIP2.dll;
-					  $(OutDir)MySqlConnector.dll" />
+					  $(OutDir)MySqlConnector.dll;
+					  $(OutDir)ValveResourceFormat.dll;
+					  $(OutDir)ValveKeyValue.dll;
+					  $(OutDir)ValvePak.dll;
+					  $(OutDir)K4os.Compression.LZ4.dll;
+					  $(OutDir)ZstdSharp.dll;
+					  $(OutDir)System.IO.Hashing.dll" />
 			<AllDlls Include="$(OutDir)*.dll" />
 			<ToDelete Include="@(AllDlls)" Exclude="@(Keep)" />
 		</ItemGroup>
@@ -76,8 +85,15 @@
 					  $(PublishDir)Dapper.dll;
 					  $(PublishDir)MaxMind.Db.dll;
 					  $(PublishDir)MaxMind.GeoIP2.dll;
-					  $(PublishDir)MySqlConnector.dll" />
-			<PublishAll Include="$(PublishDir)*.dll;$(PublishDir)*.pdb" />
+					  $(PublishDir)MySqlConnector.dll;
+					  $(PublishDir)ValveResourceFormat.dll;
+					  $(PublishDir)ValveKeyValue.dll;
+					  $(PublishDir)ValvePak.dll;
+					  $(PublishDir)K4os.Compression.LZ4.dll;
+					  $(PublishDir)ZstdSharp.dll;
+					  $(PublishDir)System.IO.Hashing.dll" />
+			<!-- *.so / *.dylib: ValveResourceFormat's native texture / shader libraries, never loaded for physics -->
+			<PublishAll Include="$(PublishDir)*.dll;$(PublishDir)*.pdb;$(PublishDir)*.so;$(PublishDir)*.dylib" />
 			<PublishDelete Include="@(PublishAll)" Exclude="@(PublishKeep)" />
 		</ItemGroup>
 
