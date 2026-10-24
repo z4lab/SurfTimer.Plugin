@@ -1650,7 +1650,7 @@ public class PlayerHud
 	/// Displays checkpoints comparison messages in player chat.
 	/// Only calculates if the player has a PB, otherwise it will display N/A
 	/// </summary>
-	/// <param name="atStage">At a stage start of a staged map (stage N start = checkpoint N-1) - labelled with the stage</param>
+	/// <param name="atStage">At a stage start of a staged map (stage N start = checkpoint N-1) - labelled with the finished stage N-1, like the splits panel</param>
 	internal void DisplayCheckpointMessages(bool atStage = false)
 	{
 		int pbTime;
@@ -1769,7 +1769,7 @@ public class PlayerHud
 
 		// The runner and their spectators by their own toggle, others by theirs (!options - Chat)
 		var message = ChatAnnounce.Msg(atStage ? "stage_split_message" : "checkpoint_split_message",
-			atStage ? playerCurrentCheckpoint + 1 : playerCurrentCheckpoint, splitTime, currentSpeed.ToString("0"), strPbDifference, strWrDifference,
+			playerCurrentCheckpoint, splitTime, currentSpeed.ToString("0"), strPbDifference, strWrDifference,
 			TimeOnly(strPbDifference), TimeOnly(strWrDifference));
 		ChatAnnounce.Run(ChatEvent.SplitMap, _player, message, ChatAnnounce.About(_player, message));
 
