@@ -241,6 +241,12 @@ public class CurrentRun : RunStatsEntity
 			nameof(CurrentRun), player.Profile.Name, stage, stage_run_time, saveLastStage
 		);
 #endif
+		if (stage_run_time <= 0) // No stage takes 0 ticks - a zone handler got the wrong run; never a record
+		{
+			SurfTimer.ServiceProvider.GetRequiredService<ILogger<CurrentRun>>().LogWarning(
+				"[{Class}] Stage {Stage} time of {Ticks} ticks not saved for '{Name}'", nameof(CurrentRun), stage, stage_run_time, player.Profile.Name);
+			return;
+		}
 		int pStyle = player.Timer.Style;
 		string rankedTime = CourseRanks.Time(player, 2, stage, stage_run_time);
 		if (
@@ -318,6 +324,12 @@ public class CurrentRun : RunStatsEntity
 			nameof(CurrentRun), player.Profile.Name, checkpoint, checkpoint_run_time, saveLastCheckpoint
 		);
 #endif
+		if (checkpoint_run_time <= 0) // Same as stages: never a 0 tick segment record
+		{
+			SurfTimer.ServiceProvider.GetRequiredService<ILogger<CurrentRun>>().LogWarning(
+				"[{Class}] Checkpoint {Checkpoint} time of {Ticks} ticks not saved for '{Name}'", nameof(CurrentRun), checkpoint, checkpoint_run_time, player.Profile.Name);
+			return;
+		}
 		int pStyle = player.Timer.Style;
 		string rankedTime = CourseRanks.Time(player, 3, checkpoint, checkpoint_run_time);
 		if (

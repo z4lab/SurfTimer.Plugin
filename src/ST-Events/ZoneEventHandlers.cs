@@ -307,9 +307,14 @@ public partial class SurfTimer
 		if (player.Timer.Stage == stage)
 			failed_stage = true;
 
+		// Stage mode: only the next stage's start finishes the running stage. Landing in another stage start - e.g. a
+		// !rs to the stage start that arrives a frame after the next stage was reached - finishes nothing (it saved the
+		// stopped timer's 0 ticks as the stage before that zone)
+		bool stageModeFinish = player.Timer.IsStageMode && player.Timer.IsRunning && stage > 1 && stage == player.Timer.Stage + 1;
+
 		// Captured before the stage-mode branch below resets the timer
 		bool finishedStageForRepeat = player.IsRepeatMode && stage > 1 && !failed_stage
-			&& player.Timer.IsRunning && !player.Timer.IsBonusMode;
+			&& player.Timer.IsRunning && !player.Timer.IsBonusMode && (!player.Timer.IsStageMode || stageModeFinish);
 		// Sync of the stage just completed, saved with it
 		float segmentSync = player.SegmentSyncPercent;
 
@@ -317,10 +322,10 @@ public partial class SurfTimer
 		// Save a Stage run when `IsStageMode` is active - (`stage - 1` to get the previous stage data)
 		if (player.Timer.IsStageMode)
 		{
-			if (stage > 1 && !failed_stage && player.Timer.IsRunning)
+			if (stageModeFinish)
 				player.CountAttempt(2, (short)(stage - 1), finished: true);
 
-			if (stage > 1 && !failed_stage && !player.Timer.IsPracticeMode)
+			if (stageModeFinish && !player.Timer.IsPracticeMode)
 			{
 				int stage_run_time = player.Timer.Ticks;
 				float entryVelX = player.Timer.StageEntryVelX;
@@ -333,7 +338,7 @@ public partial class SurfTimer
 
 				player.HUD.DisplayStageMessage((short)(stage - 1), stage_run_time, velocity);
 			}
-			else if (stage > 1 && !failed_stage && player.Timer.IsRunning && player.Timer.IsPracticeMode)
+			else if (stageModeFinish && player.Timer.IsPracticeMode)
 			{
 				player.HUD.DisplayStageMessage((short)(stage - 1), player.Timer.Ticks, velocity); // Practice: shown, not saved
 			}
