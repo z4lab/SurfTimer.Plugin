@@ -85,11 +85,13 @@ public partial class SurfTimer
 			int cbq = bot_quota.GetPrimitiveValue<int>();
 			int replaybot_count = CurrentMap.ReplayManager.Pool.Count;
 
-			if (cbq != replaybot_count)
+			// Not while a slot awaits its bot: SpawnReplayBot's queued `bot_quota N-1; bot_add_t` gets there itself, and
+			// raising it first makes the bot manager add a bot of its own on maps with a nav mesh - one too many, so it
+			// kicks one, and the kicked replay bot's freed slot drops the quota and gets the other kicked too
+			if (cbq != replaybot_count && !CurrentMap.ReplayManager.Pool.Any(s => s.Controller == null))
 			{
-				// If a replay bot never joins after this, the server refused it (e.g. the map has no nav mesh)
-				_logger.LogDebug("[{ClassName}] bot_quota {Old} -> {New} (replay pool slots: {Slots}, awaiting a bot: {Awaiting})",
-					nameof(SurfTimer), cbq, replaybot_count, replaybot_count, CurrentMap.ReplayManager.Pool.Count(s => s.Controller == null));
+				_logger.LogDebug("[{ClassName}] bot_quota {Old} -> {New} (replay pool slots: {Slots})",
+					nameof(SurfTimer), cbq, replaybot_count, replaybot_count);
 				bot_quota.SetValue(replaybot_count);
 			}
 		}

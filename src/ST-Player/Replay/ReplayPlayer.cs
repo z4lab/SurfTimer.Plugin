@@ -118,7 +118,7 @@ public class ReplayPlayer
 		this.IsPlayable = false;
 		this.RepeatCount = -1;
 
-		this.Frames.Clear();
+		this.Frames = new List<ReplayFrame>(); // Not Clear() - the list is shared with the WR template (LoadContentFrom)
 
 		this.ResetReplay();
 

@@ -70,9 +70,10 @@ public partial class SurfTimer
 			slot.LoadReplayData(repeat);
 			slot.LastWatchedAt = DateTime.UtcNow; // Grace period for the requester to start watching
 
-			// CS2 kicks bots without a pending spectator team when another player joins (cs2kz-metamod)
-			controller.PendingTeamNum = 1;
+			// CS2 kicks bots without a pending spectator team when another player joins (cs2kz-metamod).
+			// After SwitchTeam, which sets the pending team to its own team
 			controller.SwitchTeam(CsTeam.Terrorist);
+			controller.PendingTeamNum = 1;
 
 			AddTimer(1.5f, () =>
 			{
