@@ -267,6 +267,11 @@ public class CurrentRun : RunStatsEntity
 				ChatAnnounce.Record(ChatEvent.StageWr, player, ChatAnnounce.Msg("stagewr_set",
 					player.Controller.PlayerName, stage, rankedTime));
 			}
+			else if (stage_run_time == SurfTimer.CurrentMap.StageWR[stage][pStyle].RunTime) // Player tied the Stage WR with a PB - the record stays with who set it first
+			{
+				var tied = ChatAnnounce.Msg("stagewr_tied", player.Controller.PlayerName, stage, rankedTime);
+				ChatAnnounce.Pb(ChatEvent.StagePb, player, tied, tied);
+			}
 			else if (player.Stats.StagePB[stage][pStyle] != null && player.Stats.StagePB[stage][pStyle].ID == -1) // Player first Stage personal best
 			{
 				ChatAnnounce.Pb(ChatEvent.StagePb, player,
@@ -349,6 +354,11 @@ public class CurrentRun : RunStatsEntity
 			{
 				ChatAnnounce.Record(ChatEvent.CpWr, player, ChatAnnounce.Msg("checkpointwr_set",
 					player.Controller.PlayerName, checkpoint, rankedTime));
+			}
+			else if (checkpoint_run_time == SurfTimer.CurrentMap.CheckpointWR[checkpoint][pStyle].RunTime) // Player tied the Checkpoint WR with a PB - the record stays with who set it first
+			{
+				var tied = ChatAnnounce.Msg("checkpointwr_tied", player.Controller.PlayerName, checkpoint, rankedTime);
+				ChatAnnounce.Pb(ChatEvent.CpPb, player, tied, tied);
 			}
 			else if (player.Stats.CheckpointPB[checkpoint][pStyle] != null && player.Stats.CheckpointPB[checkpoint][pStyle].ID == -1) // Player first Checkpoint personal best
 			{

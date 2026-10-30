@@ -101,9 +101,9 @@ internal static class ProfileRepository
 		FROM (SELECT 1) AS one
 		LEFT JOIN `{p}player_stats` ps ON ps.`player_id` = @PlayerId AND ps.`style_id` = @Style";
 
-	// Rank = strictly faster times + 1 (ties share a rank) - a range scan on the leaderboard index
+	// Rank = distinct strictly faster times + 1 (ties share a rank: 1, 1, 2) - a range scan on the leaderboard index
 	private const string RankOf = @"
-		(SELECT COUNT(*) FROM `{p}times` o
+		(SELECT COUNT(DISTINCT o.`run_time_ticks`) FROM `{p}times` o
 			WHERE o.`course_id` = mine.`course_id` AND o.`style_id` = mine.`style_id` AND o.`hidden` = 0
 				AND o.`run_time_ticks` < mine.`run_time_ticks`) + 1";
 

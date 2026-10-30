@@ -108,6 +108,13 @@ public partial class SurfTimer
 				saveMapTime = true;
 				ChatAnnounce.Record(ChatEvent.MapWr, player, ChatAnnounce.Msg("mapwr_set", player.Controller.PlayerName, rankedTime));
 			}
+			else if (player.Timer.Ticks == CurrentMap.WR[pStyle].RunTime
+				&& (player.Stats.PB[pStyle].RunTime <= 0 || player.Timer.Ticks < player.Stats.PB[pStyle].RunTime)) // Player tied the Map WR with a PB - the record stays with who set it first
+			{
+				saveMapTime = true;
+				var tied = ChatAnnounce.Msg("mapwr_tied", player.Controller.PlayerName, rankedTime);
+				ChatAnnounce.Pb(ChatEvent.MapPb, player, tied, tied);
+			}
 			else if (player.Stats.PB[pStyle].RunTime <= 0) // Player first ever PersonalBest for the map
 			{
 				saveMapTime = true;
@@ -557,6 +564,12 @@ public partial class SurfTimer
 		{
 			saveBonusTime = true;
 			BonusMessage(ChatEvent.BonusWr, player, ChatAnnounce.Msg("bonuswr_set", player.Controller.PlayerName, bonus_idx, rankedTime), null);
+		}
+		else if (player.Timer.Ticks == CurrentMap.BonusWR[bonus_idx][pStyle].RunTime
+			&& (player.Stats.BonusPB[bonus_idx][pStyle].RunTime <= 0 || player.Timer.Ticks < player.Stats.BonusPB[bonus_idx][pStyle].RunTime)) // Player tied the Bonus WR with a PB - the record stays with who set it first
+		{
+			saveBonusTime = true;
+			BonusMessage(ChatEvent.BonusPb, player, ChatAnnounce.Msg("bonuswr_tied", player.Controller.PlayerName, bonus_idx, rankedTime), null);
 		}
 		else if (player.Stats.BonusPB[bonus_idx][pStyle].RunTime <= 0) // Player first ever PersonalBest for the bonus
 		{

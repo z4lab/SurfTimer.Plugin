@@ -1,8 +1,9 @@
 namespace SurfTimer;
 
 /// <summary>
-/// times (PBs), time_splits, run_history, course_stats and replays. Ranks are "count of strictly
-/// faster visible times + 1" - a range scan on the (course_id, style_id, hidden, run_time_ticks) index.
+/// times (PBs), time_splits, run_history, course_stats and replays. Ranks are "count of distinct strictly
+/// faster visible times + 1" (ties share a rank, the next one isn't pushed down: 1, 1, 2) - a range scan on the
+/// (course_id, style_id, hidden, run_time_ticks) index. Among tied times the one set first is listed first.
 /// Hidden times (timer-banned players) are kept but left out of ranks, WRs and completions.
 /// </summary>
 internal static class TimeRepository
@@ -84,7 +85,7 @@ internal static class TimeRepository
 			t.`start_velocity_x` AS StartVelX, t.`start_velocity_y` AS StartVelY, t.`start_velocity_z` AS StartVelZ,
 			t.`end_velocity_x` AS EndVelX, t.`end_velocity_y` AS EndVelY, t.`end_velocity_z` AS EndVelZ,
 			t.`replay_id`, t.`updated_at`, t.`hidden`, p.`name` AS PlayerName,
-			(SELECT COUNT(*) FROM `{p}times` x
+			(SELECT COUNT(DISTINCT x.`run_time_ticks`) FROM `{p}times` x
 				WHERE x.`course_id` = t.`course_id` AND x.`style_id` = t.`style_id` AND x.`hidden` = 0
 					AND x.`run_time_ticks` < t.`run_time_ticks`) + 1 AS `Rank`,
 			COALESCE(cs.`completions`, 0) AS TotalCount
@@ -281,15 +282,19 @@ internal static class TimeRepository
 	}
 
 	/// <summary>
-	/// The visible time at a leaderboard position (1 = WR) of a course - null when there are fewer times.
+	/// The visible time at a leaderboard rank (1 = WR) of a course, the first one set when tied - null when there
+	/// are fewer ranks.
 	/// </summary>
 	internal static Task<RankedTimeRow?> GetTimeAtRankAsync(int courseId, int style, int rank) =>
 		SurfTimer.DB.QueryFirstOrDefaultAsync<RankedTimeRow>(@"
 			SELECT t.`id`, p.`name` AS PlayerName, t.`run_time_ticks` AS RunTime, t.`replay_id` AS ReplayId
 			FROM `{p}times` t JOIN `{p}players` p ON p.`id` = t.`player_id`
 			WHERE t.`course_id` = @CourseId AND t.`style_id` = @Style AND t.`hidden` = 0
-			ORDER BY t.`run_time_ticks`, t.`updated_at`
-			LIMIT 1 OFFSET @Offset",
+				AND t.`run_time_ticks` = (SELECT DISTINCT d.`run_time_ticks` FROM `{p}times` d
+					WHERE d.`course_id` = @CourseId AND d.`style_id` = @Style AND d.`hidden` = 0
+					ORDER BY d.`run_time_ticks` LIMIT 1 OFFSET @Offset)
+			ORDER BY t.`updated_at`
+			LIMIT 1",
 			new { CourseId = courseId, Style = style, Offset = Math.Max(0, rank - 1) });
 
 	/// <summary>
@@ -369,7 +374,7 @@ internal static class TimeRepository
 	internal static Task<List<BoardRow>> GetLeaderboardAsync(int courseId, int style, int offset, int limit) =>
 		SurfTimer.DB.QueryAsync<BoardRow>(@"
 			SELECT t.`id`, t.`player_id`, p.`name` AS PlayerName, t.`run_time_ticks` AS RunTime, t.`updated_at`, t.`replay_id`,
-				RANK() OVER (ORDER BY t.`run_time_ticks`) AS `Rank`
+				DENSE_RANK() OVER (ORDER BY t.`run_time_ticks`) AS `Rank`
 			FROM `{p}times` t JOIN `{p}players` p ON p.`id` = t.`player_id`
 			WHERE t.`course_id` = @CourseId AND t.`style_id` = @Style AND t.`hidden` = 0
 			ORDER BY t.`run_time_ticks`, t.`updated_at`

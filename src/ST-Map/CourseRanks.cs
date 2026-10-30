@@ -6,7 +6,8 @@ namespace SurfTimer;
 /// Every visible PB time of the map's courses (map, stages, bonuses, checkpoint segments) and the splits of every map
 /// PB, in memory - so finish and split messages show "[rank/finishers]" right away, before the run is saved. Loaded
 /// with the map's records (map start and after every saved time) and updated the moment a PB is announced.
-/// Ranks are like the leaderboard's: 1 + the other players' faster times (ties share a rank). Main thread only.
+/// Ranks are like the leaderboard's: 1 + the other players' distinct faster times (ties share a rank: 1, 1, 2).
+/// Main thread only.
 /// </summary>
 internal sealed class CourseRanks
 {
@@ -27,14 +28,24 @@ internal sealed class CourseRanks
 		/// <summary>The rank a time of this player has (their own time left out) and the finishers with it counted</summary>
 		internal (int Rank, int Total) RankOf(int playerId, int ticks)
 		{
-			int faster = LowerBound(ticks);
 			bool own = _byPlayer.TryGetValue(playerId, out int ownTicks);
-			if (own && ownTicks < ticks)
-				faster--;
-			return (faster + 1, _sorted.Count + (own ? 0 : 1));
+			bool skipOwn = own;
+			int rank = 1, last = -1;
+			for (int i = 0, faster = LowerBound(ticks); i < faster; i++)
+			{
+				int t = _sorted[i];
+				if (skipOwn && t == ownTicks)
+					skipOwn = false;
+				else if (t != last)
+				{
+					rank++;
+					last = t;
+				}
+			}
+			return (rank, _sorted.Count + (own ? 0 : 1));
 		}
 
-		/// <summary>How many times are faster than ticks</summary>
+		/// <summary>How many times are faster than ticks (ties counted each)</summary>
 		private int LowerBound(int ticks)
 		{
 			int low = 0, high = _sorted.Count;
